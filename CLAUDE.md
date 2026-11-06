@@ -18,7 +18,7 @@ Responder a una pregunta: **¿el flujo óptico sobre la región periocular, con 
 - HTML + JavaScript (ES modules) con **Vite**. Sin framework, salvo que haya una razón clara. Antes de empezar, si puedes acceder al repo del hub (`physiodevapp/physiq`) o a otros satélites, revisa sus convenciones y sigue las mismas.
 - **MediaPipe Face Landmarker** (`@mediapipe/tasks-vision`) para localizar la cara y las regiones de interés.
 - **OpenCV.js** para el flujo óptico denso (Farnebäck), ejecutado en un **Web Worker**.
-- Despliegue en **GitHub Pages** mediante GitHub Actions, con rutas relativas (`base` de Vite configurada para el subpath del repo).
+- Despliegue en **Cloudflare Workers con archivos estáticos** (Workers Builds conectado al repo, como en `dualkinema`): `main` → producción y cada rama → URL de previsualización. Rutas relativas (`base: './'` en Vite) para que la misma build sirva también en un subdirectorio cuando la copie el hub.
 - El modelo `.task` y los archivos WASM se **sirven desde el propio repo**, no desde un CDN, para que funcione sin red una vez cargado.
 
 ## Pipeline
@@ -116,13 +116,13 @@ Secuencia con instrucciones en pantalla y duración configurable:
 4. Un cabeceo suave sin contracción periocular **no** genera eventos, gracias a la compensación.
 5. El JSON exportado valida contra el esquema documentado.
 6. Cargada en un iframe con `?host=physiq`, emite `ready` y `result` y aplica la configuración recibida.
-7. El despliegue en GitHub Pages funciona por HTTPS desde el móvil.
+7. El despliegue en Cloudflare funciona por HTTPS desde el móvil, en producción y en las previsualizaciones por rama.
 
 ## Forma de trabajar
 
 Trabaja por fases y **detente al final de cada una** para que el autor la pruebe en el móvil:
 
-1. **Base**: esqueleto Vite, despliegue en Pages, cámara con selector y visualización de fps y resolución reales.
+1. **Base**: esqueleto Vite, despliegue en Cloudflare, cámara con selector y visualización de fps y resolución reales.
 2. **Landmarks**: Face Landmarker, ROI dibujadas por lado, corrección de espejo y su test.
 3. **EAR y parpadeos**: métricas y curvas en tiempo real.
 4. **Flujo óptico**: worker con OpenCV.js, compensación de la cabeza y energía residual por ROI.
@@ -131,3 +131,18 @@ Trabaja por fases y **detente al final de cada una** para que el autor la pruebe
 7. **Exportación e integración**: JSON y CSV, esquema documentado, modo alojado y API `postMessage`.
 
 Mantén un `README.md` con instrucciones de uso clínico (encuadre, distancia, iluminación) y un `CHANGELOG.md`.
+
+## Despliegue (Cloudflare)
+
+- Configuración en `wrangler.jsonc` (nombre `orbicula`, `assets.directory: ./dist`, bloque `previews: {}`, que `wrangler preview` exige aunque vaya vacío). En Workers Builds: build `npm run build`; despliegue `npx wrangler deploy`; previsualización `npx wrangler preview`; *Enable Preview Builds* activado; direcciones públicas activadas en *Domains → Worker URL* (Production y Preview).
+- Previsualización de cada rama: `https://<rama>-orbicula.<subdominio>.workers.dev` (rama en minúsculas, lo que no sea letra o número cambiado por `-`). **Indica siempre esta URL al terminar una fase.**
+- El pie muestra versión, rama y commit (`WORKERS_CI_BRANCH`, `WORKERS_CI_COMMIT_SHA`) para comprobar que la previsualización abierta es la última.
+- Cabeceras en `public/_headers`: la CSP (`connect-src 'self'`, sin orígenes externos) hace cumplir el requisito de privacidad. Al añadir MediaPipe/OpenCV (WASM), añadir `'wasm-unsafe-eval'` a `script-src`, no abrir orígenes externos.
+- GitHub Actions (`.github/workflows/ci.yml`) pasa tests y build en cada PR y en `main`.
+- Desde el entorno en la nube de Claude Code, `*.workers.dev` puede no ser accesible: la comprobación en el móvil la hace el autor.
+
+## Convenciones de Git (las mismas que en los demás repos del autor)
+
+- Todo cambio en una rama (`feat/…`, `fix/…` o la que asigne una sesión de Claude Code) y se fusiona mediante PR. Nunca push directo a `main`.
+- Formato de commit: `git commit -m "título corto en imperativo" -m "descripción si hace falta"` (título de ~72 caracteres como máximo).
+- Sin `Co-Authored-By` en los commits.

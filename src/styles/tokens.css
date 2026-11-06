@@ -1,0 +1,131 @@
+/*
+ * Tokens visuales de orbicula: único sitio donde se definen colores, tipografías,
+ * espaciados y radios. El hub (PhysiQ) puede sobrescribirlos.
+ *
+ * Tema oscuro por defecto (el del ecosistema). El claro se aplica si el sistema lo
+ * pide y no se ha forzado el oscuro, o si se fuerza con data-theme="light".
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* Superficies */
+  --bg: #0a0d12;
+  --surface: #111620;
+  --surface2: #171e2e;
+  --surface3: #1e2740;
+  --border: #232d45;
+  --border2: #2d3a58;
+  --header-bg: rgba(10, 13, 18, 0.92);
+  --stage-bg: #000;
+
+  /* Superposición sobre el vídeo (igual en ambos temas: va sobre la imagen) */
+  --overlay-bg: rgba(0, 0, 0, 0.6);
+  --overlay-border: rgba(255, 255, 255, 0.12);
+  --overlay-text: #e8edf5;
+  --overlay-ok: #38d9a9;
+  --overlay-warn: #ff9f43;
+  --overlay-bad: #ff6b6b;
+
+  /* Texto */
+  --text: #e8edf5;
+  --text2: #8fa0bf;
+  --text3: #5a6e8a;
+  --on-accent: #0a0d12;
+
+  /* Acentos y estados */
+  --accent: #5ec8d8;
+  --accent-soft: rgba(94, 200, 216, 0.12);
+  --accent-line: rgba(94, 200, 216, 0.35);
+  --ok: #38d9a9;
+  --ok-soft: rgba(56, 217, 169, 0.1);
+  --warn: #ff9f43;
+  --warn-soft: rgba(255, 159, 67, 0.1);
+  --danger: #ff6b6b;
+  --danger-soft: rgba(255, 107, 107, 0.1);
+
+  /* Lado del paciente (curvas, ROI) */
+  --side-left: #4f9cf9;
+  --side-right: #f783ac;
+
+  /* Tipografía */
+  --font-ui: 'Outfit', system-ui, sans-serif;
+  --font-mono: 'DM Mono', ui-monospace, monospace;
+  --font-display: 'DM Serif Display', Georgia, serif;
+  --fs-xs: 0.6875rem;
+  --fs-sm: 0.8125rem;
+  --fs-md: 0.9375rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.5rem;
+
+  /* Espaciado */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+
+  /* Radios */
+  --radius-sm: 6px;
+  --radius: 12px;
+  --radius-pill: 999px;
+
+  /* Layout */
+  --header-h: 56px;
+  --content-max: 640px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    color-scheme: light;
+    --bg: #f5f7fb;
+    --surface: #ffffff;
+    --surface2: #eef1f7;
+    --surface3: #e3e8f2;
+    --border: #d9dfeb;
+    --border2: #c4ccdc;
+    --header-bg: rgba(245, 247, 251, 0.92);
+    --text: #121826;
+    --text2: #4a5875;
+    --text3: #7a879f;
+    --on-accent: #ffffff;
+    --accent: #0f8a9c;
+    --accent-soft: rgba(15, 138, 156, 0.1);
+    --accent-line: rgba(15, 138, 156, 0.35);
+    --ok: #0f9d74;
+    --ok-soft: rgba(15, 157, 116, 0.1);
+    --warn: #c56a0c;
+    --warn-soft: rgba(197, 106, 12, 0.1);
+    --danger: #d63c3c;
+    --danger-soft: rgba(214, 60, 60, 0.1);
+    --side-left: #2a6fd1;
+    --side-right: #c9407a;
+  }
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface2: #eef1f7;
+  --surface3: #e3e8f2;
+  --border: #d9dfeb;
+  --border2: #c4ccdc;
+  --header-bg: rgba(245, 247, 251, 0.92);
+  --text: #121826;
+  --text2: #4a5875;
+  --text3: #7a879f;
+  --on-accent: #ffffff;
+  --accent: #0f8a9c;
+  --accent-soft: rgba(15, 138, 156, 0.1);
+  --accent-line: rgba(15, 138, 156, 0.35);
+  --ok: #0f9d74;
+  --ok-soft: rgba(15, 157, 116, 0.1);
+  --warn: #c56a0c;
+  --warn-soft: rgba(197, 106, 12, 0.1);
+  --danger: #d63c3c;
+  --danger-soft: rgba(214, 60, 60, 0.1);
+  --side-left: #2a6fd1;
+  --side-right: #c9407a;
+}
