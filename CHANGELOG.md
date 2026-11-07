@@ -29,8 +29,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - **El cierre por flujo se congela durante los parpadeos.** Mientras algún ojo está cerrado más de la mitad según el EAR, no se integra. Así un parpadeo no deja el cierre desplazado ni da falsos eventos en los 2 s siguientes. El JSON guarda en `flow.frozen` los pares congelados.
 - **La subida del cierre necesita 2,1 s de historia:** sin ella no hay eventos al empezar.
 - **Repetición sobre los cuatro JSON de la fase 4:** contracciones mínimas detectadas por ojo, 17/19 y 16/19, con 3/17 y 4/17 falsas alarmas (dos de ellas, movimientos reales). Ningún evento en el cabeceo y el giro. Detalle en `docs/plan-fase-5.md`.
-- `replay-events.mjs` recalcula el cierre congelado en los JSON antiguos y acepta `--fix paso:rep=act|control`.
-- 17 tests nuevos.
+- `replay-events.mjs` recalcula el cierre congelado en los JSON antiguos. Acepta `--fix paso:rep=act|control` y `--events`.
+- **Duración mínima de 0,5 s:** una contracción más corta queda como «breve» (`status: "brief"`) y no cuenta. Con los cinco JSON (la fase 4 y la prueba de la 5a de las 19:57):
+  - contracciones mínimas detectadas, 25/29 en el ojo izquierdo y 26/29 en el derecho;
+  - **0/26 falsas alarmas** en los controles;
+  - 0 eventos en el reposo, el parpadeo espontáneo, el cabeceo y el giro.
+- Los eventos que empiezan en la cuenta atrás no se guardan en el paso.
+- 18 tests nuevos.
 
 ### Añadido (fase 4b: medida del flujo por ROI)
 - **Flujo por ROI y por lado del paciente** (párpado superior e inferior, ceja y canto externo). El worker devuelve, por ROI, 14 sumas de su campo de flujo («momentos», `src/flow/metrics.js`); con ellas el hilo principal calcula el flujo medio y la energía residual frente a cualquier movimiento afín de la cabeza, sin volver a recorrer los píxeles.

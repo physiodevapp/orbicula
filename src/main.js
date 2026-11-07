@@ -336,7 +336,7 @@ function logBlink(side, e) {
 }
 
 const DET_KIND = { contraction: 'contracción', brow: 'ceja (exp.)', canthus: 'canto (exp.)' };
-const DET_STATUS = { head: ' · descartada: cabeza', blink: ' · era un parpadeo' };
+const DET_STATUS = { head: ' · descartada: cabeza', blink: ' · era un parpadeo', brief: ' · breve, no cuenta' };
 /** Eventos de la fase 5: al asistente, a la lista y a las curvas. Los parpadeos ya los anota logBlink. */
 function onDetections(list) {
   for (const e of list) {

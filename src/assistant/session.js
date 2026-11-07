@@ -276,6 +276,7 @@ export class GuidedSession {
   recordDetection(e) {
     if (!['running', 'review'].includes(this.state) || this.cur?.t0 == null) return;
     const c = this.cur;
+    if (e.tStart < c.t0) return; // empezó en la cuenta atrás (o en el paso anterior)
     c.detections.push({ kind: e.kind, side: e.side, t: Math.round(e.tStart - c.t0), duration: e.duration, peak: e.peak, tPeak: Math.round(e.tPeak - c.t0), status: e.status });
   }
 

@@ -150,19 +150,42 @@ Comando: `node scripts/dev/replay-events.mjs informe.json`. Para las 18:38, con 
 
 **Umbral.** Un margen sobre el máximo del reposo no ayuda. Con ×1,25 se perdían casi todas las contracciones de las 18:38: poca luz, reposo ruidoso y un umbral el doble de alto. Se queda en el **máximo del reposo**, como se aprobó. El suelo (0,001 DI) no actúa en ningún JSON real: los umbrales van de 0,020 a 0,057 DI.
 
-**Resultados** (umbral = máximo del reposo, cierre congelado en los parpadeos):
+**Primera prueba en el móvil con la 5a** (19:57, commit 57e261c, trasera, controles):
+- La app en directo y la repetición coinciden.
+- 10/10 contracciones en cada ojo, pero **3/9 falsas alarmas por ojo**.
+- Casi todas las falsas alarmas coinciden con un parpadeo incompleto (20–45 %) y son **breves**.
 
-| Prueba | Contracciones detectadas | Falsas alarmas |
+**Duración mínima.** Juntando los cinco JSON, para cada repetición se toma la contracción más larga:
+
+| | Duración |
+|---|---|
+| Contracciones mantenidas (80 repeticiones-ojo) | 600–1800 ms, salvo dos (272 y 393 ms) |
+| Falsas alarmas en los controles (13) | 140–400 ms |
+| Eventos en reposos y parpadeo espontáneo | 80–470 ms |
+
+Por eso una contracción de **menos de 0,5 s queda como `brief`** («breve»). Se guarda, pero no cuenta (`minDurationMs`).
+
+**Resultados finales del 5a** (umbral = máximo del reposo, cierre congelado en los parpadeos, duración ≥ 0,5 s):
+
+| Prueba | Ojo izquierdo | Ojo derecho |
 |---|---|---|
-| Con controles, 18:38 + 19:14 | I 17/19 · D 16/19 | I 3/17 · D 4/17 |
-| Contracción mínima, 17:47 | 3/4 en los dos ojos | — |
-| Contracción mínima, 18:55 | 5/5 en los dos ojos | — |
-| Cabeceo y giro, 17:47 y 18:55 | — | **0 eventos** (criterio 4) |
+| Con controles: contracciones detectadas | **25/29** | **26/29** |
+| Con controles: falsas alarmas | **0/26** | **0/26** |
 
-- Las dos pruebas con controles excluyen las repeticiones con un parpadeo de verdad.
-- De las falsas alarmas, dos son movimientos reales ya identificados en la fase 4: el control 4 de las 18:38, con un cierre parcial del 23 %, y el control 2 de las 19:14. Quedan sin explicar el control 7 de las 18:38, al borde de la ventana, y el 6 de las 19:14, en el ojo derecho, que supera el umbral solo 1,06 veces.
-- **Reposos y parpadeo espontáneo:** quedan 0–1 eventos por paso. Son cortos y apenas pasan el umbral (1,0–1,1 veces). La contracción mínima más débil lo pasó 1,57 veces.
-- **Ceja y canto** (experimentales): demasiados eventos (decenas por paso con contracciones o parpadeos). No se muestran en el resumen hasta revisarlos en el 5c.
+| Prueba | Contracciones | Falsas alarmas |
+|---|---|---|
+| Contracción mínima, 17:47 | 3/4 | — |
+| Contracción mínima, 18:55 | 5/5 | — |
+| Cabeceo y giro | — | 0 eventos |
+| Reposos y parpadeo espontáneo | — | 0 eventos |
+
+- Las pruebas con controles son las de las 18:38, 19:14 y 19:57. Se excluyen las repeticiones con un parpadeo de verdad.
+- Contracciones detectadas por prueba: 18:38, 7/10 y 8/10; 19:14, 8/9 y 8/9; 19:57, 10/10 y 10/10.
+- Las contracciones perdidas son cortas, de la prueba con poca luz (18:38).
+- Los dos controles con movimiento real de la fase 4 eran breves y ya no cuentan.
+- Referencia del EAR en la fase 4: 6/13 y 10/13.
+- **Límite:** un solo sujeto. Un parpadeo incompleto o una sacudida de menos de 0,5 s no cuentan como contracción, pero quedan registrados como «breve». Para las mioquimias (5c), esos eventos breves pueden ser justo lo que interesa.
+- **Ceja y canto** (experimentales): demasiados eventos, decenas por paso con contracciones o parpadeos. No salen en el resumen hasta revisarlos en el 5c.
 
 ## Pruebas
 - **Tests unitarios:**

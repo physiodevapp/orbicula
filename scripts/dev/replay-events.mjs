@@ -20,6 +20,10 @@ for (let i = argv.indexOf('--fix'); i >= 0; i = argv.indexOf('--fix')) {
   if (id) fixes[`${id}:${rep}`] = cond;
   argv.splice(i, 2);
 }
+// --events: además, una línea JSON por contracción válida (para estudiar duración y pico).
+const dumpEvents = argv.includes('--events');
+if (dumpEvents) argv.splice(argv.indexOf('--events'), 1);
+const NULL_STEPS = ['check', 'rest', 'rest-end', 'natural', 'nod', 'turn'];
 const [file, optJson] = argv;
 if (!file) {
   console.error('Uso: node scripts/dev/replay-events.mjs informe.json [opciones JSON]');
@@ -120,10 +124,18 @@ for (const step of steps) {
   const [cl, cr] = count('contraction', 'ok');
   const [hl, hr] = count('contraction', 'head');
   const [bl, br] = count('contraction', 'blink');
+  const [sl, sr] = count('contraction', 'brief');
   const [wl, wr] = count('brow', 'ok');
   const [kl, kr] = count('canthus', 'ok');
-  console.log(`\n${step.id}: contracciones I ${cl} · D ${cr} (descartadas por la cabeza ${hl}+${hr}, eran parpadeos ${bl}+${br}) · ceja ${wl}+${wr} · canto ${kl}+${kr}`);
+  console.log(`\n${step.id}: contracciones I ${cl} · D ${cr} (descartadas por la cabeza ${hl}+${hr}, eran parpadeos ${bl}+${br}, breves ${sl}+${sr}) · ceja ${wl}+${wr} · canto ${kl}+${kr}`);
   const reps = repsOf(step);
+  if (dumpEvents) {
+    for (const e of ev.filter((x) => x.kind === 'contraction' && x.status === 'ok')) {
+      const r = reps.find((x) => e.tEnd >= x.hold && e.tStart <= x.release + 1000);
+      const label = r ? r.cond : NULL_STEPS.includes(step.id) ? 'null' : 'other';
+      console.log(`EV ${JSON.stringify({ step: step.id, side: e.side, label, rep: r?.rep ?? null, duration: e.duration, peak: e.peak })}`);
+    }
+  }
   if (!reps.length) continue;
   const line = reps.map((r) => {
     const hit = SIDES.map((side) => ev.some((e) => e.kind === 'contraction' && e.status === 'ok' && e.side === side && e.tEnd >= r.hold && e.tStart <= r.release + 1000));

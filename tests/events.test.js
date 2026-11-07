@@ -147,6 +147,14 @@ describe('detector de eventos', () => {
     expect(c[0].tEnd).toBeGreaterThan(9400);
   });
 
+  it('una subida de menos de 0,5 s (parpadeo incompleto, sacudida) queda como «breve» y no cuenta', () => {
+    const flick = (t, side) => (side === 'right' && t > 8000 && t < 8250 ? 0.02 : 0);
+    const c = run(new EventDetector(cal), fakeStep(15000, { closure: flick })).filter((e) => e.kind === 'contraction');
+    expect(c).toHaveLength(1);
+    expect(c[0].status).toBe('brief');
+    expect(c[0].duration).toBeLessThan(500);
+  });
+
   it('sin contracción no hay eventos', () => {
     expect(run(new EventDetector(cal), fakeStep(15000))).toHaveLength(0);
   });

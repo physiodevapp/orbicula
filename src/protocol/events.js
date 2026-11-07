@@ -19,6 +19,7 @@ export const EVENT_DEFAULTS = {
   medianMs: 600, // ventana de la mediana de «cómo estaba antes»
   riseMs: 1500, // hasta cuánto antes se busca ese «antes»
   endRatio: 0.5, // un evento acaba cuando la subida baja de esta fracción del umbral
+  minDurationMs: 500, // una contracción más corta es «breve» (parpadeo incompleto, sacudida): no cuenta
   riseMargin: 1, // umbral = margen × máximo de la subida en el reposo válido
   riseFloor: 0.001, // suelo del umbral (DI), provisional hasta repetirlo con los JSON reales: que un reposo muy quieto no dé un umbral ridículo
   headK: 3, // cabeza quieta: velocidad del dorso nasal < headK × su mediana en el reposo…
@@ -198,7 +199,10 @@ export function calibrate(step, options = {}) {
  *   de parpadeos. Ambos devuelven los eventos que quedan cerrados en ese momento.
  * Tipos: 'contraction' (subida del cierre por flujo por encima del umbral), 'blink' / 'closure' (detector
  * del EAR, cierre ≥ 50 %) y, experimentales, 'brow' / 'canthus' (energía por encima del umbral).
- * Estado (`status`): 'ok' (cuenta), 'head' (descartado: cabeza en movimiento) o 'blink' (era un parpadeo).
+ * Estado (`status`): 'ok' (cuenta), 'head' (descartado: cabeza en movimiento), 'blink' (era un parpadeo)
+ * o 'brief' (contracción de menos de minDurationMs: en los JSON de la fase 4 y la 5a, las contracciones
+ * mantenidas duraron 600–1800 ms y las falsas alarmas de los controles y del reposo, 80–470 ms, casi
+ * siempre con un parpadeo incompleto a la vez; se guarda, pero no cuenta).
  * Los tiempos de los eventos van en el reloj de la cámara (ms).
  */
 export class EventDetector {
@@ -299,6 +303,7 @@ export class EventDetector {
       let status = 'ok';
       if (this.moves.some((m) => m >= a.tStart - marginMs && m <= a.tEnd + marginMs)) status = 'head';
       else if (a.kind === 'contraction' && (closing || this.blinks[a.side].some((b) => b.tUp + blinkAfter >= a.tStart && b.tDown - blinkBefore <= a.tEnd))) status = 'blink';
+      else if (a.kind === 'contraction' && a.tEnd - a.tStart < this.opt.minDurationMs) status = 'brief';
       const ev = { ...a, duration: Math.round(a.tEnd - a.tStart), peak: Number(a.peak.toFixed(2)), status };
       this.events.push(ev);
       out.push(ev);

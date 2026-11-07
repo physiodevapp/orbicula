@@ -106,8 +106,9 @@ export function describeSummary(step) {
   }
   const ok = (step.detections ?? []).filter((e) => e.kind === 'contraction' && e.status === 'ok');
   const gated = (step.detections ?? []).filter((e) => e.status === 'head').length;
+  const brief = (step.detections ?? []).filter((e) => e.status === 'brief').length;
   if (step.detections?.length || step.calibration) {
-    lines.push(`Contracciones detectadas: I ${ok.filter((e) => e.side === 'left').length} · D ${ok.filter((e) => e.side === 'right').length}${gated ? ` (${gated} descartadas por mover la cabeza)` : ''}.`);
+    lines.push(`Contracciones detectadas: I ${ok.filter((e) => e.side === 'left').length} · D ${ok.filter((e) => e.side === 'right').length}${gated ? ` (${gated} descartadas por mover la cabeza)` : ''}${brief ? `; ${brief} breves (< 0,5 s), que no cuentan` : ''}.`);
   }
   return lines.join('\n');
 }
