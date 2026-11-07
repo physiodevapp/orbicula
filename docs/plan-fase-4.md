@@ -113,6 +113,22 @@ Trasera «fps» (la cámara dio ~30 fps; poca luz), modo seguido. Análisis: `no
 - **Normalización (DI/s) adecuada:** valores coherentes entre lados y pasos.
 - **Guiños (ojo que no guiña):** en el guiño izquierdo, el EAR dice que el ojo derecho se cierra un 66–86 % (el izquierdo, 79–91 %: la diferencia de ~10 % que vio el autor), mientras que el flujo integrado dice que se mueve la mitad que el que guiña. Apoya en parte que la malla exagera el cierre del otro ojo. En el guiño derecho no es concluyente: integrar el flujo no es fiable con cierres completos (el párpado tapa el ojo y el flujo pierde el seguimiento).
 
+## Paso 4c: segundo análisis (JSON del autor, 2026-11-07, commit ef4c2a5)
+Trasera «fps», modo seguido con voz, contracción mínima más pequeña. Luz de interior escasa y a contraluz (ventana detrás): la cámara volvió a dar ~30 fps y el ruido del flujo sin compensar en reposo subió (párpado superior p95 0,33 DI/s frente a 0,23). Auriculares: si son Bluetooth, añaden latencia a los pitidos (parte de los ~0,8 s de retraso del gesto).
+
+- **Criterio 1: justo.** Análisis de la cara 22–28/s (por debajo de 24 en varios pasos; quizá el móvil caliente tras la prueba anterior o la poca luz). Vigilar; si hace falta, bajar el flujo a 25 pares/s.
+- **Criterio 3: primera evidencia a favor, con el estadístico adecuado.** La energía (velocidad) no discrimina: en reposo los ojos ya tienen movimientos rápidos (sacadas). Lo que funciona es el **desplazamiento integrado**: apertura por flujo = ∫(componente hacia abajo del párpado inferior − del superior) dt, compensada con el dorso nasal. Calibrado frente a ventanas de reposo sin parpadeos (percentil; ≥ 95 = detectado):
+  - contracción mínima, repeticiones 1–3: **flujo 100 en los dos ojos; EAR 60–95** (solo una de seis por encima de 95). Repetición 4: flujo 82–91, EAR 54–68. Repetición 5: ninguno.
+  - primer JSON: flujo 100 en las 5; EAR 86–100.
+  - Limitaciones: pocas repeticiones, ventanas nulas solapadas (57) y sin control de «no hacer nada». Para cerrarlo hace falta una prueba con más repeticiones y **repeticiones de control** (pitido sin gesto), que dé tasas de acierto y de falsos positivos para el EAR y para el flujo.
+- **Criterio 4:** párpados, 0 % sobre el p99 del reposo en cabeceo y giro con el dorso nasal (cumple). Canto y ceja no: en el giro, 47–58 % con el dorso nasal y 30–41 % con la postura; en el cabeceo, el dorso nasal empeora el canto (10–20 % frente a 5 % sin compensar). Las regiones laterales necesitan su propia compensación (afín local con puntos cercanos, o la postura para ellas).
+- **Guiños:** en el guiño izquierdo, ojo que no guiña / ojo que guiña: EAR 0,6 y flujo integrado 0,5. Esta vez se parecen; sigue sin estar claro si la malla exagera. El flujo integrado no es fiable con el ojo cerrado del todo.
+
+## Propuesta para terminar la fase 4
+1. **Apertura por flujo** como métrica de la app (curva y JSON), con corrección de la deriva (integrador con fuga o restar la línea base de los últimos segundos).
+2. **Prueba de contracción mínima con controles**: ~10 contracciones mínimas y ~10 controles en orden aleatorio, con dos pitidos distintos («contrae» / «no hagas nada»); tasas de acierto y falsos positivos del EAR y del flujo.
+3. **Compensación de las regiones laterales** (canto y ceja).
+
 ## Pruebas
 - **Vídeos sintéticos con la respuesta conocida** (ampliar `scripts/dev/make-face-videos.py`): mover solo el párpado 1–2 px (el flujo lo tiene que ver) y, por separado, toda la cara simulando un cabeceo (la compensación lo tiene que anular).
 - **Tests unitarios:** energía, máscaras de ROI en coordenadas de la franja, recolocación de la franja, signos con espejo y el ajuste del movimiento rígido.

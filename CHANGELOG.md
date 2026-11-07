@@ -23,6 +23,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - `scripts/dev/analyze-flow.mjs`: análisis del JSON del asistente de la fase 4 (criterios 3 y 4, alineado con el gesto real).
 - Primer análisis (4c) en `docs/plan-fase-4.md`: criterio 1 cumple; criterio 4 cumple en párpados y canto con el dorso nasal, no en la ceja; criterio 3 sin concluir (la contracción «mínima» también la veía el EAR). Compensación por defecto: dorso nasal.
 
+- `analyze-flow.mjs`: detección calibrada frente al reposo (percentil de cada repetición entre ventanas de reposo sin parpadeos) para el EAR y la apertura por flujo integrada. Segundo análisis en `docs/plan-fase-4.md`: con contracciones más pequeñas, el flujo integrado detecta 3 de 5 que el EAR no ve.
+
 ### Corregido (fase 4b)
 - La asimetría de las curvas fallaba al elegir una métrica que no está en la serie de la cara.
 

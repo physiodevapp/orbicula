@@ -164,3 +164,46 @@ for (const id of ['nod', 'turn']) {
     }
   }
 }
+
+// ── Detección frente al reposo (calibrada) ───────────────────────────────────────────────────
+// El «cierre» (mediana de antes − mínimo durante) sale positivo aunque no pase nada: el mínimo de una
+// señal con ruido siempre queda por debajo. Por eso se calcula el mismo estadístico en ventanas de
+// reposo sin parpadeos (reposo, comprobación y parpadeo espontáneo) y cada repetición se expresa como
+// percentil de esa distribución nula: ≥ 95 = detectada. Se compara el EAR con la apertura por flujo
+// integrada (dorso nasal).
+{
+  const HOLD = 1500;
+  const D = 800;
+  const statsAt = (s, h, r = h + HOLD) => {
+    const out = {};
+    for (const side of SIDES) {
+      out[`ear.${side}`] = med(within(s.series.t, s.series[side].ear, h - 800, h + 200)) - Math.min(...within(s.series.t, s.series[side].ear, h + D, r + D));
+      const a = flowAperture(s, side, 'R');
+      out[`flujo.${side}`] = med(within(s.flow.t, a, h - 400, h + 200)) - Math.min(...within(s.flow.t, a, h + D, r + D));
+    }
+    return out;
+  };
+  const nul = [];
+  for (const id of ['check', 'rest', 'natural']) {
+    const s = step(id);
+    if (!s) continue;
+    const bw = blinkWindows(s, 200, 400);
+    for (let h = 1000; h + HOLD + D + 800 < s.series.t.at(-1); h += 250) {
+      if (bw.some(([a, b]) => b >= h - 800 && a <= h + HOLD + D + 600)) continue;
+      nul.push(statsAt(s, h));
+    }
+  }
+  const keys = ['ear.left', 'ear.right', 'flujo.left', 'flujo.right'];
+  const rank = (k, v) => Math.round((100 * nul.filter((x) => x[k] < v).length) / nul.length);
+  console.log(`\nDETECCIÓN FRENTE AL REPOSO: percentil de cada repetición en ${nul.length} ventanas de reposo sin parpadeos (≥ 95 = detectada; las ventanas se solapan, así que es orientativo).`);
+  console.log(`  p95 nulo: ${keys.map((k) => `${k} ${f(pct(nul.map((x) => x[k]), 0.95), 3)}`).join(' · ')}`);
+  for (const id of ['minimal', 'more']) {
+    const s = step(id);
+    if (!s) continue;
+    for (const r of reps(s)) {
+      const x = statsAt(s, r.hold, r.release);
+      const det = (k) => (rank(k, x[k]) >= 95 ? '✔' : ' ');
+      console.log(`  ${id.padEnd(8)} rep ${r.rep}: ${keys.map((k) => `${k} ${f(x[k], 3)} (${rank(k, x[k])})${det(k)}`).join(' · ')}`);
+    }
+  }
+}
