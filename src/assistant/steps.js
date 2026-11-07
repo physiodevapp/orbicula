@@ -1,3 +1,5 @@
+import { protocolSteps } from '../protocol/steps.js';
+
 // Pasos del asistente de pruebas de la fase 3 (EAR y parpadeos).
 // `expect` es lo que se debería detectar si todo va bien: se guarda en el JSON para compararlo.
 // `countable`: el usuario puede anotar cuántos ha contado él.
@@ -219,3 +221,6 @@ export const PLANS = {
   phase3: { id: 'phase3', label: 'Fase 3: parpadeos (unos 7 min)', steps: PHASE3_STEPS, flow: false },
 };
 export const DEFAULT_PLAN = 'phase4';
+
+/** El protocolo clínico guiado (fase 5) tiene su propia tarjeta: sus pasos salen de la configuración. */
+export const PROTOCOL_PLAN = { id: 'protocol', label: 'Protocolo clínico', build: protocolSteps, flow: true };

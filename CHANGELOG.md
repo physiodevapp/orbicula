@@ -4,6 +4,23 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (fase 5b: protocolo guiado)
+- **Tarjeta «Protocolo clínico»**, encima del asistente de pruebas (que se queda como herramienta de desarrollo). Seis fases con voz y pitidos, en modo seguido por defecto:
+  1. **reposo (calibración)**, 30 s;
+  2. **parpadeo espontáneo**, 60 s;
+  3. **cierre suave**;
+  4. **cierre forzado**;
+  5. **elevación de cejas**;
+  6. **sonrisa amplia**.
+
+  Cada gesto va con pitido agudo = ahora y grave = relaja. La voz habla de «tú». Son unos 4 minutos.
+- **Configurable:** reposo (30/45/60 s), parpadeo (30/60/90 s) y repeticiones de cada gesto (3/4/5), más el código anónimo opcional. La configuración se guarda en el JSON (`settings`).
+- **Si el reposo no vale** (cabeza movida, demasiados parpadeos o cara perdida), el protocolo no sigue. Suenan dos pitidos graves, la voz lo explica («Apoya la cabeza y quédate quieto. Repetimos.») y el reposo se repite solo a los 7 s. En la revisión, «Siguiente» está desactivado. Se exige como tiempo válido al menos la mitad del reposo.
+- Los eventos y la calibración funcionan igual que en el asistente (misma `calibrate` y mismo `EventDetector`).
+- El JSON (`orbicula-test-session/3`) lleva ahora la serie **`smile`** (blendshape de sonrisa, por lado) y `settings`. Es lo que necesitará la co-activación ojo–boca.
+- `createAssistant` admite varias tarjetas (`prefix`, `rootId`, `busyKey`, `plan`); no se pueden grabar dos a la vez. `scripts/dev/run-assistant.cjs --card protocol` recorre el protocolo.
+- 11 tests nuevos.
+
 ### Añadido (fase 5a: calibración y eventos)
 - **Calibración sobre el reposo** (`src/protocol/events.js`, `calibrate`). Por lado salen:
   - el umbral de los eventos;

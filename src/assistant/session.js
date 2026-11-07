@@ -8,11 +8,13 @@
 export const PREP_MS = 3000;
 /** Modo seguido: pausa entre el final de un paso (dos pitidos) y la cuenta atrás del siguiente. */
 export const AUTO_PAUSE_MS = 2000;
+/** Modo seguido: tras un paso no válido (p. ej. el reposo del protocolo) se repite solo pasado este tiempo. */
+export const RETRY_PAUSE_MS = 7000;
 
 const r3 = (v) => (Number.isFinite(v) ? Math.round(v * 1000) / 1000 : null);
 
 /** Señales que se guardan por lado en cada paso. */
-export const SERIES_KEYS = ['ear', 'aperture', 'blink', 'lookDown', 'lookUp', 'irisH', 'irisV'];
+export const SERIES_KEYS = ['ear', 'aperture', 'blink', 'lookDown', 'lookUp', 'irisH', 'irisV', 'smile'];
 const emptySide = () => Object.fromEntries(SERIES_KEYS.map((k) => [k, []]));
 
 /**
@@ -187,15 +189,19 @@ export class GuidedSession {
 
   /** ¿Pasará solo al siguiente paso? (para que la interfaz siga llamando a tick en la revisión) */
   get autoAdvancing() {
-    return this.state === 'review' && this.autoAdvanceMs != null && this.cur?.status === 'completed';
+    return this.state === 'review' && this.autoAdvanceMs != null && ['completed', 'invalid'].includes(this.cur?.status);
   }
 
   /** Avanza las fases por tiempo; la interfaz lo llama unas 10 veces por segundo. */
   tick() {
     const t = this.now();
-    if (this.autoAdvancing && t - this.phaseStart >= this.autoAdvanceMs) {
-      this.next();
-      return;
+    if (this.autoAdvancing) {
+      const invalid = this.cur.status === 'invalid';
+      if (t - this.phaseStart >= (invalid ? RETRY_PAUSE_MS : this.autoAdvanceMs)) {
+        if (invalid) this.repeat();
+        else this.next();
+        return;
+      }
     }
     if (this.state === 'prep' && t - this.phaseStart >= this.#prepOf(this.step)) {
       this.state = 'running';
@@ -287,9 +293,12 @@ export class GuidedSession {
     this.cur.durationMs = Math.round(this.now() - this.phaseStart);
     this.cur.perf = this.getPerf();
     this.onStepEnd(this.cur, this.step);
+    // Un paso que exige una calibración válida (el reposo del protocolo) no se da por bueno sin ella.
+    const invalid = !!this.step.requireValid && this.cur.calibration && !this.cur.calibration.valid;
+    if (invalid) this.cur.status = 'invalid';
     this.state = 'review';
     this.phaseStart = this.now(); // para la pausa del modo seguido
-    this.onCue('end');
+    this.onCue(invalid ? 'invalid' : 'end');
     this.#emit();
   }
 
@@ -325,9 +334,9 @@ export class GuidedSession {
     }
   }
 
-  /** Guarda el paso revisado y pasa al siguiente (o termina). */
+  /** Guarda el paso revisado y pasa al siguiente (o termina). Un paso no válido hay que repetirlo. */
   next() {
-    if (this.state !== 'review') return;
+    if (this.state !== 'review' || this.cur?.status === 'invalid') return;
     this.#push();
     this.#advance();
   }

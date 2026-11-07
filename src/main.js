@@ -16,6 +16,7 @@ import { Analysis } from './landmarks/analysis.js';
 import { sampleOf } from './landmarks/process.js';
 import { BlinkDetector } from './metrics/blinks.js';
 import { createAssistant } from './ui/assistant.js';
+import { PROTOCOL_PLAN } from './assistant/steps.js';
 import { createBenchmark } from './ui/benchmark.js';
 import { Series } from './metrics/series.js';
 import { asymmetry } from './metrics/asymmetry.js';
@@ -154,14 +155,15 @@ function captureContext() {
   };
 }
 
-const assistant = createAssistant({
+/** Lo que comparten el asistente de pruebas y el protocolo clínico: las mismas medidas y la misma calibración. */
+const sessionDeps = {
   getContext: captureContext,
   getPerf: () => ({
     cameraFps: round1(camera.meter.fps), analysisFps: round1(analysis?.fps), analysisMs: round1(analysis?.ms),
     flowFps: state.showFlow ? round1(flow?.fps) : null, flowMs: state.showFlow ? round1(flow?.ms) : null,
     flowRateCap: state.showFlow ? (flow?.rateCap ?? 0) : null, // pares/s de la rebaja automática (0 = sin rebaja)
   }),
-  // El reposo y las series empiezan de cero; el plan de la fase 4 enciende el flujo (y espera a OpenCV.js).
+  // El reposo y las series empiezan de cero; los planes con flujo lo encienden (y esperan a OpenCV.js).
   onStart: async (plan) => {
     resetMeasures();
     setCalibration(null);
@@ -171,13 +173,19 @@ const assistant = createAssistant({
       if (!state.showFlow) throw new Error('no se pudo cargar el flujo óptico');
     }
   },
-  // El paso de reposo da la calibración de los eventos (fase 5).
+  // El paso de reposo da la calibración de los eventos (fase 5). Con `minValidFraction`, el tiempo válido
+  // mínimo es esa fracción del reposo (el protocolo); si no, el de por defecto.
   onStepEnd: (result, step) => {
     if (!step.calibrates || !state.showFlow) return;
-    result.calibration = calibrate(result);
+    const o = step.calibrateOptions;
+    result.calibration = calibrate(result, o?.minValidFraction ? { minValidMs: Math.round(result.plannedMs * o.minValidFraction) } : {});
     setCalibration(result.calibration);
   },
-});
+};
+const assistant = createAssistant(sessionDeps);
+const protocol = createAssistant({ ...sessionDeps, prefix: 'pr', rootId: 'protocol', busyKey: 'protocol', plan: PROTOCOL_PLAN });
+/** Las dos tarjetas reciben todas las medidas; solo la que está grabando un paso las guarda. */
+const recorders = [assistant, protocol];
 
 const bench = createBenchmark({
   camera,
@@ -340,7 +348,7 @@ const DET_STATUS = { head: ' · descartada: cabeza', blink: ' · era un parpadeo
 /** Eventos de la fase 5: al asistente, a la lista y a las curvas. Los parpadeos ya los anota logBlink. */
 function onDetections(list) {
   for (const e of list) {
-    assistant.recordDetection(e);
+    for (const r of recorders) r.recordDetection(e);
     if (e.kind === 'blink' || e.kind === 'closure') continue;
     if (e.kind !== 'contraction' && e.status !== 'ok') continue;
     els.blinkLog.querySelector('.log-empty')?.remove();
@@ -452,7 +460,7 @@ function onResult(r) {
       if (eventDetector) onDetections(eventDetector.pushBlink(side, event));
     }
   }
-  assistant.record(r.t, sample, newEvents);
+  for (const a of recorders) a.record(r.t, sample, newEvents);
 
   flow?.setFace(r);
   flowProcessor.pushFace(r.t, r);
@@ -538,7 +546,7 @@ function onFlowSample(s) {
     left: { ...side(s.left), closure: s.closure?.left ?? NaN, rise: eventDetector?.last.rise.left ?? NaN },
     right: { ...side(s.right), closure: s.closure?.right ?? NaN, rise: eventDetector?.last.rise.right ?? NaN },
   });
-  assistant.recordFlow(s);
+  for (const a of recorders) a.recordFlow(s);
   if (isFlowMetric(curves.metric)) curves.requestDraw();
 }
 
@@ -613,7 +621,7 @@ async function start() {
   showError('');
   els.startBtn.disabled = true;
   lowSince = null;
-  assistant.interrupt('la cámara se reinició (cambio de cámara, de prioridad o de pestaña)');
+  for (const a of recorders) a.interrupt('la cámara se reinició (cambio de cámara, de prioridad o de pestaña)');
   bench.interrupt('la cámara se reinició');
   resetMeasures(); // otra cámara u otra resolución: el reposo y las series ya no valen
   flow?.resetStrip();
@@ -631,6 +639,7 @@ async function start() {
     els.live.hidden = false;
     els.curvesView.hidden = false;
     assistant.show();
+    protocol.show();
     bench.show();
     els.controls.hidden = false;
     // La resolución real se conoce cuando llega el primer frame.

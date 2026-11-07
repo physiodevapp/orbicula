@@ -4,6 +4,9 @@ Guía paso a paso dentro de la app (tarjeta «Asistente de pruebas», debajo del
 
 **No es el JSON de exportación de resultados** (ese es la interfaz pública y se define en la fase 7, con `docs/schema.md`). Este es un archivo de diagnóstico con su propio esquema, `orbicula-test-session/3`. La versión 3 es de la fase 5 y añade `calibration` y `detections`. La 2, de la fase 4, no los tenía; la 1 tampoco tenía `plan`, iris, flujo ni marcas.
 
+## Protocolo clínico (fase 5)
+Tarjeta propia, «Protocolo clínico», encima de esta. Las seis fases (reposo, parpadeo espontáneo, cierre suave, cierre forzado, elevación de cejas y sonrisa amplia) usan el mismo motor, los mismos pitidos y el mismo JSON (`plan: "protocol"`, con `settings`). Si el reposo no vale, se repite solo.
+
 ## Pruebas disponibles
 - **Fase 4: flujo óptico** (por defecto, unos 4 min): reposo 20 s, contracción mínima («Entrecierra los ojos lo mínimo, como si sonrieras con los ojos») ×5, contracción algo mayor ×3, cabeceo 15 s, giro 12 s, cejas ×3, guiño izquierdo ×3, guiño derecho ×3 y parpadeo espontáneo 20 s. Enciende el flujo óptico al empezar (la primera vez descarga OpenCV.js). Las repeticiones van con pitidos: **agudo = ahora, grave = suelta**, y sobre el vídeo se lee «¡Ahora!» o «Suelta» con el número de repetición; se puede hacer con la cámara trasera sin mirar.
 - **Fase 4: contracción mínima con controles** (unos 3 min): reposo 20 s; dos tandas de 10 repeticiones en orden al azar, la mitad **contracción mínima** (pitido agudo: entrecerrar lo mínimo y mantener hasta el grave) y la mitad **control** (dos pitidos cortos: no hacer nada, quieto hasta el grave); reposo final 20 s. Sirve para medir aciertos y falsas alarmas del EAR y del flujo (criterio 3). El orden se sortea en cada sesión y queda en las marcas (`cond`).
@@ -47,7 +50,8 @@ Solo medidas numéricas y la configuración: ninguna imagen, ningún nombre. Inc
   "analysis": { "mode": "worker|main", "delegate": "GPU|CPU", "imageSize": {}, "blendshapes": true, "swapNames": false, "blockedHosts": [] },
   "flow":     { "on": true, "config": "farneback-320-vf-30", "library": "OpenCV.js", "version": "", "params": {}, "loadMs": 0 },
   "detector": { /* umbrales del detector de parpadeos usados */ },
-  "plan": "phase4|phase3",
+  "plan": "phase4|micro|phase3|protocol",
+  "settings": null,                                // solo el protocolo: { "restSec": 30, "naturalSec": 60, "reps": 3 }
   "steps": [{
     "id": "wink-left", "title": "", "instruction": "",
     "status": "completed|skipped|interrupted", "attempt": 1, "interruptReason": null,
@@ -61,7 +65,7 @@ Solo medidas numéricas y la configuración: ninguna imagen, ningún nombre. Inc
     "marks": [ { "rep": 1, "kind": "hold|release", "t": 0, "cond": "act|control" } ],
     "calibration": null,                          // solo en el reposo (fase 5): umbrales, validez y motivo (src/protocol/events.js)
     "detections": [ { "kind": "contraction|blink|closure|brow|canthus", "side": "left|right", "t": 0, "duration": 0, "peak": 0, "tPeak": 0, "status": "ok|head|blink" } ],   // pitidos «ahora» / «suelta», en el reloj de las series; cond solo en la prueba con controles
-    "series": { "t": [], "left": { "ear": [], "aperture": [], "blink": [], "lookDown": [], "lookUp": [], "irisH": [], "irisV": [] }, "right": { } },   // t en ms desde el inicio del paso; null = sin cara
+    "series": { "t": [], "left": { "ear": [], "aperture": [], "blink": [], "lookDown": [], "lookUp": [], "irisH": [], "irisV": [], "smile": [] }, "right": { } },   // t en ms desde el inicio del paso; null = sin cara
     "flow": {                                     // un elemento por par de frames con flujo
       "t": [], "dt": [],                          // ms (mismo reloj que series.t) y ms entre los dos frames del par
       "left": { "upperLid": { "eN": [], "eR": [], "eP": [], "eH": [], "dR": [], "tR": [], "dP": [], "tP": [], "dH": [], "tH": [] }, "lowerLid": {}, "brow": {}, "canthus": {} },
@@ -73,7 +77,7 @@ Solo medidas numéricas y la configuración: ninguna imagen, ningún nombre. Inc
   }]
 }
 ```
-Tipos de evento: `blink` (parpadeo, ≤ 0,8 s), `closure` (cierre de más de 0,8 s con el ojo muy cerrado, p. ej. un guiño mantenido) y `narrowing` («entornado»: más de 0,8 s pero con un cierre poco profundo, < 50 %). `lookDown` y `lookUp` son los blendshapes de mirada del modelo, para estudiar los falsos cierres al mirar hacia abajo.
+Tipos de evento: `blink` (parpadeo, ≤ 0,8 s), `closure` (cierre de más de 0,8 s con el ojo muy cerrado, p. ej. un guiño mantenido) y `narrowing` («entornado»: más de 0,8 s pero con un cierre poco profundo, < 50 %). `lookDown` y `lookUp` son los blendshapes de mirada del modelo, para estudiar los falsos cierres al mirar hacia abajo. `smile` es el blendshape `mouthSmile` de ese lado (0–1), para la co-activación ojo–boca.
 
 **Flujo** (`flow`, fase 4), por ROI y lado del paciente: `eN`, `eR`, `eP`, `eH` = energía residual sin compensar, compensada con el dorso nasal, con la postura y con «dorso nasal + giro», en (DI/s)² (DI = distancia intercantal); `dR`/`dP`/`dH` = componente **hacia abajo** (+ = el tejido baja) y `tR`/`tP`/`tH` = **hacia la sien** (+ = hacia fuera), en DI/s, con cada compensación. `closure` = cierre por flujo de cada ojo (DI, + = se cierra). `head` = movimiento de la cabeza que se resta, en el centro de la franja (DI/s). `summary.flow` da por ROI y compensación el p50, p95 y p99 de la energía. `irisH` = posición del iris a lo largo del ojo (0 = comisura interna, 1 = externa); `irisV` = hacia abajo (+), ambos respecto al ancho del ojo.
 

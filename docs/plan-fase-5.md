@@ -187,6 +187,16 @@ Por eso una contracción de **menos de 0,5 s queda como `brief`** («breve»). S
 - **Límite:** un solo sujeto. Un parpadeo incompleto o una sacudida de menos de 0,5 s no cuentan como contracción, pero quedan registrados como «breve». Para las mioquimias (5c), esos eventos breves pueden ser justo lo que interesa.
 - **Ceja y canto** (experimentales): demasiados eventos, decenas por paso con contracciones o parpadeos. No salen en el resumen hasta revisarlos en el 5c.
 
+## Paso 5b (hecho; pendiente de la prueba en el móvil)
+- Tarjeta «Protocolo clínico» (`index.html`, `src/protocol/steps.js`) sobre el mismo motor del asistente (`createAssistant` con prefijo de ids). Aparte del asistente de pruebas, como se aprobó.
+- El reposo exige `requireValid`: la tarjeta repite el reposo si la calibración no vale, también en modo seguido (a los 7 s, con aviso de voz).
+- **Tiempo válido mínimo:** la mitad del reposo. Con 30 s son 15 s, como en el plan. Los tramos limpios mínimos para el umbral siguen siendo 3 s.
+- **Cámara simulada:**
+  - `lid.y4m`: las seis fases se completan solas, sin errores ni peticiones externas.
+  - `nod.y4m` (la cabeza se mueve): el reposo sale «no válido» y se repite solo.
+- **Lo que no hace todavía (5c):** resumen por fase y lado, asimetrías, FFT, co-activación y completitud relativa al cierre forzado. El JSON ya lleva lo necesario, incluida la serie `smile`.
+- **Pendiente de decidir con tus datos:** los gestos duran 3 s con 4 s de pausa.
+
 ## Pruebas
 - **Tests unitarios:**
   - que la subida causal equivale al estadístico por ventanas;
