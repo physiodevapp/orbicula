@@ -35,6 +35,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 - Análisis de la prueba completa con buena luz: la compensación «dorso nasal + giro» no mejora con datos reales (se quita de la curva); el criterio 4 se cumple con el cierre por flujo (lo que generará los eventos) en la prueba con un reposo válido; la referencia de reposo ahora excluye los tramos con la cabeza en movimiento.
 
+- **Fase 4 cerrada** (`docs/plan-fase-4.md`): en dos pruebas con controles, el cierre por flujo detectó 12/13 contracciones mínimas en cada ojo frente a 6/13 y 10/13 del EAR, con las mismas falsas alarmas, y con mucho más margen de separación (×8 frente a ×1–3 en la prueba con la cabeza apoyada).
+
 ### Corregido (fase 4b)
 - `analyze-flow.mjs`: en la detección calibrada solo se apartan los parpadeos de verdad (cierre ≥ 50 %); antes apartaba también los eventos poco profundos que provoca la propia contracción mínima.
 - La asimetría de las curvas fallaba al elegir una métrica que no está en la serie de la cara.

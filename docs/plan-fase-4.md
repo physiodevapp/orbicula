@@ -156,6 +156,29 @@ Luz mejor (ruido del EAR en reposo 0,008 frente a 0,010–0,012). El autor movi�
 - **Rendimiento:** el ajuste automático actuó desde el cuarto paso (flujo a 20 pares/s) y el análisis de la cara se quedó en 23–24/s: justo en el límite, con el móvil caliente.
 - **Decisiones para la fase 5:** (1) los eventos salen del **cierre por flujo compensado con el dorso nasal**; (2) **puerta de calidad «cabeza en movimiento»**: sin eventos mientras la velocidad del dorso nasal supere el umbral del reposo, con aviso en pantalla; (3) reposo inicial más largo y con la cabeza apoyada (respaldo o pared), porque la referencia depende de él.
 
+## Paso 4c: confirmación con controles (JSON del autor, 2026-11-07 19:14, commit 7f02658)
+Cabeza apoyada, buena luz. 20 repeticiones al azar; 7 apartadas por parpadeos reales (cierre ≥ 50 %): 6 contracciones y 7 controles válidos. Medida y umbral fijados de antemano (cierre por flujo compensado con el dorso nasal; p95 del reposo).
+
+| medida | aciertos | falsas alarmas | contracción más débil / control más fuerte* |
+|---|---|---|---|
+| EAR izquierdo | 4/6 | 1/7 | ×1,1 |
+| EAR derecho | 6/6 | 1/7 | ×3,1 |
+| **cierre por flujo, izquierdo** | **6/6** | 1/7 | **×7,8** |
+| **cierre por flujo, derecho** | **6/6** | 1/7 | **×8,7** |
+
+\* Sin el único control en que las cuatro medidas registran un movimiento real (la falsa alarma, común a todas).
+
+- **Juntando las dos pruebas con controles** (18:38 y 19:14): contracciones mínimas detectadas por ojo, **flujo 12/13 y 12/13 frente a EAR 6/13 y 10/13**, con las mismas falsas alarmas (2/15 en todas, por movimientos reales). Por ojo, el flujo detectó 8 contracciones que el EAR no vio; el EAR, ninguna que el flujo no viera.
+- Aunque las dos medidas separen las clases, **el flujo lo hace con mucho más margen**: en la prueba de las 19:14 la contracción más débil multiplica por ~8 el control más fuerte, frente a ×1,1–3 del EAR.
+- Un parpadeo completo da un cierre grande en el EAR y casi nulo en el flujo: el flujo pierde el seguimiento cuando el párpado tapa el ojo. Para los parpadeos y los cierres completos sigue mandando el EAR; el flujo es para los movimientos finos.
+
+## Conclusión de la fase 4
+- **Pregunta de la v0: sí.** Con la cámara trasera de un móvil, el flujo óptico sobre la región periocular (cierre por flujo, compensado con el dorso nasal) detecta contracciones del orbicular más finas que las que capta el EAR de los landmarks, sin más falsas alarmas. Limitaciones: un solo sujeto (el autor), dos sesiones con controles, sin patrón de referencia (EMG) ni pacientes.
+- **Criterio 1:** cumple con el móvil frío (25–30 análisis/s); con el móvil caliente baja a 22–24 aunque el flujo se rebaje solo a 20 pares/s. Vigilar en la fase 5 (sesiones largas).
+- **Criterio 3:** cumplido con la medida definitiva (cierre por flujo), en dos sesiones.
+- **Criterio 4:** cumplido con la medida que genera los eventos (cierre por flujo) en la sesión con un reposo válido (17:47); la energía de cada ROI no lo cumple en el giro para el canto y la ceja → puerta de calidad «cabeza en movimiento» en la fase 5.
+- **Decisiones para la fase 5:** eventos con el cierre por flujo (dorso nasal); EAR para parpadeos y cierres completos; aviso y sin eventos con la cabeza en movimiento; reposo inicial largo con la cabeza apoyada (de él salen los umbrales); vigilar el calor.
+
 ## Propuesta para terminar la fase 4 (1 y 2 hechos; aprobada por el autor)
 1. **Apertura por flujo** como métrica de la app (curva y JSON), con corrección de la deriva (integrador con fuga o restar la línea base de los últimos segundos).
 2. **Prueba de contracción mínima con controles**: ~10 contracciones mínimas y ~10 controles en orden aleatorio, con dos pitidos distintos («contrae» / «no hagas nada»); tasas de acierto y falsos positivos del EAR y del flujo.

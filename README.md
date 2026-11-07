@@ -7,7 +7,7 @@ Cuantificación de movimientos finos de la musculatura periocular (orbicular de 
 
 ## Estado
 
-v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolución reales) **fase 2** (Face Landmarker, ROI por lado y lateralidad) y **fase 3** (EAR, parpadeos y curvas en tiempo real). En curso: **fase 4** (flujo óptico; hechos los pasos 4a y 4b). Ver [`CHANGELOG.md`](CHANGELOG.md).
+v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolución reales) **fase 2** (Face Landmarker, ROI por lado y lateralidad) y **fase 3** (EAR, parpadeos y curvas en tiempo real). **Fase 4** (flujo óptico): hecha; en el móvil del autor, el cierre por flujo detecta contracciones mínimas del orbicular que el EAR no distingue del reposo (ver `docs/plan-fase-4.md`). Ver [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Uso clínico
 
