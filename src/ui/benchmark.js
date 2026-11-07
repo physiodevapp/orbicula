@@ -2,7 +2,7 @@
 // flujo, más una sin flujo), con el análisis de la cara a la vez, registra cada resultado y exporta
 // un JSON. Ver src/assistant/benchmark.js.
 import { buildPlan, summarizeRun, buildBenchmarkReport, groupSummary, flowRaw } from '../assistant/benchmark.js';
-import { FLOW_CONFIGS, OPENCV_VERSION, FARNEBACK, LUCAS_KANADE } from '../flow/config.js';
+import { FLOW_CONFIGS, OPENCV_VERSION, FARNEBACK, FARNEBACK_LITE, LUCAS_KANADE } from '../flow/config.js';
 import { downloadJson, shareJson, copyJson, stamp } from './share.js';
 import { createCues } from './cues.js';
 
@@ -90,6 +90,8 @@ export function createBenchmark({ camera, video, ensureAnalysis, ensureFlow, get
       f.latencyMs.push(now - m.t);
       f.roundTripMs.push(m.roundTripMs ?? null);
       f.dt.push(m.dt);
+      const src = m.sourceNote ? `${m.source}: ${m.sourceNote}` : m.source;
+      f.sources[src] = (f.sources[src] ?? 0) + 1;
       f.size = m.size;
     };
     camera.onVideoFrame = (now, meta) => {
@@ -142,7 +144,7 @@ export function createBenchmark({ camera, video, ensureAnalysis, ensureFlow, get
     const durationMs = performance.now() - t0;
     if (withFlow) {
       const end = flow.counts;
-      const start = countsAtWarmup ?? { submitted: 0, busy: 0, noStrip: 0, replaced: 0 };
+      const start = countsAtWarmup ?? {};
       raw.flow.counts = Object.fromEntries(Object.keys(end).map((k) => [k, end[k] - (start[k] ?? 0)]));
       raw.flow.strip = flow.strip ? { ...flow.strip } : null;
     }
@@ -184,7 +186,7 @@ export function createBenchmark({ camera, video, ensureAnalysis, ensureFlow, get
       flow = await ensureFlow();
       flowOnResult = flow.onResult;
       flowConfig = flow.config.key;
-      flowInfo = { library: 'OpenCV.js', version: OPENCV_VERSION, loadMs: r1(flow.loadMs), farneback: FARNEBACK, lucasKanade: LUCAS_KANADE };
+      flowInfo = { library: 'OpenCV.js', version: OPENCV_VERSION, loadMs: r1(flow.loadMs), farneback: FARNEBACK, farnebackLite: FARNEBACK_LITE, lucasKanade: LUCAS_KANADE, videoFrame: typeof VideoFrame === 'function' };
       // Punto de trabajo de la fase 3: análisis de la cara con blendshapes.
       await base.setBlendshapes(true);
 
@@ -215,7 +217,7 @@ export function createBenchmark({ camera, video, ensureAnalysis, ensureFlow, get
         if (cancelled) break;
         const paired = raw.flow ? raw.flow.t.map((t, i) => i).filter((i) => raw.flow.paired[i]) : [];
         runs.push({
-          index: p.index, round: p.round, flow: p.flow, method: p.method, maxWidth: p.maxWidth, status: 'completed',
+          index: p.index, round: p.round, flow: p.flow, status: 'completed',
           startedAtMs: Math.round(runStart - tStart), durationMs: Math.round(durationMs),
           summary: summarizeRun(raw, { warmupMs }),
           series: {
@@ -251,6 +253,13 @@ export function createBenchmark({ camera, video, ensureAnalysis, ensureFlow, get
     }
   }
 
+  /** Si el plano Y no se pudo leer (el móvil da los frames en la GPU), se dice qué se usó en su lugar. */
+  function sourcesNote(rows) {
+    const used = new Set(rows.filter((x) => x.source === 'videoframe').flatMap((x) => Object.keys(x.sources)));
+    if (!used.size) return '';
+    return [...used].every((k) => k.startsWith('y-plane')) ? 'Plano Y leído directamente del frame. ' : `Origen de la imagen en las pasadas «Y»: ${[...used].join(', ')}. `;
+  }
+
   function finish(partial) {
     setState('done');
     const g = groupSummary(runs);
@@ -258,15 +267,15 @@ export function createBenchmark({ camera, video, ensureAnalysis, ensureFlow, get
     const f1 = (v) => (v == null ? '—' : v.toFixed(1));
     el.table.replaceChildren(
       Object.assign(document.createElement('caption'), { textContent: partial ? 'Resultados parciales (media de las pasadas hechas)' : 'Resultados (media de 2 pasadas por configuración)' }),
-      ...[['Flujo', 'pares/s', 'ms flujo', 'ms total', 'análisis/s', 'cámara']].map((cells) => {
+      ...[['Flujo', 'pares/s', 'ms flujo', 'ms copia', 'ms total', 'análisis/s', 'cámara']].map((cells) => {
         const tr = document.createElement('tr');
         for (const c of cells) tr.append(Object.assign(document.createElement('th'), { textContent: c }));
         return tr;
       }),
       ...rows.map((x) => {
         const tr = document.createElement('tr');
-        const name = x.method === 'none' ? 'ninguno' : `${x.method === 'lk' ? 'LK' : 'Farn.'} ${x.size ? `${x.size.width}×${x.size.height}` : x.maxWidth || 'máx.'}`;
-        const cells = [name, f1(x.flowFps), f1(x.flowMsMean), f1(x.totalMsMean), f1(x.analysisFps), f1(x.cameraFps)];
+        const name = FLOW_CONFIGS[x.flow].short;
+        const cells = [name, f1(x.flowFps), f1(x.flowMsMean), f1(x.readMsMean), f1(x.totalMsMean), f1(x.analysisFps), f1(x.cameraFps)];
         for (const c of cells) tr.append(Object.assign(document.createElement('td'), { textContent: c }));
         return tr;
       }),
@@ -275,7 +284,9 @@ export function createBenchmark({ camera, video, ensureAnalysis, ensureFlow, get
     const minFace = faces.length ? Math.min(...faces) : null;
     const loss = Object.entries(g.analysisFpsLoss).filter(([, v]) => v != null);
     el.note.textContent =
-      'pares/s = veces por segundo que se calcula el flujo entre dos frames; ms flujo = lo que tarda el algoritmo; ms total = todo el trabajo del worker por frame (incluida la copia de la imagen); análisis/s = análisis de la cara (MediaPipe) a la vez; cámara = fps. ' +
+      'pares/s = veces por segundo que se calcula el flujo entre dos frames; ms flujo = lo que tarda el algoritmo; ms copia = sacar la franja en grises del frame; ms total = todo el trabajo del worker por frame; análisis/s = análisis de la cara (MediaPipe) a la vez; cámara = fps. «Y» = solo el plano de brillo del frame; «ligero» = Farnebäck con menos niveles e iteraciones. ' +
+      sourcesNote(rows) +
+      (rows[0]?.size || rows[1]?.size ? `Franja de trabajo: ${(rows.find((x) => x.size) ?? {}).size.width}×${(rows.find((x) => x.size) ?? {}).size.height} px. ` : '') +
       (loss.length ? `El flujo resta al análisis de la cara: ${loss.map(([k, v]) => `${FLOW_CONFIGS[k].label} ${v > 0 ? '−' : '+'}${Math.abs(v).toFixed(1)}/s`).join('; ')}. ` : '') +
       (minFace != null && minFace < 0.9 ? `Ojo: en alguna pasada la cara solo se detectó en el ${Math.round(minFace * 100)} % de los análisis.` : 'Cara detectada durante casi toda la prueba.');
     el.share.hidden = !navigator.canShare;

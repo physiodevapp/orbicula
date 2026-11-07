@@ -12,11 +12,11 @@ suite('plan de pasadas', () => {
     expect(keys[0]).toBe('none');
     expect(keys.at(-1)).toBe('none');
     for (const c of COMBOS) expect(plan.filter((p) => p.flow === c.key)).toHaveLength(2);
-    expect(plan.find((p) => p.flow === 'lk-640')).toMatchObject({ method: 'lk', maxWidth: 640 });
+    expect(plan.find((p) => p.flow === 'lite-320-vf-30')).toMatchObject({ method: 'farneback', maxWidth: 320, params: 'lite', source: 'videoframe', maxRate: 30 });
   });
-  it('compara Farnebäck a varios tamaños y Lucas-Kanade', () => {
-    expect(COMBOS.filter((c) => c.method === 'farneback').length).toBeGreaterThanOrEqual(3);
-    expect(COMBOS.some((c) => c.method === 'lk')).toBe(true);
+  it('4a bis: la referencia de la 4a frente al plano Y, Farnebäck ligero y el límite de 30/s', () => {
+    expect(COMBOS.map((c) => c.key)).toEqual(['none', 'farneback-320', 'farneback-320-vf', 'lite-320-vf', 'lite-320-vf-30']);
+    expect(COMBOS.find((c) => c.key === 'farneback-320')).toMatchObject({ source: 'bitmap', params: 'standard', maxRate: 0 });
   });
   it('se pueden pedir más rondas', () => {
     expect(buildPlan({ rounds: 4 })).toHaveLength(4 * COMBOS.length);
@@ -147,6 +147,14 @@ suite('summarizeFlow', () => {
     expect(s.flow.flowFps).toBeCloseTo(60, 0);
     expect(s.flow.flowFraction).toBeCloseTo(1, 1);
   });
+  it('cuenta de dónde sale la imagen y los frames saltados por el límite de pares/s', () => {
+    const f = flow({});
+    f.sources = { 'y-plane: NV12': 500, 'worker-bitmap: frame girado': 3 };
+    f.counts = { submitted: 300, busy: 2, noStrip: 0, capped: 300, replaced: 0 };
+    const s = summarizeFlow(f, { warmupMs: 3000, cameraFps: 60 });
+    expect(s.sources['y-plane: NV12']).toBe(500);
+    expect(s.counts.capped).toBe(300);
+  });
   it('con un flujo vacío no revienta', () => {
     const s = summarizeFlow(flowRaw(), { warmupMs: 3000 });
     expect(s.flowFps).toBeNull();
@@ -156,7 +164,7 @@ suite('summarizeFlow', () => {
 
 suite('informe', () => {
   // Análisis de la cara: 25/s sin flujo; cada configuración con flujo lo frena según su coste.
-  const COST = { none: 0, 'farneback-320': 1, 'farneback-640': 3, 'farneback-full': 5, 'lk-640': 2 };
+  const COST = { none: 0, 'farneback-320': 5, 'farneback-320-vf': 3, 'lite-320-vf': 2, 'lite-320-vf-30': 1 };
   const mkRuns = () =>
     buildPlan().map((p) => {
       const step = 40 + 4 * COST[p.flow];
@@ -170,12 +178,13 @@ suite('informe', () => {
     expect(g.groups.every((x) => x.runs === 2)).toBe(true);
     const by = Object.fromEntries(g.groups.map((x) => [x.flow, x]));
     expect(by.none.flowFps).toBeNull();
-    expect(by['farneback-640'].flowMsMean).toBeCloseTo(40, 5);
-    expect(by['farneback-640'].size).toEqual({ width: 320, height: 110 });
+    expect(by['farneback-320-vf'].flowMsMean).toBeCloseTo(40, 5);
+    expect(by['farneback-320-vf'].size).toEqual({ width: 320, height: 110 });
+    expect(by['lite-320-vf-30']).toMatchObject({ params: 'lite', source: 'videoframe', maxRate: 30 });
     expect(by.none.analysisFps).toBeCloseTo(25, 0);
     expect(Object.keys(g.analysisFpsLoss)).not.toContain('none');
-    expect(g.analysisFpsLoss['farneback-full']).toBeGreaterThan(g.analysisFpsLoss['farneback-320']);
-    expect(g.analysisFpsLoss['farneback-320']).toBeGreaterThan(0);
+    expect(g.analysisFpsLoss['farneback-320']).toBeGreaterThan(g.analysisFpsLoss['lite-320-vf-30']);
+    expect(g.analysisFpsLoss['lite-320-vf-30']).toBeGreaterThan(0);
   });
 
   it('buildBenchmarkReport: esquema, series opcionales y JSON válido', () => {

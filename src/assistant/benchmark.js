@@ -1,4 +1,4 @@
-// Prueba de rendimiento del flujo óptico (paso 4a): plan de pasadas, estadísticas e informe. Sin DOM.
+// Prueba de rendimiento del flujo óptico (pasos 4a y 4a bis): plan de pasadas, estadísticas e informe. Sin DOM.
 // Con el análisis de la cara en su punto de trabajo (worker, con blendshapes), compara varias
 // configuraciones del flujo óptico, que corre a la vez en su propio worker, y una pasada sin flujo
 // para ver cuánto frena al análisis de la cara.
@@ -6,18 +6,23 @@
 // Diseño: cada configuración se mide dos veces, la segunda ronda en orden inverso (ABBA), para que
 // el calentamiento del móvil o un cambio de luz no favorezcan siempre a la misma.
 // La versión 1 del esquema (fase 3) comparaba worker / hilo principal y blendshapes: ver docs/rendimiento.md.
+// 4a bis (mismo esquema, otras configuraciones): Farnebäck a 320 px como en la 4a, frente a leer solo el
+// plano Y del frame, Farnebäck ligero y un límite de 30 pares/s.
 import { FLOW_CONFIGS } from '../flow/config.js';
 
 export const BENCH_SCHEMA = 'orbicula-benchmark/2';
 
-export const COMBOS = ['none', 'farneback-320', 'farneback-640', 'farneback-full', 'lk-640'].map((k) => FLOW_CONFIGS[k]);
+export const COMBOS = ['none', 'farneback-320', 'farneback-320-vf', 'lite-320-vf', 'lite-320-vf-30'].map((k) => FLOW_CONFIGS[k]);
+
+/** Lo que define una configuración en el plan y en el informe. */
+const configFields = (c) => ({ flow: c.key, method: c.method, maxWidth: c.maxWidth, params: c.params, source: c.source, maxRate: c.maxRate });
 
 /** Lista de pasadas: ronda 1 en un orden y la ronda 2 en el inverso. */
 export function buildPlan({ rounds = 2 } = {}) {
   const runs = [];
   for (let r = 0; r < rounds; r++) {
     for (const c of r % 2 ? [...COMBOS].reverse() : COMBOS) {
-      runs.push({ index: runs.length + 1, round: r + 1, flow: c.key, method: c.method, maxWidth: c.maxWidth });
+      runs.push({ index: runs.length + 1, round: r + 1, ...configFields(c) });
     }
   }
   return runs;
@@ -93,7 +98,7 @@ export function summarizeRun(raw, { warmupMs }) {
 
 /** Series vacías del flujo de una pasada. */
 export function flowRaw() {
-  return { t: [], paired: [], flowMs: [], readMs: [], prepMs: [], totalMs: [], cropMs: [], latencyMs: [], roundTripMs: [], dt: [], size: null, strip: null, counts: null };
+  return { t: [], paired: [], flowMs: [], readMs: [], prepMs: [], totalMs: [], cropMs: [], latencyMs: [], roundTripMs: [], dt: [], sources: {}, size: null, strip: null, counts: null };
 }
 
 /**
@@ -102,7 +107,9 @@ export function flowRaw() {
  * - flowMs: lo que tarda el algoritmo; readMs: pasar la franja a la CPU; prepMs: gris y brillo;
  *   totalMs: todo el trabajo del worker por frame; cropMs: recorte en el hilo principal.
  * - latencyMs: de la captura del frame a tener el flujo; dtMs: tiempo entre los dos frames de cada par.
- * - counts: frames mandados, descartados por estar ocupado el worker, sin franja, y recolocaciones de la franja.
+ * - counts: frames mandados, descartados por estar ocupado el worker, sin franja, saltados por el límite de
+ *   pares/s, y recolocaciones de la franja.
+ * - sources: de dónde salió la imagen en grises en cada frame ('bitmap', 'y-plane: NV12', 'worker-bitmap: motivo'…).
  */
 export function summarizeFlow(f, { warmupMs, cameraFps = null }) {
   const keep = f.t.map((t, i) => i).filter((i) => f.t[i] >= warmupMs);
@@ -126,7 +133,8 @@ export function summarizeFlow(f, { warmupMs, cameraFps = null }) {
     dtMs: describe(pickPaired(f.dt)),
     size: f.size, // tamaño de trabajo de la franja (px)
     strip: f.strip, // franja en el frame completo (px)
-    counts: { submitted: c.submitted ?? null, busy: c.busy ?? null, noStrip: c.noStrip ?? null, replaced: c.replaced ?? null },
+    counts: { submitted: c.submitted ?? null, busy: c.busy ?? null, noStrip: c.noStrip ?? null, capped: c.capped ?? null, replaced: c.replaced ?? null },
+    sources: f.sources ?? {},
   };
 }
 
@@ -140,11 +148,12 @@ export function groupSummary(runs) {
   const groups = COMBOS.map((c) => {
     const rs = runs.filter((r) => r.flow === c.key && r.summary);
     const fl = rs.map((r) => r.summary.flow).filter(Boolean);
+    const sources = {};
+    for (const x of fl) for (const [k, n] of Object.entries(x.sources ?? {})) sources[k] = (sources[k] ?? 0) + n;
     return {
-      flow: c.key,
-      method: c.method,
-      maxWidth: c.maxWidth,
+      ...configFields(c),
       runs: rs.length,
+      sources,
       // Flujo
       flowFps: avg(fl.map((x) => x.flowFps)),
       flowFraction: avg(fl.map((x) => x.flowFraction)),
@@ -152,6 +161,7 @@ export function groupSummary(runs) {
       flowMsP90: avg(fl.map((x) => x.flowMs.p90)),
       totalMsMean: avg(fl.map((x) => x.totalMs.mean)),
       readMsMean: avg(fl.map((x) => x.readMs.mean)),
+      prepMsMean: avg(fl.map((x) => x.prepMs.mean)),
       cropMsMean: avg(fl.map((x) => x.cropMs.mean)),
       flowLatencyMsMean: avg(fl.map((x) => x.latencyMs.mean)),
       size: fl.find((x) => x.size)?.size ?? null,
@@ -192,9 +202,7 @@ export function buildBenchmarkReport({ runs, startedAt, runMs, warmupMs, code = 
     runs: runs.map((r) => ({
       index: r.index,
       round: r.round,
-      flow: r.flow,
-      method: r.method,
-      maxWidth: r.maxWidth,
+      ...configFields(FLOW_CONFIGS[r.flow]),
       status: r.status,
       startedAtMs: r.startedAtMs,
       durationMs: r.durationMs,

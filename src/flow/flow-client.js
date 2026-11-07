@@ -5,12 +5,14 @@
 // la manda al worker con su marca de tiempo de captura. La franja sale de las últimas ROI de
 // MediaPipe y solo se recoloca cuando la cara se sale de ella.
 import FlowWorker from './flow.worker.js?worker';
-import { FLOW_CONFIGS, DEFAULT_FLOW, OPENCV_VERSION } from './config.js';
+import { FLOW_CONFIGS, DEFAULT_FLOW, OPENCV_VERSION, FARNEBACK_PARAMS } from './config.js';
 import { stripFromRois, needsNewStrip, workingSize } from './strip.js';
 import { FpsMeter } from '../capture/camera-logic.js';
 
 /** Frames en vuelo: uno calculándose y otro preparándose. Si están los dos, el frame se descarta. */
 const MAX_IN_FLIGHT = 2;
+
+const emptyCounts = () => ({ submitted: 0, busy: 0, noStrip: 0, replaced: 0, capped: 0 });
 
 export class FlowClient {
   constructor() {
@@ -26,7 +28,9 @@ export class FlowClient {
     this.seq = 0;
     this.ms = 0; // media móvil de los ms de flujo
     this.meter = new FpsMeter(1000); // pares de frames con flujo por segundo
-    this.counts = { submitted: 0, busy: 0, noStrip: 0, replaced: 0 };
+    this.counts = emptyCounts();
+    this.lastSubmitT = null; // marca de tiempo del último frame mandado (para el límite de pares/s)
+    this.videoFrameOk = typeof VideoFrame === 'function'; // se apaga si `new VideoFrame(video)` falla
     this.blockedHosts = new Set();
     this.meta = new Map(); // id → {submitAt, cropMs}
     this.onResult = null;
@@ -93,13 +97,14 @@ export class FlowClient {
     this.config = c;
     if (this.strip) this.work = workingSize(this.strip, c.maxWidth);
     this.stripId++;
+    this.lastSubmitT = null;
   }
 
   /** Últimas ROI de MediaPipe: recoloca la franja si la cara se ha salido de ella. */
   setFace(result) {
     if (!result?.face) return;
     const frameChanged = !this.frame || this.frame.width !== result.frame.width || this.frame.height !== result.frame.height;
-    if (!frameChanged && !needsNewStrip(this.strip, result.rois)) return;
+    if (!frameChanged && !needsNewStrip(this.strip, result.rois, result.frame)) return;
     const strip = stripFromRois(result.rois, result.frame);
     if (!strip) return;
     if (this.strip) this.counts.replaced++;
@@ -118,7 +123,7 @@ export class FlowClient {
   }
 
   resetCounts() {
-    this.counts = { submitted: 0, busy: 0, noStrip: 0, replaced: 0 };
+    this.counts = emptyCounts();
   }
 
   /** Recorta la franja del frame actual y la manda al worker. */
@@ -132,21 +137,49 @@ export class FlowClient {
       this.counts.busy++;
       return;
     }
+    // Límite de pares por segundo: el frame se salta si llega antes de tiempo (3 ms de margen).
+    const rate = this.config.maxRate;
+    if (rate && this.lastSubmitT != null && t - this.lastSubmitT < 1000 / rate - 3) {
+      this.counts.capped++;
+      return;
+    }
     const { x, y, w, h } = this.strip;
     const work = this.work;
     const id = ++this.seq;
-    const stripId = this.stripId;
-    const method = this.config.method;
+    const base = {
+      type: 'frame', id, t, stripId: this.stripId, method: this.config.method,
+      params: FARNEBACK_PARAMS[this.config.params],
+    };
     const submitAt = performance.now();
-    this.meta.set(id, { submitAt, cropMs: null, scale: work.scale });
-    this.inflight++;
+    this.lastSubmitT = t;
     this.counts.submitted++;
+    this.inflight++;
+
+    if (this.config.source === 'videoframe' && this.videoFrameOk) {
+      // El frame completo pasa al worker (sin copiar: se transfiere) y allí se lee solo el plano Y.
+      let frame = null;
+      try {
+        frame = new VideoFrame(video, { timestamp: Math.round(t * 1000) });
+      } catch {
+        this.videoFrameOk = false; // este navegador no lo admite: en adelante, el recorte de siempre
+      }
+      if (frame) {
+        this.meta.set(id, { submitAt, cropMs: performance.now() - submitAt, scale: work.scale });
+        this.worker.postMessage(
+          { ...base, videoFrame: frame, rect: { x, y, w, h }, work: { width: work.width, height: work.height }, frameSize: { ...this.frame } },
+          [frame],
+        );
+        return;
+      }
+    }
+
+    this.meta.set(id, { submitAt, cropMs: null, scale: work.scale });
     createImageBitmap(video, x, y, w, h, { resizeWidth: work.width, resizeHeight: work.height, resizeQuality: 'medium' })
       .then((bitmap) => {
         const meta = this.meta.get(id);
         if (meta) meta.cropMs = performance.now() - submitAt;
         if (!this.worker) return bitmap.close();
-        this.worker.postMessage({ type: 'frame', id, t, bitmap, stripId, method }, [bitmap]);
+        this.worker.postMessage({ ...base, bitmap }, [bitmap]);
       })
       .catch(() => {
         this.inflight = Math.max(0, this.inflight - 1);

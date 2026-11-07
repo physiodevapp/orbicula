@@ -53,6 +53,30 @@ Problemas abiertos que afectan a esta fase:
 - **4b. Medida completa:** métricas, las tres compensaciones, curvas, superposición y un **asistente de la fase 4** (pasos nuevos en `src/assistant/steps.js` o un segundo plan) que guarde en el JSON las series de flujo, EAR e iris. Pasos propuestos: reposo 20 s; «Entrecierra los ojos lo mínimo, como si sonrieras con los ojos» ×5 con pausas; entrecerrar algo más (que el EAR sí lo note) ×3; cabeceo suave 15 s; giro lateral suave 10 s; elevación de cejas ×3; parpadeo espontáneo 20 s.
 - **4c. Análisis del JSON del autor** y decisión de la compensación y la normalización, con los números delante. Comprobar los criterios 3 y 4 con los umbrales de arriba.
 
+## Resultados del paso 4a (móvil del autor, 2026-11-07)
+Prueba de rendimiento `orbicula-benchmark/2`, análisis de la cara en worker con blendshapes y flujo a la vez.
+
+| | Frontal «fps» | **Trasera «fps» (720p)** | Trasera «Resolución» (4K) |
+|---|---|---|---|
+| Cámara | 24 fps | 60 fps | 60 → 30 fps (se calienta) |
+| Franja (frame completo) | 220 × 98 px | ~340 × 165 px | ~1100 × 500 px |
+| Análisis de la cara sin flujo | 23,7/s | **28,1/s (35 ms)** | 18,5/s (53 ms) |
+| Ídem con Farnebäck 320 px | 24,0/s | **22,2/s (44 ms)** | 14,0/s |
+| Farnebäck 320 px: ms / pares/s | 12 / 24 | **23 / 25** | 56 / 11 |
+| Copia de la franja a la CPU | 10 ms | **16 ms** | 24–64 ms |
+| Lucas-Kanade 640 px: ms / pares/s | 8 / 24 | 19 / 29 | 139 / 6 |
+
+Conclusiones:
+- **4K en directo no sirve para el flujo** (Farnebäck sin reducir: 590 ms, 1,5 pares/s; la cámara cae a 30 fps por calor). Queda para el modo de vídeo grabado, como ya decía `CLAUDE.md`.
+- **Punto de trabajo: trasera «fps» (720p) con Farnebäck a 320 px.** Lucas-Kanade apenas ahorra y da menos información.
+- A 60 fps el flujo **frena a MediaPipe por debajo de 24 análisis/s** (criterio 1): los dos workers compiten por la CPU. Con la frontal (24 fps) no pasaba.
+- Un tercio del tiempo del worker era **copiar la franja** (RGBA desde la GPU), no el flujo.
+- Error encontrado: con la cara en el borde del frame, la franja se recolocaba en cada análisis (117 veces en una pasada). Corregido en el 4a bis.
+- El autor observa que, al guiñar un ojo, el otro marca un cierre solo ~10 % menor: probablemente la malla de MediaPipe acopla los dos ojos. Añadir guiños por lado al asistente del 4b y compararlos con el flujo.
+
+## Paso 4a bis
+Para recuperar los 24 análisis/s con flujo: leer solo el **plano Y** del `VideoFrame` de la franja en el worker (sin RGBA; respaldo con `createImageBitmap` si el frame no es YUV legible, que se anota), **Farnebäck ligero** (2 niveles, ventana 9, 2 iteraciones) y **límite de 30 pares/s**. La prueba de rendimiento compara esas variantes con la referencia de la 4a (Farnebäck 320 px). Hacerla con la trasera en «fps».
+
 ## Pruebas
 - **Vídeos sintéticos con la respuesta conocida** (ampliar `scripts/dev/make-face-videos.py`): mover solo el párpado 1–2 px (el flujo lo tiene que ver) y, por separado, toda la cara simulando un cabeceo (la compensación lo tiene que anular).
 - **Tests unitarios:** energía, máscaras de ROI en coordenadas de la franja, recolocación de la franja, signos con espejo y el ajuste del movimiento rígido.

@@ -2,7 +2,10 @@
 
 Tarjeta «Prueba de rendimiento» (debajo del asistente de pruebas).
 
-**Desde la fase 4a (esquema `orbicula-benchmark/2`) mide el flujo óptico.** Con el análisis de la cara en su punto de trabajo (worker, con blendshapes), ejecuta sola 10 pasadas de 12 s: Farnebäck con la franja de los ojos reducida a 320 px de ancho, a 640 px y sin reducir (hasta 1280), Lucas-Kanade sobre una rejilla a 640 px, y una pasada sin flujo para ver cuánto frena el flujo al análisis de la cara. Exporta un JSON con los tiempos. Hay que hacerla dos veces con la trasera: con la prioridad «fps» (720p) y con «Resolución» (4K).
+**Desde la fase 4a (esquema `orbicula-benchmark/2`) mide el flujo óptico.** Con el análisis de la cara en su punto de trabajo (worker, con blendshapes), ejecuta sola 10 pasadas de 12 s (5 configuraciones × 2) y exporta un JSON con los tiempos. Una de las configuraciones es sin flujo, para ver cuánto frena el flujo al análisis de la cara.
+
+- **4a**: Farnebäck con la franja de los ojos reducida a 320 px de ancho, a 640 px y sin reducir (hasta 1280), y Lucas-Kanade sobre una rejilla a 640 px. Resultados en `docs/plan-fase-4.md`.
+- **4a bis** (la actual): Farnebäck a 320 px como en la 4a (`farneback-320`), leyendo solo el plano Y del frame (`farneback-320-vf`), Farnebäck ligero con plano Y (`lite-320-vf`) y lo mismo limitado a 30 pares/s (`lite-320-vf-30`). Hacerla con la trasera en «fps».
 
 La versión 1 (fase 3) comparaba el análisis en worker y en el hilo principal, con y sin blendshapes; sus conclusiones están en `docs/plan-fase-4.md` y la descripción de su JSON, al final de este documento.
 
@@ -25,7 +28,8 @@ La versión 1 (fase 3) comparaba el análisis en worker y en el hilo principal, 
 - **flowMs**: lo que tarda el algoritmo (Farnebäck o Lucas-Kanade). **readMs**: pasar la franja de la GPU a la CPU dentro del worker. **prepMs**: escala de grises y normalización del brillo. **totalMs**: todo el trabajo del worker por frame. **cropMs**: recorte y reducción de la franja en el hilo principal.
 - **latencyMs**: de la captura del frame a tener el flujo; **dtMs**: tiempo entre los dos frames de cada par.
 - **size / strip**: tamaño de trabajo de la franja y su rectángulo en el frame completo.
-- **counts**: frames mandados al worker, descartados porque estaba ocupado (`busy`), sin franja todavía (`noStrip`) y recolocaciones de la franja (`replaced`).
+- **counts**: frames mandados al worker, descartados porque estaba ocupado (`busy`), sin franja todavía (`noStrip`), saltados por el límite de pares/s (`capped`) y recolocaciones de la franja (`replaced`).
+- **sources**: de dónde salió la imagen en grises en cada frame: `bitmap` (recorte RGBA en el hilo principal), `y-plane: <formato>` (plano Y del frame) o `worker-bitmap: <motivo>` (el frame no se podía leer como YUV).
 - `summary.analysisFpsLoss`: análisis de la cara por segundo que se pierden con cada configuración respecto a la pasada sin flujo.
 
 ## Qué mide cada pasada: análisis de la cara

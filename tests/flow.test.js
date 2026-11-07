@@ -31,6 +31,8 @@ describe('franja periocular', () => {
     const s = stripFromRois(roisOf(shift(makeFace(), -0.3, -0.35)), FRAME);
     for (const v of Object.values(s)) expect(Number.isInteger(v)).toBe(true);
     expect(s.w % 2 + (s.h % 2)).toBe(0);
+    const t = stripFromRois(rois, FRAME);
+    expect(t.x % 2 + (t.y % 2)).toBe(0); // origen par (planos de color YUV a media resolución)
     expect(s.x).toBe(0);
     expect(s.y).toBe(0);
     expect(s.x + s.w).toBeLessThanOrEqual(FRAME.width);
@@ -48,6 +50,15 @@ describe('franja periocular', () => {
     const s = stripFromRois(rois, FRAME);
     expect(needsNewStrip(s, roisOf(scaleAbout(makeFace(), 0.95)))).toBe(false);
     expect(needsNewStrip(s, roisOf(scaleAbout(makeFace(), 0.5)))).toBe(true);
+  });
+
+  it('con la cara en el borde del frame, la franja recortada no se recoloca en cada análisis', () => {
+    const edge = roisOf(shift(makeFace(), -0.32, 0)); // el ojo derecho del paciente se sale por la izquierda
+    expect(roiCore(edge).x).toBeLessThan(0);
+    const s = stripFromRois(edge, FRAME);
+    expect(s.x).toBe(0);
+    expect(needsNewStrip(s, edge, FRAME)).toBe(false);
+    expect(needsNewStrip(s, roisOf(shift(makeFace(), -0.318, 0.002)), FRAME)).toBe(false);
   });
 
   it('una cara fuera del frame no da franja', () => {
