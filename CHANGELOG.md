@@ -28,7 +28,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - **Cierre por flujo** (curva «Cierre F» y serie `flow.closure` del JSON): desplazamiento acumulado del párpado superior hacia abajo menos el del inferior, compensado con el dorso nasal, en DI (+ = se cierra), con un integrador con fuga de 5 s para que no derive. Es la medida que detectó contracciones que el EAR no distinguía del reposo.
 - **Prueba «contracción mínima con controles»** (nuevo plan del asistente, unos 3 min): reposo, 2 × 10 repeticiones en orden al azar (mitad contracciones mínimas con el pitido agudo, mitad controles con **dos pitidos cortos: no hacer nada**) y reposo final. Las marcas guardan la condición de cada repetición. `analyze-flow.mjs` da, para el EAR y el flujo, aciertos, falsas alarmas y AUC (criterio 3).
 
+- Prueba con controles en el móvil: el cierre por flujo detectó 6/7 contracciones mínimas en cada ojo frente a 2/7 y 4/7 del EAR, con las mismas falsas alarmas (1/8). Criterio 3 cumplido de forma provisional (`docs/plan-fase-4.md`).
+
 ### Corregido (fase 4b)
+- `analyze-flow.mjs`: en la detección calibrada solo se apartan los parpadeos de verdad (cierre ≥ 50 %); antes apartaba también los eventos poco profundos que provoca la propia contracción mínima.
 - La asimetría de las curvas fallaba al elegir una métrica que no está en la serie de la cara.
 
 ### Añadido (fase 4a bis: aligerar el flujo)

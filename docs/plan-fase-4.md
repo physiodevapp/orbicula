@@ -124,6 +124,23 @@ Trasera «fps», modo seguido con voz, contracción mínima más pequeña. Luz d
 - **Criterio 4:** párpados, 0 % sobre el p99 del reposo en cabeceo y giro con el dorso nasal (cumple). Canto y ceja no: en el giro, 47–58 % con el dorso nasal y 30–41 % con la postura; en el cabeceo, el dorso nasal empeora el canto (10–20 % frente a 5 % sin compensar). Las regiones laterales necesitan su propia compensación (afín local con puntos cercanos, o la postura para ellas).
 - **Guiños:** en el guiño izquierdo, ojo que no guiña / ojo que guiña: EAR 0,6 y flujo integrado 0,5. Esta vez se parecen; sigue sin estar claro si la malla exagera. El flujo integrado no es fiable con el ojo cerrado del todo.
 
+## Paso 4c: prueba con controles (JSON del autor, 2026-11-07, commit 89eba00)
+Plan «contracción mínima con controles»: 20 repeticiones al azar (10 contracciones mínimas, 10 controles). Análisis: `node scripts/dev/analyze-flow.mjs informe.json` (apartado «CRITERIO 3 CON CONTROLES»).
+
+- Se apartan solo las repeticiones con un parpadeo de verdad (cierre ≥ 50 %): 5 de 20. El detector marca además eventos poco profundos (20–35 %) tras muchas contracciones; son la propia contracción o ruido, y apartarlos quitaba sobre todo contracciones (primera versión del análisis: 11 de 20 apartadas, 7 de ellas contracciones).
+- Resultado (7 contracciones y 8 controles válidos; detectada = por encima del p95 de 108 ventanas de reposo):
+
+  | medida | aciertos | falsas alarmas | AUC |
+  |---|---|---|---|
+  | EAR izquierdo | 2/7 | 1/8 | 0,77 |
+  | EAR derecho | 4/7 | 1/8 | 0,84 |
+  | **cierre por flujo, izquierdo** | **6/7** | 1/8 | 0,88 |
+  | **cierre por flujo, derecho** | **6/7** | 1/8 | 0,96 |
+
+- Por ojo, el flujo detectó 6 contracciones que el EAR no vio y el EAR ninguna que el flujo no viera. La única falsa alarma es el mismo control en las cuatro medidas: probablemente un movimiento real (anticipación o parpadeo leve).
+- **Criterio 3: cumplido de forma provisional.** El cierre por flujo detecta contracciones mínimas que el EAR no distingue del reposo, sin más falsas alarmas. Muestra pequeña: conviene repetirlo otro día, con buena luz, para confirmarlo.
+- Rendimiento: análisis de la cara 20–25/s (por debajo de 24 en las tandas), probablemente por calor tras tres pruebas seguidas. Pendiente: bajar el flujo (p. ej. a 24 pares/s) cuando el análisis de la cara no llegue.
+
 ## Propuesta para terminar la fase 4 (1 y 2 hechos; aprobada por el autor)
 1. **Apertura por flujo** como métrica de la app (curva y JSON), con corrección de la deriva (integrador con fuga o restar la línea base de los últimos segundos).
 2. **Prueba de contracción mínima con controles**: ~10 contracciones mínimas y ~10 controles en orden aleatorio, con dos pitidos distintos («contrae» / «no hagas nada»); tasas de acierto y falsos positivos del EAR y del flujo.

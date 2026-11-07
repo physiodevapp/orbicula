@@ -34,9 +34,15 @@ const f = (v, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : '—');
 const rms = (e) => Math.sqrt(e); // energía → velocidad (DI/s)
 
 /** Ventanas [ini, fin] (ms, reloj de las series) de los parpadeos de cualquier lado, con margen. */
-function blinkWindows(s, before = 150, after = 300) {
-  return SIDES.flatMap((side) => s.events[side].map((e) => [e.t - e.duration - before, e.t + e.duration + after]));
+function blinkWindows(s, before = 150, after = 300, minCompleteness = 0) {
+  return SIDES.flatMap((side) => s.events[side].filter((e) => e.completeness >= minCompleteness).map((e) => [e.t - e.duration - before, e.t + e.duration + after]));
 }
+/**
+ * En la detección calibrada solo se apartan los parpadeos de verdad (cierre ≥ 50 %): el detector
+ * también marca eventos poco profundos (20–35 %) que son la propia contracción mínima o ruido, y
+ * apartarlos quitaría sobre todo contracciones. La misma regla vale para el reposo y las repeticiones.
+ */
+const REAL_BLINK = 0.5;
 const inAny = (t, wins) => wins.some(([a, b]) => t >= a && t <= b);
 
 // ── Reposo ─────────────────────────────────────────────────────────────────────────────────────
@@ -187,7 +193,7 @@ for (const id of ['nod', 'turn']) {
   for (const id of ['check', 'rest', 'natural', 'rest-end']) {
     const s = step(id);
     if (!s) continue;
-    const bw = blinkWindows(s, 200, 400);
+    const bw = blinkWindows(s, 200, 400, REAL_BLINK);
     for (let h = 1000; h + HOLD + D + 800 < s.series.t.at(-1); h += 250) {
       if (bw.some(([a, b]) => b >= h - 800 && a <= h + HOLD + D + 600)) continue;
       nul.push(statsAt(s, h));
@@ -202,13 +208,13 @@ for (const id of ['nod', 'turn']) {
   if (micro.length) {
     // Se apartan las repeticiones con un parpadeo dentro de la ventana (falsearían las dos medidas).
     const all = micro.flatMap((s) => {
-      const bw = blinkWindows(s, 200, 400);
+      const bw = blinkWindows(s, 200, 400, REAL_BLINK);
       return reps(s).map((r) => ({ ...r, blink: bw.some(([a, b]) => b >= r.hold - 800 && a <= r.release + 800 + 600), x: statsAt(s, r.hold, r.release) }));
     });
     const trials = all.filter((t) => !t.blink);
     const act = trials.filter((t) => t.cond === 'act');
     const ctl = trials.filter((t) => t.cond === 'control');
-    console.log(`\n(${all.length - trials.length} de ${all.length} repeticiones apartadas por un parpadeo en la ventana: ${all.filter((t) => t.blink).map((t) => t.cond).join(', ') || 'ninguna'})`);
+    console.log(`\n(${all.length - trials.length} de ${all.length} repeticiones apartadas por un parpadeo de verdad —cierre ≥ 50 %— en la ventana: ${all.filter((t) => t.blink).map((t) => t.cond).join(', ') || 'ninguna'})`);
     // AUC = probabilidad de que una contracción dé más que un control (0,5 = azar, 1 = separación perfecta).
     const auc = (k) => {
       let w = 0;
