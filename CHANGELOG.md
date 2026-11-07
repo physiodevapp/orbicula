@@ -28,7 +28,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - Lateralidad con guiños de cada ojo, con la cámara frontal y con la trasera: la apertura por landmarks y el blendshape de parpadeo suben en el lado correcto (I = izquierda del paciente). La asignación por defecto de los blendshapes es la correcta (no hace falta invertirla).
 - Análisis con la frontal en prioridad «Resolución»: 25–28 análisis/s, 33–37 ms, GPU; ojo de ≈ 250 px de ancho.
 
-### Cambiado
+### Cambiado (a partir de la primera sesión real con la cámara frontal)
+- Detector de parpadeos: un cierre ya no acaba al recuperar un % fijo del reposo sino al recuperar el 60 % de **su propia profundidad** (o el 90 % del reposo, lo que ocurra antes). Antes, si el ojo se quedaba un rato más entornado, el detector se «atascaba» durante segundos y se tragaba los parpadeos siguientes (en los datos: un cierre de 5,4 s que ocultaba cuatro parpadeos). Reposo de 20 s: de 10 y 7 parpadeos detectados a 14 y 13 (anotados a mano: unos 13).
+- Umbral de inicio 0,75 → 0,8 del reposo (y fin 0,85 → 0,9): recoge bajadas flojas que el muestreo de ~20 Hz apenas ve. Sin falsos eventos en mirada y cabeceo.
+- Un parpadeo muy rápido de una sola muestra cuenta si cierra al menos el 40 %.
+- Nuevo tipo de evento `narrowing` («entornado»): más de 0,8 s pero con un cierre menor del 50 %. Se distingue de `closure`.
+- Las series del asistente guardan también los blendshapes de mirada (`lookDown`, `lookUp`) para estudiar los falsos cierres al mirar hacia abajo.
+- Asistente: textos de revisión más claros («cierres de más de 0,8 s») y avisos en los pasos de guiño y de mirada.
 - Los fps de la cámara se miden con `presentedFrames`, para que el análisis no los infravalore.
 
 ### Añadido

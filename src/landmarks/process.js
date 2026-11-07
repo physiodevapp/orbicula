@@ -27,6 +27,9 @@ export function sampleOf(result) {
     ear: result.rois[s].ear,
     aperture: result.rois[s].aperture,
     blink: result.blend[s].eyeBlink ?? NaN,
+    // Mirada arriba/abajo del modelo: para estudiar los falsos cierres al mirar hacia abajo.
+    lookDown: result.blend[s].eyeLookDown ?? NaN,
+    lookUp: result.blend[s].eyeLookUp ?? NaN,
   });
   return { left: side('left'), right: side('right') };
 }

@@ -132,10 +132,63 @@ describe('BlinkDetector', () => {
     expect(run(new BlinkDetector({ baseline: 0.3 }), s)).toHaveLength(1);
   });
 
+  it('un ojo que se queda más entornado que antes tras un parpadeo no deja el detector atascado', () => {
+    // Datos reales: tras un parpadeo el ojo se queda ~5 s al 74 % del reposo; los parpadeos de ese
+    // tramo no se deben perder (antes el cierre «no acababa» hasta recuperar el 85 % del reposo).
+    const det = new BlinkDetector();
+    const events = [];
+    for (let t = 0; t <= 14000; t += 45) {
+      let v = 0.32;
+      if (t >= 6000 && t < 11500) v = 0.235; // ojo algo entornado
+      const dip = (c) => (Math.abs(t - c) < 90 ? 0.04 : null); // parpadeos muy breves, casi cerrados
+      v = dip(6000 + 600) ?? dip(6000 + 3200) ?? v;
+      const e = det.push(t, v);
+      if (e) events.push(e);
+    }
+    const blinks = events.filter((e) => e.kind === 'blink');
+    expect(blinks.length).toBeGreaterThanOrEqual(2);
+    // Mientras el ojo está entornado no hay ningún «cierre»: como mucho un «entornado» (poco profundo).
+    expect(events.filter((e) => e.kind === 'closure')).toHaveLength(0);
+    for (const e of events.filter((x) => x.duration > 800)) expect(e.kind).toBe('narrowing');
+  });
+
+  it('dos parpadeos seguidos con reapertura parcial cuentan como dos', () => {
+    // El EAR no vuelve al 85 % del reposo entre ambos, pero sí recupera más de la mitad.
+    const det = new BlinkDetector();
+    const sig = [];
+    for (let t = 0; t <= 9000; t += 40) {
+      let v = 0.3;
+      const f = (c) => Math.max(0, 1 - Math.abs(t - c) / 90);
+      v -= 0.22 * f(5000) + 0.22 * f(5350);
+      sig.push({ t, v });
+    }
+    expect(run(det, sig)).toHaveLength(2);
+  });
+
+  it('un parpadeo muy rápido de una sola muestra cuenta si es profundo y no si es superficial', () => {
+    const mk = (v) => {
+      const s = [];
+      for (let t = 0; t <= 6000; t += 80) s.push({ t, v: t === 4000 ? v : 0.3 });
+      return s;
+    };
+    expect(run(new BlinkDetector(), mk(0.08))).toHaveLength(1);
+    expect(run(new BlinkDetector(), mk(0.2))).toHaveLength(0); // solo baja el 33 %
+  });
+
   it('un cierre sostenido del ojo no arrastra el reposo: tras el cierre se detecta el siguiente parpadeo', () => {
     const det = new BlinkDetector();
     const events = run(det, signal({ seconds: 30, blinks: [{ t0: 4000, hold: 2000 }, { t0: 20000 }] }));
     expect(events.map((e) => e.kind)).toEqual(['closure', 'blink']);
+  });
+
+  it('un cierre largo y poco profundo es «entornado»; uno profundo, «cierre»', () => {
+    const shallow = run(new BlinkDetector(), signal({ blinks: [{ t0: 4000, hold: 1500, min: 0.2 }] }));
+    expect(shallow.map((e) => e.kind)).toEqual(['narrowing']);
+    const deep = run(new BlinkDetector(), signal({ blinks: [{ t0: 4000, hold: 1500, min: 0.1 }] }));
+    expect(deep.map((e) => e.kind)).toEqual(['closure']);
+    const det = new BlinkDetector();
+    run(det, signal({ blinks: [{ t0: 4000, hold: 1500, min: 0.2 }] }));
+    expect(det.stats(20000)).toMatchObject({ count: 0, closures: 0, narrowings: 1 });
   });
 
   it('reset borra eventos y reposo', () => {

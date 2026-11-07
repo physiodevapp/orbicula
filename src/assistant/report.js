@@ -19,9 +19,11 @@ export function stats(values) {
 function sideSummary(step, side) {
   const events = step.events[side];
   const blinks = events.filter((e) => e.kind === 'blink');
+  const closures = events.filter((e) => e.kind === 'closure');
   return {
     blinks: blinks.length,
-    closures: events.length - blinks.length,
+    closures: closures.length,
+    narrowings: events.length - blinks.length - closures.length,
     blinkDurationMs: stats(blinks.map((e) => e.duration)),
     blinkCompleteness: stats(blinks.map((e) => e.completeness)),
     ear: stats(step.series[side].ear),
@@ -46,8 +48,9 @@ export function describeSummary(step) {
   const s = summarizeStep(step);
   const side = (name, x) => {
     const comp = x.blinkCompleteness.mean == null ? '' : ` · cierre medio ${Math.round(x.blinkCompleteness.mean * 100)} %`;
-    const clo = x.closures ? ` · ${x.closures} cierre${x.closures > 1 ? 's' : ''} largo${x.closures > 1 ? 's' : ''}` : '';
-    return `${name}: ${x.blinks} parpadeo${x.blinks === 1 ? '' : 's'}${comp}${clo}`;
+    const clo = x.closures ? ` · ${x.closures} cierre${x.closures > 1 ? 's' : ''} de más de 0,8 s` : '';
+    const nar = x.narrowings ? ` · ${x.narrowings} entornado${x.narrowings > 1 ? 's' : ''}` : '';
+    return `${name}: ${x.blinks} parpadeo${x.blinks === 1 ? '' : 's'}${comp}${clo}${nar}`;
   };
   return `${side('I', s.left)}\n${side('D', s.right)}\nCara detectada en el ${Math.round((s.faceFraction ?? 0) * 100)} % de las muestras.`;
 }

@@ -125,9 +125,10 @@ export function createAssistant({ getContext, getPerf, onStart }) {
       el.revTitle.textContent = `${s.step.title}${interrupted ? ' (interrumpido)' : ''}`;
       el.summary.textContent = interrupted ? `Interrumpido: ${c.interruptReason}. Repite el paso.` : describeSummary(c);
       const x = s.step.expect;
-      el.expect.textContent = !x ? '' : x.closures != null
-        ? `Esperado: ${x.closures} cierres largos.`
-        : `Esperado: I ${x.left}, D ${x.right} parpadeos.`;
+      const exp = !x ? '' : x.closures != null
+        ? `Esperado: ${x.closures} cierres en cada ojo.`
+        : `Esperado: I ${x.left}, D ${x.right} (parpadeos o cierres).`;
+      el.expect.textContent = [exp, s.step.hint].filter(Boolean).join(' ');
       el.countedRow.hidden = !s.step.countable;
       el.counted.value = c.user.counted ?? '';
       el.notes.value = c.user.notes ?? '';

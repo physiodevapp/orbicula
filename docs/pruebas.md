@@ -42,9 +42,11 @@ Solo medidas numéricas y la configuración: ninguna imagen, ningún nombre. Inc
     "user": { "counted": null, "notes": "" },     // lo que anota el usuario
     "perf": { "cameraFps": 0, "analysisFps": 0, "analysisMs": 0 },
     "summary": { "samples": 0, "faceFraction": 0, "left": { /* parpadeos, cierres, duración, completitud, EAR… */ }, "right": {} },
-    "events": { "left": [ { "kind": "blink|closure", "t": 0, "duration": 0, "min": 0, "baseline": 0, "completeness": 0 } ], "right": [] },
-    "series": { "t": [], "left": { "ear": [], "aperture": [], "blink": [] }, "right": { } }   // t en ms desde el inicio del paso; null = sin cara
+    "events": { "left": [ { "kind": "blink|closure|narrowing", "t": 0, "duration": 0, "min": 0, "baseline": 0, "completeness": 0 } ], "right": [] },
+    "series": { "t": [], "left": { "ear": [], "aperture": [], "blink": [], "lookDown": [], "lookUp": [] }, "right": { } }   // t en ms desde el inicio del paso; null = sin cara
   }]
 }
 ```
+Tipos de evento: `blink` (parpadeo, ≤ 0,8 s), `closure` (cierre de más de 0,8 s con el ojo muy cerrado, p. ej. un guiño mantenido) y `narrowing` («entornado»: más de 0,8 s pero con un cierre poco profundo, < 50 %). `lookDown` y `lookUp` son los blendshapes de mirada del modelo, para estudiar los falsos cierres al mirar hacia abajo.
+
 Los lados son siempre los del paciente. Las series completas permiten reproducir el detector con los datos reales y ajustar los umbrales sin repetir la prueba.

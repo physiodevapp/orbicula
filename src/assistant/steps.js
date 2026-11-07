@@ -32,6 +32,7 @@ export const PHASE3_STEPS = [
     instruction: 'Cierra SOLO el ojo izquierdo, ábrelo y espera 2 segundos. Repite 5 veces.',
     durationMs: 25000,
     expect: { left: 5, right: 0 },
+    hint: 'Un guiño de más de 0,8 s se anota como «cierre» y no como parpadeo. Es normal que el otro ojo acompañe con un cierre más corto.',
     countable: true,
   },
   {
@@ -40,6 +41,7 @@ export const PHASE3_STEPS = [
     instruction: 'Cierra SOLO el ojo derecho, ábrelo y espera 2 segundos. Repite 5 veces.',
     durationMs: 25000,
     expect: { left: 0, right: 5 },
+    hint: 'Un guiño de más de 0,8 s se anota como «cierre» y no como parpadeo. Es normal que el otro ojo acompañe con un cierre más corto.',
     countable: true,
   },
   {
@@ -56,6 +58,7 @@ export const PHASE3_STEPS = [
     instruction: 'Cierra los dos ojos suavemente durante 2 segundos y ábrelos. Repite 3 veces con 4 segundos de pausa.',
     durationMs: 25000,
     expect: { closures: 3 },
+    hint: 'Se cuenta como «cierre» todo lo que dure más de 0,8 s con los ojos cerrados.',
     countable: true,
   },
   {
@@ -64,6 +67,7 @@ export const PHASE3_STEPS = [
     instruction: 'Sin parpadear a propósito: mira arriba, al frente, abajo, al frente. Repite 3 veces, despacio.',
     durationMs: 20000,
     expect: { left: 0, right: 0 },
+    hint: 'Al mirar hacia abajo el párpado baja y el detector puede anotarlo como cierre: es un caso conocido que se está estudiando.',
   },
   {
     id: 'nod',

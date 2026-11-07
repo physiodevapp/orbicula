@@ -14,7 +14,7 @@ function make(extra = {}) {
   const s = new GuidedSession(STEPS, { now: () => t, prepMs: 300, onCue: (c) => cues.push(c), getPerf: () => ({ analysisFps: 24 }), ...extra });
   return { s, cues, at: (v) => { t = v; s.tick(); } };
 }
-const sample = (l, r) => ({ left: { ear: l, aperture: 0.2, blink: 0.1 }, right: { ear: r, aperture: 0.2, blink: 0.1 } });
+const sample = (l, r) => ({ left: { ear: l, aperture: 0.2, blink: 0.1, lookDown: 0.3 }, right: { ear: r, aperture: 0.2, blink: 0.1, lookDown: 0.3 } });
 const ev = (t, kind = 'blink') => ({ kind, t, duration: 120.4, min: 0.1234, baseline: 0.3, completeness: 0.6 });
 
 describe('GuidedSession', () => {
@@ -59,6 +59,8 @@ describe('GuidedSession', () => {
     expect(c.rel).toEqual([0, 40, 80]);
     expect(c.series.left.ear).toEqual([0.31, 0.1, null]);
     expect(c.series.right.ear).toEqual([0.29, 0.29, null]);
+    expect(c.series.left.lookDown).toEqual([0.3, 0.3, null]);
+    expect(c.series.left.lookUp).toEqual([null, null, null]); // sin dato = null
     expect(c.events.left).toEqual([{ kind: 'blink', t: 20, duration: 120, min: 0.123, baseline: 0.3, completeness: 0.6 }]);
     expect(c.events.right).toEqual([]);
   });
@@ -292,6 +294,7 @@ describe('informe', () => {
     expect(sum.faceFraction).toBeCloseTo(0.9);
     expect(sum.left.blinks).toBe(1);
     expect(sum.left.closures).toBe(1);
+    expect(sum.left.narrowings).toBe(0);
     expect(sum.right.blinks).toBe(0);
     expect(sum.left.ear.mean).toBeCloseTo(0.3);
     expect(describeSummary(s.results[0])).toMatch(/I: 1 parpadeo/);

@@ -5,15 +5,19 @@
 //  - «Apertura en reposo» (línea base): percentil alto de la ventana de los últimos segundos.
 //    Los parpadeos son breves, así que el percentil 90 los ignora. Puede fijarse desde fuera
 //    (`baseline`): la calibración del protocolo (fase 5) la dará con el reposo del paciente.
-//  - Un cierre empieza cuando la señal baja de `startRatio` × reposo y acaba cuando vuelve a
-//    subir de `endRatio` × reposo (histéresis, para no contar dos veces un mismo parpadeo).
+//  - Un cierre empieza cuando la señal baja de `startRatio` × reposo. Acaba cuando la señal se
+//    recupera: por encima de `endRatio` × reposo o, si es antes, cuando recupera `recovery` de
+//    la profundidad del propio cierre (mínimo + recovery × (reposo − mínimo)). La segunda
+//    condición evita que un ojo que se queda un rato más entornado que antes (cansancio,
+//    relajación) deje el detector «atascado» y se trague los parpadeos siguientes.
 //  - Duración = tiempo entre los cruces (interpolados) del nivel intermedio entre el reposo y
 //    el mínimo: no depende de los umbrales de arriba ni de la frecuencia de muestreo.
 //  - Completitud = cierre respecto a la apertura en reposo = (reposo − mínimo) / reposo. El EAR
 //    no llega a 0 con el ojo cerrado (el contorno del párpado tiene grosor): en las pruebas del
 //    autor un cierre completo ronda el 70–80 %.
-//  - Un cierre de más de `closureMs` se anota como «cierre» (voluntario o mantenido), no como
-//    parpadeo, y no cuenta para la frecuencia.
+//  - Un cierre de más de `closureMs` no es un parpadeo y no cuenta para la frecuencia: se anota
+//    como «cierre» (voluntario o mantenido) si es profundo, o como «entornado» si el ojo solo
+//    baja de `narrowingDepth` (entrecerrar los ojos, relajar el párpado).
 //
 // Todos los umbrales son provisionales y se ajustarán con pruebas en el móvil.
 
@@ -21,10 +25,13 @@ export const BLINK_DEFAULTS = {
   windowMs: 5000, // ventana para estimar el reposo
   percentile: 0.9,
   warmupMs: 1500, // sin detección hasta tener esta cantidad de señal
-  startRatio: 0.75,
-  endRatio: 0.85,
+  startRatio: 0.8, // con datos reales: 0,75 se dejaba bajadas flojas que el muestreo (~20 Hz) apenas ve
+  endRatio: 0.9,
+  recovery: 0.6, // fracción de la profundidad del cierre que se ha de recuperar para darlo por terminado
   minSamples: 2, // muestras por debajo del umbral de inicio para aceptar un cierre
+  singleSampleDepth: 0.4, // …salvo un parpadeo muy rápido, de una sola muestra, si cierra al menos esta fracción
   closureMs: 800,
+  narrowingDepth: 0.5, // un evento largo que cierra menos que esto es «entornado», no «cierre»
   maxGapMs: 250, // un hueco mayor (cara perdida) corta el cierre en curso
   baseline: null,
 };
@@ -55,6 +62,7 @@ export class BlinkDetector {
     this.closing = false;
     this.ev = []; // muestras del cierre en curso
     this.base0 = null; // reposo al empezar el cierre
+    this.minV = Infinity; // mínimo del cierre en curso
     this.prev = null;
     this.firstT = null;
     this.events = [];
@@ -95,11 +103,15 @@ export class BlinkDetector {
       if (base != null && v < this.opt.startRatio * base) {
         this.closing = true;
         this.base0 = base;
+        this.minV = v;
         this.ev = this.prev ? [this.prev, sample] : [sample];
       }
     } else {
       this.ev.push(sample);
-      if (v > this.opt.endRatio * this.base0) {
+      this.minV = Math.min(this.minV, v);
+      const { endRatio, recovery } = this.opt;
+      const endLevel = Math.min(endRatio * this.base0, this.minV + recovery * (this.base0 - this.minV));
+      if (v > endLevel) {
         out = this.#finish();
         this.closing = false;
         this.ev = [];
@@ -112,10 +124,10 @@ export class BlinkDetector {
   #finish() {
     const { ev, base0: base } = this;
     const below = ev.filter((s) => s.v < this.opt.startRatio * base).length;
-    if (below < this.opt.minSamples) return null;
-
     let min = ev[0];
     for (const s of ev) if (s.v < min.v) min = s;
+    const depth = (base - min.v) / base;
+    if (below < this.opt.minSamples && !(below >= 1 && depth >= this.opt.singleSampleDepth)) return null;
     const half = (base + min.v) / 2;
 
     let tDown = ev[0].t;
@@ -134,8 +146,9 @@ export class BlinkDetector {
     }
 
     const duration = Math.max(0, tUp - tDown);
+    const long = duration > this.opt.closureMs;
     const event = {
-      kind: duration > this.opt.closureMs ? 'closure' : 'blink',
+      kind: !long ? 'blink' : depth < this.opt.narrowingDepth ? 'narrowing' : 'closure',
       t: min.t, // instante del mínimo
       tDown,
       tUp,
@@ -151,12 +164,14 @@ export class BlinkDetector {
   /** Cuenta, frecuencia (por minuto, sobre los últimos 60 s) y último parpadeo. */
   stats(tNow) {
     const blinks = this.events.filter((e) => e.kind === 'blink');
+    const closures = this.events.filter((e) => e.kind === 'closure');
     const elapsed = this.firstT == null ? 0 : tNow - this.firstT;
     const recent = blinks.filter((e) => e.t >= tNow - 60000).length;
     const span = Math.min(60000, elapsed);
     return {
       count: blinks.length,
-      closures: this.events.length - blinks.length,
+      closures: closures.length,
+      narrowings: this.events.length - blinks.length - closures.length,
       // Antes de 10 s de señal la frecuencia no es fiable.
       perMinute: span >= 10000 ? (recent * 60000) / span : null,
       last: blinks.at(-1) ?? null,

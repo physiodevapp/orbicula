@@ -9,6 +9,10 @@ export const PREP_MS = 3000;
 
 const r3 = (v) => (Number.isFinite(v) ? Math.round(v * 1000) / 1000 : null);
 
+/** Señales que se guardan por lado en cada paso. */
+export const SERIES_KEYS = ['ear', 'aperture', 'blink', 'lookDown', 'lookUp'];
+const emptySide = () => Object.fromEntries(SERIES_KEYS.map((k) => [k, []]));
+
 const newResult = (step, attempt) => ({
   id: step.id,
   attempt, // nº de intento de este paso (sube al repetirlo)
@@ -24,7 +28,7 @@ const newResult = (step, attempt) => ({
   perf: null,
   t0: null, // marca de tiempo (cámara) de la primera muestra
   rel: [], // ms desde t0
-  series: { left: { ear: [], aperture: [], blink: [] }, right: { ear: [], aperture: [], blink: [] } },
+  series: { left: emptySide(), right: emptySide() },
   events: { left: [], right: [] },
 });
 
@@ -125,7 +129,7 @@ export class GuidedSession {
     c.t0 ??= t;
     c.rel.push(Math.round(t - c.t0));
     for (const side of ['left', 'right']) {
-      for (const k of ['ear', 'aperture', 'blink']) c.series[side][k].push(r3(sample?.[side]?.[k]));
+      for (const k of SERIES_KEYS) c.series[side][k].push(r3(sample?.[side]?.[k]));
       for (const e of events[side] ?? []) {
         c.events[side].push({
           kind: e.kind,

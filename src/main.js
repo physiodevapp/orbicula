@@ -242,7 +242,8 @@ function logBlink(side, e) {
   who.className = `side-${side}`;
   who.textContent = SIDE_LETTER[side];
   const what = document.createElement('span');
-  what.textContent = `${e.kind === 'blink' ? 'parpadeo' : 'cierre'} · ${Math.round(e.duration)} ms · ${Math.round(e.completeness * 100)} %`;
+  const KIND = { blink: 'parpadeo', closure: 'cierre', narrowing: 'entornado' };
+  what.textContent = `${KIND[e.kind]} · ${Math.round(e.duration)} ms · ${Math.round(e.completeness * 100)} %`;
   li.append(at, who, what);
   els.blinkLog.prepend(li);
   while (els.blinkLog.children.length > 8) els.blinkLog.lastChild.remove();
