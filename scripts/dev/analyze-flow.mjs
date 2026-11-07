@@ -1,6 +1,9 @@
 // Análisis del JSON del asistente de la fase 4 (paso 4c): criterios 3 y 4 de docs/plan-fase-4.md.
 //
-//   node scripts/dev/analyze-flow.mjs informe.json
+//   node scripts/dev/analyze-flow.mjs informe.json [--fix micro-1:1=act,micro-2:4=control]
+//
+// --fix corrige la condición de repeticiones en las que quien hace la prueba se equivocó de gesto
+// (lo anota al compartir el JSON): paso:repetición=act|control.
 //
 // - Reposo: p95 y p99 de la energía de cada ROI y compensación, y ruido del EAR (desviación típica).
 //   Se quitan los parpadeos (±margen) para que la referencia sea el reposo de verdad.
@@ -12,6 +15,10 @@
 import { readFileSync } from 'node:fs';
 
 const j = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const fixArg = process.argv[process.argv.indexOf('--fix') + 1];
+const FIXES = process.argv.includes('--fix')
+  ? Object.fromEntries(fixArg.split(',').map((x) => { const [k, v] = x.split('='); return [k, v]; }))
+  : {};
 const ROIS = ['upperLid', 'lowerLid', 'brow', 'canthus'];
 const VAR = { eN: 'sin comp.', eR: 'dorso nasal', eP: 'postura' };
 const SIDES = ['left', 'right'];
@@ -80,7 +87,10 @@ const earAt = (s, side, t0, t1) => s.series.t.map((t, i) => [t, s.series[side].e
 
 function reps(s) {
   const holds = s.marks.filter((m) => m.kind === 'hold');
-  return holds.map((h) => ({ rep: h.rep, hold: h.t, cond: h.cond ?? 'act', release: s.marks.find((m) => m.kind === 'release' && m.rep === h.rep)?.t }));
+  return holds.map((h) => {
+    const fixed = FIXES[`${s.id}:${h.rep}`];
+    return { rep: h.rep, hold: h.t, cond: fixed ?? h.cond ?? 'act', fixed: !!fixed, release: s.marks.find((m) => m.kind === 'release' && m.rep === h.rep)?.t };
+  });
 }
 
 /**
@@ -230,7 +240,7 @@ for (const id of ['nod', 'turn']) {
       console.log(`${k.padEnd(12)}  ${`${hit}/${act.length}`.padStart(7)}   ${`${fa}/${ctl.length}`.padStart(13)}   ${f(auc(k), 2).padStart(6)}`);
     }
     console.log('Por repetición (orden de la prueba):');
-    for (const t of all) console.log(`${t.blink ? '  [parpadeo] ' : ''}` + `  ${t.cond === 'act' ? 'CONTRAE ' : 'control '} ${keys.map((k) => `${k} ${f(t.x[k], 3)} (${rank(k, t.x[k])})`).join(' · ')}`);
+    for (const t of all) console.log(`${t.blink ? '  [parpadeo] ' : ''}${t.fixed ? '  [corregida] ' : ''}` + `  ${t.cond === 'act' ? 'CONTRAE ' : 'control '} ${keys.map((k) => `${k} ${f(t.x[k], 3)} (${rank(k, t.x[k])})`).join(' · ')}`);
   }
 
   for (const id of ['minimal', 'more']) {

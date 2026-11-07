@@ -137,7 +137,8 @@ Plan «contracción mínima con controles»: 20 repeticiones al azar (10 contrac
   | **cierre por flujo, izquierdo** | **6/7** | 1/8 | 0,88 |
   | **cierre por flujo, derecho** | **6/7** | 1/8 | 0,96 |
 
-- Por ojo, el flujo detectó 6 contracciones que el EAR no vio y el EAR ninguna que el flujo no viera. La única falsa alarma es el mismo control en las cuatro medidas: probablemente un movimiento real (anticipación o parpadeo leve).
+- Por ojo, el flujo detectó 6 contracciones que el EAR no vio y el EAR ninguna que el flujo no viera.
+- El autor se equivocó en la repetición 1 de la primera tanda (contrajo en un control): `--fix micro-1:1=act`. No cambia nada, porque esa repetición ya quedaba apartada por un parpadeo; el flujo la marcó (100/100) y el EAR no (69/85). En el resto hizo el gesto que tocaba, así que la falsa alarma (el mismo control en las cuatro medidas) es real: coincide con un cierre parcial poco profundo (23–33 %) que el detector marcó como parpadeo.
 - **Criterio 3: cumplido de forma provisional.** El cierre por flujo detecta contracciones mínimas que el EAR no distingue del reposo, sin más falsas alarmas. Muestra pequeña: conviene repetirlo otro día, con buena luz, para confirmarlo.
 - Rendimiento: análisis de la cara 20–25/s (por debajo de 24 en las tandas), probablemente por calor tras tres pruebas seguidas. Pendiente: bajar el flujo (p. ej. a 24 pares/s) cuando el análisis de la cara no llegue.
 
