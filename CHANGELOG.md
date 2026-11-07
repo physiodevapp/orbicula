@@ -4,6 +4,30 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (fase 5a: calibración y eventos)
+- **Calibración sobre el reposo** (`src/protocol/events.js`, `calibrate`). Por lado salen:
+  - el umbral de los eventos;
+  - la apertura en reposo (EAR y apertura normalizada) y el ruido del EAR;
+  - el umbral de «cabeza quieta»: 3 × la mediana de la velocidad del dorso nasal, entre 0,1 y 0,3 DI/s;
+  - el p99 de la energía de la ceja y el canto.
+
+  Dice si el reposo vale (tiempo sin parpadeos y con la cabeza quieta, cara detectada) y, si no, por qué.
+- **Eventos en directo** (`EventDetector`):
+  - **Medida:** la *subida* del cierre por flujo, es decir, cuánto se ha cerrado el ojo respecto a la mediana de los 0,6 s anteriores. Es la versión causal del estadístico del criterio 4 de la fase 4, con un test que lo comprueba.
+  - **Umbral:** el máximo de esa subida en el reposo válido, con un suelo provisional.
+  - **Puerta de la cabeza:** si el dorso nasal se mueve, se descartan los eventos de alrededor (±0,5 s). La velocidad se suaviza con la mediana de 3 pares, para que un pico suelto no descarte nada.
+  - **Parpadeos:** una contracción que coincide con un parpadeo de verdad (≥ 50 %) del mismo ojo cuenta como parpadeo.
+  - **Ceja y canto:** eventos experimentales por energía.
+- **Asistente:** el reposo de las pruebas de la fase 4 calibra al terminar, y desde ahí los eventos salen en directo.
+  - Aviso «Cabeza en movimiento».
+  - Contracciones en la lista de eventos.
+  - Curva nueva **«Eventos»**, con la subida, el umbral y las franjas de las contracciones; estas franjas salen también en «Cierre F».
+  - La revisión de cada paso dice cuántas contracciones hubo por ojo.
+- JSON del asistente **`orbicula-test-session/3`**: `calibration` (en el reposo) y `detections` (eventos de cada paso).
+- `scripts/dev/replay-events.mjs`: repite la calibración y el detector sobre un JSON del asistente. Da aciertos y falsas alarmas en las pruebas con controles, y eventos en el cabeceo y el giro.
+- **Selector de la curva:** en el móvil, en dos filas de tres.
+- 16 tests nuevos.
+
 ### Añadido (fase 4b: medida del flujo por ROI)
 - **Flujo por ROI y por lado del paciente** (párpado superior e inferior, ceja y canto externo). El worker devuelve, por ROI, 14 sumas de su campo de flujo («momentos», `src/flow/metrics.js`); con ellas el hilo principal calcula el flujo medio y la energía residual frente a cualquier movimiento afín de la cabeza, sin volver a recorrer los píxeles.
 - **Tres compensaciones de la cabeza a la vez** (`src/flow/processor.js`): ninguna, **dorso nasal** (restar su traslación) y **postura** (movimiento afín de puntos estables de la cara —dorso nasal, extremos del óvalo y frente—, interpolados entre los análisis que rodean a cada frame; cada par espera hasta 300 ms al análisis siguiente).

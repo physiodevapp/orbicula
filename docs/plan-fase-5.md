@@ -1,6 +1,12 @@
 # Plan de la fase 5: protocolo guiado
 
-**Borrador, pendiente de que lo apruebe el autor.** Se lee junto con `CLAUDE.md` y la «Conclusión de la fase 4» de `docs/plan-fase-4.md`.
+**Aprobado por el autor el 2026-11-07, con las recomendaciones:**
+- umbral = máximo del reposo;
+- duraciones de la tabla;
+- tarjeta «Protocolo» aparte;
+- la voz habla al paciente de **tú**.
+
+Se lee junto con `CLAUDE.md` y la «Conclusión de la fase 4» de `docs/plan-fase-4.md`.
 
 ## Qué tiene que hacer
 Un protocolo clínico guiado de seis fases que, al acabar, dé un **resumen por fase y lado con su asimetría** y un **registro de eventos**, con los umbrales calibrados sobre el reposo del propio paciente. Lo usa el clínico con el paciente delante: la voz y los pitidos van dirigidos al paciente.
@@ -125,6 +131,19 @@ Se calcula en la fase de sonrisa y, como referencia, en el reposo.
 - **5d. Cierre de la fase.**
   - Ajustes con los datos.
   - `README.md` con las instrucciones de uso clínico del protocolo, `CHANGELOG.md` y la conclusión en este documento.
+
+## Estado del paso 5a (hecho; pendiente de los JSON y de la prueba en el móvil)
+- Módulo puro `src/protocol/events.js`: `RiseTracker`, `calibrate` y `EventDetector`, con 16 tests.
+- **Cambios respecto al plan:**
+  - El umbral de «cabeza quieta» tiene también un techo provisional de 0,3 DI/s. Si la cabeza se mueve casi todo el reposo, la mediana ya es movimiento y el umbral relativo se inflaría.
+  - La velocidad de la cabeza se suaviza con la mediana de 3 pares.
+- **Cámara simulada** (vídeo `lid.y4m`, plan de la fase 4 con `?escala=0.6`): calibra, sin errores ni peticiones externas, y no da ningún evento.
+  - El párpado sintético de 1,5 px da un cierre máximo de 0,0014 DI. Ese cierre queda por debajo del máximo del reposo, porque el vídeo en bucle también lo tiene en el reposo. No sirve para validar la sensibilidad.
+  - Por eso el suelo del umbral se deja en 0,001 DI, que solo protege de umbrales ridículos.
+- **Falta:**
+  - Repetir el detector sobre los JSON reales de la fase 4 (`node scripts/dev/replay-events.mjs informe.json`). No están en el repo: el autor tiene que volver a pasarlos.
+  - Comprobar que reproduce las cifras de la fase 4: 12/13 aciertos y 2/15 falsas alarmas por ojo en las pruebas con controles, y 0 % en el cabeceo y el giro.
+  - Con esos datos, fijar el suelo.
 
 ## Pruebas
 - **Tests unitarios:**

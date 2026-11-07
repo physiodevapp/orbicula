@@ -92,6 +92,8 @@ const newResult = (step, attempt) => ({
   marks: [], // repeticiones: { rep, kind: 'hold'|'release', t } (t en ms desde t0, el reloj de las series)
   reps: step.reps ?? null,
   wantsFlow: !!step.flow, // el plan necesita el flujo óptico (para avisar si no llega)
+  calibration: null, // calibración sobre este paso (si es el reposo; fase 5)
+  detections: [], // eventos de la fase 5 (src/protocol/events.js), en ms desde t0
 });
 
 export class GuidedSession {
@@ -100,13 +102,14 @@ export class GuidedSession {
    * @param {{now?: () => number, prepMs?: number, getPerf?: () => object|null,
    *          onChange?: (snapshot: object) => void, onCue?: (cue: string) => void}} opts
    */
-  constructor(steps, { now = () => performance.now(), prepMs = PREP_MS, getPerf = () => null, onChange = () => {}, onCue = () => {} } = {}) {
+  constructor(steps, { now = () => performance.now(), prepMs = PREP_MS, getPerf = () => null, onChange = () => {}, onCue = () => {}, onStepEnd = () => {} } = {}) {
     this.steps = steps;
     this.now = now;
     this.prepMs = prepMs;
     this.getPerf = getPerf;
     this.onChange = onChange;
     this.onCue = onCue;
+    this.onStepEnd = onStepEnd; // (resultado, paso) al terminar un paso grabado entero (p. ej. para calibrar)
     // Modo seguido: sin revisión; al terminar un paso se pasa solo al siguiente tras esta pausa
     // (null = desactivado). Pensado para hacerse la prueba uno mismo con la cámara trasera.
     this.autoAdvanceMs = null;
@@ -263,12 +266,24 @@ export class GuidedSession {
     for (const side of ['left', 'right']) f.closure[side].push(sig(s.closure?.[side]));
   }
 
+  /**
+   * Registra un evento de la fase 5 (EventDetector). Se acepta también durante la revisión: un evento
+   * se da por bueno hasta ~0,5–2 s después de acabar, y el final del paso puede quedar en medio.
+   * @param {{kind:string, side:string, tStart:number, tEnd:number, duration:number, peak:number, tPeak:number, status:string}} e
+   */
+  recordDetection(e) {
+    if (!['running', 'review'].includes(this.state) || this.cur?.t0 == null) return;
+    const c = this.cur;
+    c.detections.push({ kind: e.kind, side: e.side, t: Math.round(e.tStart - c.t0), duration: e.duration, peak: e.peak, tPeak: Math.round(e.tPeak - c.t0), status: e.status });
+  }
+
   /** Termina el paso en curso (por tiempo o antes de tiempo) y pasa a la revisión. */
   finishStep() {
     if (this.state !== 'running') return;
     this.cur.status = 'completed';
     this.cur.durationMs = Math.round(this.now() - this.phaseStart);
     this.cur.perf = this.getPerf();
+    this.onStepEnd(this.cur, this.step);
     this.state = 'review';
     this.phaseStart = this.now(); // para la pausa del modo seguido
     this.onCue('end');

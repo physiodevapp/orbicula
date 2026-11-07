@@ -402,7 +402,7 @@ describe('asistente de la fase 4', () => {
     expect(describeSummary(c)).toMatch(/Flujo p95/);
     s.next();
     const r = buildReport({ results: s.results, startedAt: 'x', plan: 'phase4', build: {}, device: {}, capture: {}, analysis: {}, flow: { config: 'farneback-320-vf-30' }, detector: {} });
-    expect(r.schema).toBe('orbicula-test-session/2');
+    expect(r.schema).toBe('orbicula-test-session/3');
     expect(r.plan).toBe('phase4');
     expect(r.steps[0].flow.left.upperLid.eN).toHaveLength(20);
     expect(r.steps[0].series.left.irisH).toBeDefined();
@@ -421,6 +421,48 @@ describe('asistente de la fase 4', () => {
     s.record(200, sample(0.3, 0.3));
     t = 2600; s.tick();
     expect(describeSummary(s.cur)).toMatch(/Sin datos de flujo/);
+  });
+});
+
+describe('fase 5 en el asistente: calibración y eventos', () => {
+  const STEP = [{ id: 'rest', title: 'Reposo', instruction: '', durationMs: 2000, calibrates: true }, { id: 'b', title: 'B', instruction: '', durationMs: 2000 }];
+
+  it('avisa al terminar un paso grabado entero (para calibrar) y la calibración va al informe v3', () => {
+    let t = 0;
+    const ended = [];
+    const s = new GuidedSession(STEP, { now: () => t, prepMs: 100, onStepEnd: (r, step) => { ended.push(step.id); r.calibration = { valid: true, rise: { left: 0.004, right: 0.005 } }; } });
+    s.start();
+    t = 100; s.tick();
+    s.record(200, sample(0.3, 0.3));
+    s.skip(); // saltado: no avisa
+    expect(ended).toEqual([]);
+    s.previous();
+    t = 300; s.tick();
+    s.record(400, sample(0.3, 0.3));
+    t = 2400; s.tick();
+    expect(ended).toEqual(['rest']);
+    expect(describeSummary(s.cur)).toMatch(/Calibración válida: umbral del cierre I 0.004 · D 0.005/);
+    s.next();
+    const r = buildReport({ results: s.results, startedAt: 'x', build: {}, device: {}, capture: {}, analysis: {}, detector: {} });
+    expect(r.steps[0].calibration.rise.right).toBe(0.005);
+  });
+
+  it('guarda los eventos en el reloj de las series, también si llegan durante la revisión', () => {
+    let t = 0;
+    const s = new GuidedSession(STEP, { now: () => t, prepMs: 100 });
+    s.start();
+    s.recordDetection({ kind: 'contraction', side: 'left', tStart: 50, tEnd: 90, duration: 40, peak: 2, tPeak: 60, status: 'ok' }); // cuenta atrás: no
+    t = 100; s.tick();
+    s.record(1000, sample(0.3, 0.3));
+    s.recordDetection({ kind: 'contraction', side: 'right', tStart: 1500, tEnd: 2000, duration: 500, peak: 3.21, tPeak: 1700, status: 'ok' });
+    t = 2200; s.tick();
+    expect(s.state).toBe('review');
+    s.recordDetection({ kind: 'contraction', side: 'left', tStart: 2600, tEnd: 2900, duration: 300, peak: 1.5, tPeak: 2700, status: 'head' });
+    expect(s.cur.detections).toEqual([
+      { kind: 'contraction', side: 'right', t: 500, duration: 500, peak: 3.21, tPeak: 700, status: 'ok' },
+      { kind: 'contraction', side: 'left', t: 1600, duration: 300, peak: 1.5, tPeak: 1700, status: 'head' },
+    ]);
+    expect(describeSummary(s.cur)).toMatch(/Contracciones detectadas: I 0 · D 1 \(1 descartadas por mover la cabeza\)/);
   });
 });
 

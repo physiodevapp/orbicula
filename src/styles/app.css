@@ -273,3 +273,10 @@ main {
 .bench-table caption { text-align: left; color: var(--text3); padding-bottom: var(--sp-2); }
 .bench-table th { text-align: left; color: var(--text3); font-weight: 400; padding: var(--sp-1) var(--sp-1) var(--sp-1) 0; }
 .bench-table td { color: var(--text); padding: var(--sp-1) var(--sp-1) var(--sp-1) 0; border-top: 1px solid var(--border); }
+
+/* Selector de la curva: seis opciones; en pantallas estrechas, en dos filas de tres. */
+@media (max-width: 560px) {
+  .curves .segmented { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; }
+  .curves .segmented button:nth-child(3n + 1) { border-left: 0; }
+  .curves .segmented button:nth-child(n + 4) { border-top: 1px solid var(--border2); }
+}

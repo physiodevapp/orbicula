@@ -2,7 +2,7 @@
 
 Guía paso a paso dentro de la app (tarjeta «Asistente de pruebas», debajo del vídeo) que registra las medidas de cada paso y las guarda en un archivo JSON para compartir con quien desarrolla la app. Sirve para probar cada fase sin ir y venir de capturas, y con datos reales del móvil para ajustar los umbrales.
 
-**No es el JSON de exportación de resultados** (ese es la interfaz pública y se define en la fase 7, con `docs/schema.md`). Este es un archivo de diagnóstico con su propio esquema, `orbicula-test-session/2` (desde la fase 4; la versión 1 no tenía `plan`, iris, flujo ni marcas).
+**No es el JSON de exportación de resultados** (ese es la interfaz pública y se define en la fase 7, con `docs/schema.md`). Este es un archivo de diagnóstico con su propio esquema, `orbicula-test-session/3`. La versión 3 es de la fase 5 y añade `calibration` y `detections`. La 2, de la fase 4, no los tenía; la 1 tampoco tenía `plan`, iris, flujo ni marcas.
 
 ## Pruebas disponibles
 - **Fase 4: flujo óptico** (por defecto, unos 4 min): reposo 20 s, contracción mínima («Entrecierra los ojos lo mínimo, como si sonrieras con los ojos») ×5, contracción algo mayor ×3, cabeceo 15 s, giro 12 s, cejas ×3, guiño izquierdo ×3, guiño derecho ×3 y parpadeo espontáneo 20 s. Enciende el flujo óptico al empezar (la primera vez descarga OpenCV.js). Las repeticiones van con pitidos: **agudo = ahora, grave = suelta**, y sobre el vídeo se lee «¡Ahora!» o «Suelta» con el número de repetición; se puede hacer con la cámara trasera sin mirar.
@@ -39,7 +39,7 @@ Solo medidas numéricas y la configuración: ninguna imagen, ningún nombre. Inc
 ## Estructura
 ```jsonc
 {
-  "app": "orbicula", "kind": "test-session", "schema": "orbicula-test-session/1",
+  "app": "orbicula", "kind": "test-session", "schema": "orbicula-test-session/3",
   "createdAt": "ISO-8601", "startedAt": "ISO-8601", "participantCode": null,
   "build":    { "version": "", "branch": "", "commit": "" },
   "device":   { "userAgent": "", "hardwareConcurrency": 0, "deviceMemory": 0, "language": "", "screen": {} },
@@ -58,7 +58,9 @@ Solo medidas numéricas y la configuración: ninguna imagen, ningún nombre. Inc
     "summary": { "samples": 0, "faceFraction": 0, "left": { /* parpadeos, cierres, duración, completitud, EAR… */ }, "right": {} },
     "events": { "left": [ { "kind": "blink|closure|narrowing", "t": 0, "duration": 0, "min": 0, "baseline": 0, "completeness": 0 } ], "right": [] },
     "reps": { "count": 5, "everyMs": 5000, "holdMs": 1500, "offsetMs": 2500 },   // repeticiones guiadas (o null)
-    "marks": [ { "rep": 1, "kind": "hold|release", "t": 0, "cond": "act|control" } ],   // pitidos «ahora» / «suelta», en el reloj de las series; cond solo en la prueba con controles
+    "marks": [ { "rep": 1, "kind": "hold|release", "t": 0, "cond": "act|control" } ],
+    "calibration": null,                          // solo en el reposo (fase 5): umbrales, validez y motivo (src/protocol/events.js)
+    "detections": [ { "kind": "contraction|blink|closure|brow|canthus", "side": "left|right", "t": 0, "duration": 0, "peak": 0, "tPeak": 0, "status": "ok|head|blink" } ],   // pitidos «ahora» / «suelta», en el reloj de las series; cond solo en la prueba con controles
     "series": { "t": [], "left": { "ear": [], "aperture": [], "blink": [], "lookDown": [], "lookUp": [], "irisH": [], "irisV": [] }, "right": { } },   // t en ms desde el inicio del paso; null = sin cara
     "flow": {                                     // un elemento por par de frames con flujo
       "t": [], "dt": [],                          // ms (mismo reloj que series.t) y ms entre los dos frames del par
@@ -73,5 +75,15 @@ Solo medidas numéricas y la configuración: ninguna imagen, ningún nombre. Inc
 Tipos de evento: `blink` (parpadeo, ≤ 0,8 s), `closure` (cierre de más de 0,8 s con el ojo muy cerrado, p. ej. un guiño mantenido) y `narrowing` («entornado»: más de 0,8 s pero con un cierre poco profundo, < 50 %). `lookDown` y `lookUp` son los blendshapes de mirada del modelo, para estudiar los falsos cierres al mirar hacia abajo.
 
 **Flujo** (`flow`, fase 4), por ROI y lado del paciente: `eN`, `eR`, `eP`, `eH` = energía residual sin compensar, compensada con el dorso nasal, con la postura y con «dorso nasal + giro», en (DI/s)² (DI = distancia intercantal); `dR`/`dP`/`dH` = componente **hacia abajo** (+ = el tejido baja) y `tR`/`tP`/`tH` = **hacia la sien** (+ = hacia fuera), en DI/s, con cada compensación. `closure` = cierre por flujo de cada ojo (DI, + = se cierra). `head` = movimiento de la cabeza que se resta, en el centro de la franja (DI/s). `summary.flow` da por ROI y compensación el p50, p95 y p99 de la energía. `irisH` = posición del iris a lo largo del ojo (0 = comisura interna, 1 = externa); `irisV` = hacia abajo (+), ambos respecto al ancho del ojo.
+
+**Eventos** (`detections`, fase 5), en ms desde el inicio del paso:
+- `contraction`: subida del cierre por flujo por encima del umbral del reposo. `peak` es el pico en veces el umbral.
+- `blink` / `closure`: parpadeos y cierres del EAR de al menos un 50 %. `peak` es la completitud.
+- `brow` / `canthus`: experimentales, por la energía de la ROI.
+
+`status`:
+- `ok`: cuenta;
+- `head`: descartado porque la cabeza se movía;
+- `blink`: la contracción era un parpadeo.
 
 Los lados son siempre los del paciente. Las series completas permiten reproducir el detector con los datos reales y ajustar los umbrales sin repetir la prueba.

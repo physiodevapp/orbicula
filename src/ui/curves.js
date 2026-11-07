@@ -11,6 +11,8 @@ export const METRICS = {
   flow: { label: 'Flujo (DI/s)', min: 0.01, max: 3, digits: 2, log: true, series: 'flow' },
   // Cierre del ojo por flujo integrado (DI, + = se cierra): ver CLOSURE_TAU_MS en flow/processor.js.
   closure: { label: 'Cierre por flujo (DI)', min: -0.05, max: 0.2, digits: 3, series: 'flow', key: 'closure' },
+  // Subida del cierre (DI): la medida de los eventos de la fase 5 (src/protocol/events.js), con su umbral.
+  rise: { label: 'Subida del cierre (DI)', min: -0.01, max: 0.06, digits: 3, series: 'flow', key: 'rise' },
 };
 
 export class Curves {
@@ -56,6 +58,7 @@ export class Curves {
       grid: get('--border'),
       text: get('--text3'),
       warn: get('--warn'),
+      accent: get('--accent'),
       font: get('--font-mono'),
       left: get('--side-left'),
       right: get('--side-right'),
@@ -64,7 +67,7 @@ export class Curves {
     for (const side of ['left', 'right']) this.#drawSide(side, palette, state[side]);
   }
 
-  #drawSide(side, pal, { events, baseline }) {
+  #drawSide(side, pal, { events, baseline, detections = [], threshold = null }) {
     const canvas = this.canvases[side];
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth;
@@ -116,6 +119,28 @@ export class Curves {
       ctx.fillRect(x0, 0, Math.max(2, x(e.tUp) - x0), h);
     }
     ctx.globalAlpha = 1;
+
+    // Contracciones de la fase 5 (sobre las curvas del cierre); tenues si se descartaron.
+    if (this.metric === 'closure' || this.metric === 'rise') {
+      ctx.fillStyle = pal.accent;
+      for (const e of detections) {
+        if (e.tEnd < tNow - this.windowMs) continue;
+        ctx.globalAlpha = e.status === 'ok' ? 0.3 : 0.1;
+        const x0 = x(e.tStart);
+        ctx.fillRect(x0, 0, Math.max(2, x(e.tEnd) - x0), h);
+      }
+      ctx.globalAlpha = 1;
+    }
+    // Umbral de los eventos, calibrado con el reposo.
+    if (this.metric === 'rise' && threshold != null) {
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = pal.accent;
+      ctx.beginPath();
+      ctx.moveTo(0, y(threshold));
+      ctx.lineTo(w, y(threshold));
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
 
     // Línea base del detector (solo tiene sentido para el EAR).
     if (this.metric === 'ear' && baseline != null) {

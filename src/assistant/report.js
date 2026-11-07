@@ -5,7 +5,8 @@
 
 // Versión 2 (fase 4): plan del asistente, posición del iris, flujo óptico por ROI con las tres
 // compensaciones y marcas de las repeticiones guiadas. Lo de la versión 1 sigue igual.
-export const REPORT_SCHEMA = 'orbicula-test-session/2';
+// Versión 3 (fase 5): calibración sobre el reposo (`calibration`) y eventos en directo (`detections`).
+export const REPORT_SCHEMA = 'orbicula-test-session/3';
 
 const FLOW_ROIS = ['upperLid', 'lowerLid', 'brow', 'canthus'];
 const FLOW_VARIANTS = { none: 'eN', reference: 'eR', pose: 'eP', hybrid: 'eH' };
@@ -97,6 +98,17 @@ export function describeSummary(step) {
   } else if (step.wantsFlow) {
     lines.push('Sin datos de flujo en este paso.');
   }
+  if (step.calibration) {
+    const c = step.calibration;
+    lines.push(c.valid
+      ? `Calibración válida: umbral del cierre I ${c.rise.left} · D ${c.rise.right} DI.`
+      : `Calibración NO válida: ${c.reason}. Repite el reposo, con la cabeza apoyada.`);
+  }
+  const ok = (step.detections ?? []).filter((e) => e.kind === 'contraction' && e.status === 'ok');
+  const gated = (step.detections ?? []).filter((e) => e.status === 'head').length;
+  if (step.detections?.length || step.calibration) {
+    lines.push(`Contracciones detectadas: I ${ok.filter((e) => e.side === 'left').length} · D ${ok.filter((e) => e.side === 'right').length}${gated ? ` (${gated} descartadas por mover la cabeza)` : ''}.`);
+  }
   return lines.join('\n');
 }
 
@@ -137,6 +149,8 @@ export function buildReport({ results, startedAt, code = null, plan = null, buil
       events: step.events,
       reps: step.reps ?? null,
       marks: step.marks ?? [],
+      calibration: step.calibration ?? null,
+      detections: step.detections ?? [],
       ...(includeSeries ? { series: { t: step.rel, left: step.series.left, right: step.series.right } } : {}),
       ...(includeSeries && step.flow?.rel.length ? { flow: { t: step.flow.rel, dt: step.flow.dt, left: step.flow.left, right: step.flow.right, head: step.flow.head, closure: step.flow.closure } } : {}),
     })),

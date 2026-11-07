@@ -114,6 +114,7 @@ export const PHASE4_STEPS = [
     durationMs: 20000,
     say: 'Mira al frente sin hacer nada y parpadea con naturalidad.',
     hint: 'Este reposo es la referencia de los demás pasos: cuanto más quieto, mejor.',
+    calibrates: true, // fase 5: de este paso salen los umbrales de los eventos
   },
   {
     id: 'minimal',

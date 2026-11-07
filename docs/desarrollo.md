@@ -37,6 +37,12 @@ node scripts/dev/run-assistant.cjs --video /tmp/caras/lid.y4m --out /tmp/informe
 ```
 `check-flow.cjs` abre la app con `?debug` (que expone las series en `window.__orbicula`), enciende la curva «Flujo» y resume un ciclo del vídeo por tramos de 0,5 s: el máximo de la velocidad residual del párpado superior por lado y compensación, y el EAR. El vídeo empieza en un punto cualquiera del bucle de 16 s: hay que buscar el patrón (en `lid.y4m`, un pico al bajar y otro al subir, 1,5 s después). `run-assistant.cjs` recorre el asistente pulsando «Siguiente» en cada revisión e imprime los resúmenes.
 
+## Repetir los eventos de la fase 5 con datos reales
+```bash
+node scripts/dev/replay-events.mjs informe.json ['{"riseFloor":0.002}']
+```
+Calibra con el paso `rest` y repite el detector de eventos (`src/protocol/events.js`) sobre cada paso, como en directo. Por repetición marca si hubo contracción en cada ojo; en las pruebas con controles da aciertos y falsas alarmas.
+
 ## Repetir el detector con datos reales
 ```bash
 node scripts/dev/replay-blinks.mjs informe.json '{"startRatio":0.8}'

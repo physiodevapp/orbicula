@@ -39,7 +39,7 @@ const mmss = (ms) => `${Math.floor(ms / 60000)}:${pad(Math.ceil((ms % 60000) / 1
  *   getContext: build, device, capture, analysis, flujo y detector para el informe
  *   onStart: se llama al empezar una sesión (la app reinicia sus medidas y, si el plan lo pide, enciende el flujo)
  */
-export function createAssistant({ getContext, getPerf, onStart }) {
+export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () => {} }) {
   const root = $('assistant');
   const el = {
     status: $('asStatus'), code: $('asCode'), sound: $('asSound'), auto: $('asAuto'), voice: $('asVoice'),
@@ -127,6 +127,7 @@ export function createAssistant({ getContext, getPerf, onStart }) {
     getPerf,
     onCue,
     onChange: (s) => render(s),
+    onStepEnd: (result, step) => onStepEnd(result, step),
   });
 
   function viewFor(s) {
@@ -304,6 +305,8 @@ export function createAssistant({ getContext, getPerf, onStart }) {
     record: (t, sample, events) => session.record(t, sample, events),
     /** Un par de flujo procesado; solo se guarda mientras se graba un paso. */
     recordFlow: (sample) => session.recordFlow(sample),
+    /** Un evento de la fase 5 (contracción, parpadeo…); se guarda en el paso en curso. */
+    recordDetection: (e) => session.recordDetection(e),
     /** La cámara se reinició, etc.: el paso en curso queda interrumpido. */
     interrupt: (reason) => session.interrupt(reason),
   };
