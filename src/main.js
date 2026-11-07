@@ -1,3 +1,5 @@
+// Barrera de red: lo primero que se evalúa, antes de que cargue MediaPipe.
+import { guard } from './privacy/install.js';
 // Fuentes servidas desde el propio sitio (sin Google Fonts: ninguna llamada de red externa).
 import '@fontsource/outfit/300.css';
 import '@fontsource/outfit/400.css';
@@ -9,8 +11,16 @@ import './styles/app.css';
 
 import { Camera } from './capture/camera.js';
 import { describeError, fpsLevel, REQUESTED_FPS, PRIORITIES, STRICT_MIN_FPS } from './capture/camera-logic.js';
+import { WorkerAnalysis } from './landmarks/worker-client.js';
 import { Analysis } from './landmarks/analysis.js';
+import { sampleOf } from './landmarks/process.js';
+import { BlinkDetector } from './metrics/blinks.js';
+import { createAssistant } from './ui/assistant.js';
+import { createBenchmark } from './ui/benchmark.js';
+import { Series } from './metrics/series.js';
+import { asymmetry } from './metrics/asymmetry.js';
 import { Overlay } from './ui/overlay.js';
+import { Curves } from './ui/curves.js';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -29,8 +39,13 @@ const els = {
   quality: $('qualityBanner'),
   roiToggle: $('roiToggle'),
   swapToggle: $('swapToggle'),
+  blendToggle: $('blendToggle'),
   fpsWarning: $('fpsWarning'),
   controls: $('controls'),
+  curvesView: $('curvesView'),
+  metricHint: $('metricHint'),
+  asymVal: $('asymVal'),
+  blinkLog: $('blinkLog'),
   deviceRow: $('deviceRow'),
   deviceSelect: $('deviceSelect'),
   details: $('captureDetails'),
@@ -39,10 +54,86 @@ const els = {
 
 els.build.textContent = `v${__APP_VERSION__} · ${__BRANCH__}@${__COMMIT__}`;
 
+const SIDES = ['left', 'right'];
+const SIDE_LETTER = { left: 'I', right: 'D' };
+
 const camera = new Camera(els.video);
-const analysis = new Analysis(els.video);
 const overlay = new Overlay(els.overlay, els.stage);
-const state = { facing: 'rear', priority: 'resolution', deviceId: null, running: false, displayMirrored: false, showRoi: true };
+/** Análisis de la cara: WorkerAnalysis (lo normal) o Analysis en el hilo principal (respaldo). */
+let analysis = null;
+const state = { facing: 'rear', priority: 'fps', deviceId: null, running: false, displayMirrored: false, showRoi: true };
+
+// Medidas: series por lado y un detector de parpadeos por lado (sobre el EAR).
+const series = new Series({ maxAgeMs: 120000 });
+const detectors = { left: new BlinkDetector(), right: new BlinkDetector() };
+let lastT = 0; // marca de tiempo del último resultado
+let t0 = null; // inicio de las medidas (para el registro de parpadeos)
+
+const curves = new Curves(
+  { left: $('curveL'), right: $('curveR') },
+  series,
+  () => ({
+    left: { events: detectors.left.events, baseline: detectors.left.baseline },
+    right: { events: detectors.right.events, baseline: detectors.right.baseline },
+  }),
+);
+
+/** Datos del informe del asistente de pruebas: solo medidas y configuración, sin imágenes. */
+const round1 = (v) => (Number.isFinite(v) ? Math.round(v * 10) / 10 : null);
+function captureContext() {
+  const info = camera.info;
+  return {
+    build: { version: __APP_VERSION__, branch: __BRANCH__, commit: __COMMIT__ },
+    device: {
+      userAgent: navigator.userAgent,
+      hardwareConcurrency: navigator.hardwareConcurrency ?? null,
+      deviceMemory: navigator.deviceMemory ?? null,
+      language: navigator.language,
+      screen: { width: screen.width, height: screen.height, pixelRatio: window.devicePixelRatio },
+    },
+    capture: {
+      facing: info?.facing ?? null,
+      deviceLabel: info?.label ?? null,
+      priority: state.priority,
+      requested: { ...PRIORITIES[state.priority], fps: REQUESTED_FPS },
+      settings: { width: info?.width ?? null, height: info?.height ?? null, fps: info?.frameRate ?? null, maxFps: info?.maxFrameRate ?? null },
+      frame: camera.frameSize,
+      strictFps: info?.strictFps ?? null,
+      previewMirrored: state.displayMirrored,
+    },
+    analysis: {
+      mode: analysis?.mode ?? null,
+      delegate: analysis?.delegate ?? null,
+      imageSize: analysis?.analysisSize ?? null,
+      blendshapes: els.blendToggle.checked,
+      swapNames: els.swapToggle.checked,
+      // Dominios a los que MediaPipe intentó llamar y la barrera de privacidad bloqueó.
+      blockedHosts: [...new Set([...guard.blockedHosts, ...(analysis?.blockedHosts ?? [])])],
+    },
+    detector: { ...detectors.left.opt },
+  };
+}
+
+const assistant = createAssistant({
+  getContext: captureContext,
+  getPerf: () => ({ cameraFps: round1(camera.meter.fps), analysisFps: round1(analysis?.fps), analysisMs: round1(analysis?.ms) }),
+  onStart: () => resetMeasures(), // el reposo y las series empiezan de cero con cada paso
+});
+
+const bench = createBenchmark({
+  camera,
+  video: els.video,
+  ensureAnalysis: async () => {
+    await loadModel();
+    return analysis;
+  },
+  getBlendshapes: () => els.blendToggle.checked,
+  getContext: captureContext,
+  onStart: () => {
+    overlay.clear();
+    els.quality.hidden = true;
+  },
+});
 
 // Preferencias del clínico (solo comodidad: si el almacenamiento falla, no pasa nada).
 const pref = {
@@ -109,6 +200,83 @@ function updateStats(fps) {
   els.fpsWarning.hidden = !(lowSince && now - lowSince > 3000);
 }
 
+// ── Estadísticas por lado ───────────────────────────────────────────────────────
+const statRefs = {};
+for (const side of SIDES) {
+  const grid = $(side === 'left' ? 'statsL' : 'statsR');
+  statRefs[side] = {};
+  for (const [key, label] of [
+    ['count', 'Parpadeos'],
+    ['rate', 'Por minuto'],
+    ['dur', 'Duración'],
+    ['comp', 'Cierre'],
+    ['base', 'Reposo (EAR)'],
+  ]) {
+    const box = document.createElement('div');
+    box.className = 'stat';
+    const l = document.createElement('span');
+    l.className = 'stat-label';
+    l.textContent = label;
+    const v = document.createElement('span');
+    v.className = key === 'count' ? 'stat-value main' : 'stat-value';
+    v.textContent = '—';
+    box.append(l, v);
+    grid.append(box);
+    statRefs[side][key] = v;
+  }
+}
+
+const METRIC_HINTS = {
+  ear: 'EAR: apertura vertical media del ojo / ancho del ojo. Ronda 0,25–0,35 con el ojo abierto y baja al cerrar. Es la señal que usa el detector (la línea discontinua es el reposo estimado).',
+  aperture: 'Apertura palpebral central normalizada a la distancia entre las comisuras internas de los dos ojos.',
+  blink: 'Blendshape de parpadeo de MediaPipe (0 abierto, 1 cerrado). Es una señal más lenta y de menor rango que el EAR; sirve de apoyo.',
+};
+els.metricHint.textContent = METRIC_HINTS.ear;
+
+let lastStatsUi = 0;
+function updateCurveStats(now) {
+  if (now - lastStatsUi < 250) return;
+  lastStatsUi = now;
+  for (const side of SIDES) {
+    const s = detectors[side].stats(lastT);
+    const r = statRefs[side];
+    r.count.textContent = String(s.count);
+    r.rate.textContent = s.perMinute == null ? '—' : s.perMinute.toFixed(0);
+    r.dur.textContent = s.last ? `${Math.round(s.last.duration)} ms` : '—';
+    r.comp.textContent = s.last ? `${Math.round(s.last.completeness * 100)} %` : '—';
+    const b = detectors[side].baseline;
+    r.base.textContent = b == null ? '—' : b.toFixed(2);
+  }
+  const key = curves.metric;
+  const a = asymmetry(series.mean('left', key, lastT, 10000) ?? NaN, series.mean('right', key, lastT, 10000) ?? NaN);
+  els.asymVal.textContent = a == null ? '—' : `${a > 0 ? '+' : ''}${a.toFixed(2)}`;
+}
+
+function logBlink(side, e) {
+  els.blinkLog.querySelector('.log-empty')?.remove();
+  const li = document.createElement('li');
+  const at = document.createElement('span');
+  at.textContent = `+${(((e.t - (t0 ?? e.t)) / 1000)).toFixed(1)} s`;
+  const who = document.createElement('span');
+  who.className = `side-${side}`;
+  who.textContent = SIDE_LETTER[side];
+  const what = document.createElement('span');
+  const KIND = { blink: 'parpadeo', closure: 'cierre', narrowing: 'entornado' };
+  what.textContent = `${KIND[e.kind]} · ${Math.round(e.duration)} ms · ${Math.round(e.completeness * 100)} %`;
+  li.append(at, who, what);
+  els.blinkLog.prepend(li);
+  while (els.blinkLog.children.length > 8) els.blinkLog.lastChild.remove();
+}
+
+function resetMeasures() {
+  series.clear();
+  for (const side of SIDES) detectors[side].reset();
+  t0 = null;
+  els.blinkLog.replaceChildren(Object.assign(document.createElement('li'), { className: 'log-empty', textContent: 'Aún no hay ninguno.' }));
+  lastStatsUi = 0;
+  curves.requestDraw();
+}
+
 // ── Análisis (landmarks y ROI) ─────────────────────────────────────────────────
 let lastAnaUi = 0;
 let faceLostSince = null;
@@ -136,14 +304,18 @@ function updateAnalysisUi(r, now) {
   lastAnaUi = now;
 
   const level = fpsLevel(analysis.fps);
-  els.anaPill.textContent = `${analysis.fps.toFixed(0)} an/s · ${analysis.ms.toFixed(0)} ms`;
+  els.anaPill.textContent = `análisis ${analysis.fps.toFixed(0)}/s · ${analysis.ms.toFixed(0)} ms`;
   els.anaPill.className = `pill ${level === 'none' ? '' : level}`;
-  $('kvDelegate').textContent = analysis.delegate ?? '—';
-  $('kvTime').textContent = `${analysis.ms.toFixed(1)} ms · ${analysis.fps.toFixed(1)} fotogramas/s`;
+  $('kvDelegate').textContent = `${analysis.delegate ?? '—'} · ${analysis.mode === 'worker' ? 'worker' : 'hilo principal'}`;
+  $('kvTime').textContent = `${analysis.ms.toFixed(1)} ms por análisis · ${analysis.fps.toFixed(1)} análisis/s`;
+  const sz = analysis.analysisSize;
+  $('kvSize').textContent = sz ? `${sz.width} × ${sz.height}` : '—';
+  const blocked = [...new Set([...guard.blockedHosts, ...(analysis.blockedHosts ?? [])])];
+  $('kvBlocked').textContent = blocked.length ? blocked.join(', ') : 'ninguna';
 
   if (!r.face) {
     els.roiPill.hidden = true;
-    for (const id of ['blinkL', 'blinkR', 'openL', 'openR']) setBar(id, `${id}v`, 0, '—');
+    for (const id of ['blinkL', 'blinkR', 'earL', 'earR']) setBar(id, `${id}v`, 0, '—');
     $('kvFace').textContent = $('kvIcd').textContent = $('kvEye').textContent = '—';
     return;
   }
@@ -158,31 +330,73 @@ function updateAnalysisUi(r, now) {
   const b = r.blend;
   setBar('blinkL', 'blinkLv', b.left.eyeBlink ?? 0, (b.left.eyeBlink ?? 0).toFixed(2));
   setBar('blinkR', 'blinkRv', b.right.eyeBlink ?? 0, (b.right.eyeBlink ?? 0).toFixed(2));
-  // La apertura de un ojo abierto ronda 0,25–0,35 del ancho del ojo: la barra llena es 0,4.
-  setBar('openL', 'openLv', left.opening / 0.4, left.opening.toFixed(2));
-  setBar('openR', 'openRv', right.opening / 0.4, right.opening.toFixed(2));
+  // El EAR de un ojo abierto ronda 0,25–0,35: la barra llena es 0,5.
+  setBar('earL', 'earLv', left.ear / 0.5, left.ear.toFixed(2));
+  setBar('earR', 'earRv', right.ear / 0.5, right.ear.toFixed(2));
 }
 
-function onVideoFrame() {
-  const r = analysis.step();
-  if (!r) return;
+/** Un resultado del análisis (del worker o del hilo principal): medidas, dibujo e interfaz. */
+function onResult(r) {
   const now = performance.now();
+  t0 ??= r.t;
+  lastT = r.t;
+
+  const sample = sampleOf(r);
+  series.push(r.t, sample);
+  const newEvents = { left: [], right: [] };
+  for (const side of SIDES) {
+    const event = detectors[side].push(r.t, sample ? sample[side].ear : NaN);
+    if (event) {
+      logBlink(side, event);
+      newEvents[side].push(event);
+    }
+  }
+  assistant.record(r.t, sample, newEvents);
+
   if (r.face && state.showRoi) overlay.draw(r, { displayMirrored: state.displayMirrored });
   else overlay.clear();
   updateQuality(r, now);
   updateAnalysisUi(r, now);
+  updateCurveStats(now);
+  curves.requestDraw();
 }
 
-async function loadModel() {
-  if (analysis.ready) return;
-  els.anaPill.textContent = 'Cargando modelo…';
+/** Crea el análisis en un worker; si no puede arrancar, en el hilo principal. */
+async function createAnalysis() {
+  const blendshapes = els.blendToggle.checked;
+  // `?analysis=main` fuerza el hilo principal: sirve para comparar tiempos con y sin worker.
+  const forceMain = new URLSearchParams(location.search).get('analysis') === 'main';
   try {
-    await analysis.load();
-    els.anaPill.textContent = 'Modelo listo';
+    if (forceMain) throw new Error('forzado con ?analysis=main');
+    const worker = new WorkerAnalysis();
+    await worker.load(blendshapes);
+    return worker;
   } catch (err) {
-    els.anaPill.textContent = 'Sin análisis';
-    showError(`No se pudo cargar el modelo de la cara (${err?.message ?? err}). La cámara sigue funcionando.`);
+    console.warn('El worker de análisis no arranca, se usa el hilo principal:', err);
+    const main = new Analysis();
+    await main.load(blendshapes);
+    return main;
   }
+}
+
+let modelPromise = null;
+/** Carga el modelo una sola vez; quien llame después espera a la misma carga. */
+function loadModel() {
+  modelPromise ??= (async () => {
+    els.anaPill.textContent = 'Cargando modelo…';
+    try {
+      analysis = await createAnalysis();
+      analysis.onResult = onResult;
+      analysis.frameMirrored = false;
+      analysis.swapNames = els.swapToggle.checked;
+      els.anaPill.textContent = 'Modelo listo';
+    } catch (err) {
+      els.anaPill.textContent = 'Sin análisis';
+      showError(`No se pudo cargar el modelo de la cara (${err?.message ?? err}). La cámara sigue funcionando.`);
+      modelPromise = null; // se podrá reintentar
+    }
+  })();
+  return modelPromise;
 }
 
 async function refreshDevices() {
@@ -204,6 +418,9 @@ async function start() {
   showError('');
   els.startBtn.disabled = true;
   lowSince = null;
+  assistant.interrupt('la cámara se reinició (cambio de cámara, de prioridad o de pestaña)');
+  bench.interrupt('la cámara se reinició');
+  resetMeasures(); // otra cámara u otra resolución: el reposo y las series ya no valen
   try {
     const info = await camera.start(state);
     state.running = true;
@@ -212,10 +429,13 @@ async function start() {
     state.displayMirrored = info.facing === 'front';
     els.video.classList.toggle('mirrored', state.displayMirrored);
     // Los frames de getUserMedia no van en espejo, tampoco con la frontal: solo la vista previa.
-    analysis.frameMirrored = false;
+    if (analysis) analysis.frameMirrored = false;
     els.camPill.textContent = info.facing === 'front' ? 'frontal' : 'trasera';
     els.startCard.hidden = true;
     els.live.hidden = false;
+    els.curvesView.hidden = false;
+    assistant.show();
+    bench.show();
     els.controls.hidden = false;
     // La resolución real se conoce cuando llega el primer frame.
     const onMeta = () => renderDetails(info, camera.frameSize);
@@ -233,7 +453,9 @@ async function start() {
 }
 
 camera.onFrame = updateStats;
-camera.onVideoFrame = onVideoFrame;
+// La marca de tiempo del frame es la de captura de la cámara (si el navegador la da), no la
+// de cuando acaba el análisis: así las duraciones de los parpadeos no dependen de la latencia.
+camera.onVideoFrame = (now, meta) => analysis?.submit(els.video, meta?.captureTime ?? now);
 
 els.roiToggle.checked = pref.get('showRoi') !== '0';
 state.showRoi = els.roiToggle.checked;
@@ -244,11 +466,22 @@ els.roiToggle.addEventListener('change', () => {
 });
 
 els.swapToggle.checked = pref.get('swapBlend') === '1';
-analysis.swapNames = els.swapToggle.checked;
 els.swapToggle.addEventListener('change', () => {
-  analysis.swapNames = els.swapToggle.checked;
-  pref.set('swapBlend', analysis.swapNames ? '1' : '0');
+  if (analysis) analysis.swapNames = els.swapToggle.checked;
+  pref.set('swapBlend', els.swapToggle.checked ? '1' : '0');
 });
+
+els.blendToggle.addEventListener('change', () => analysis?.setBlendshapes(els.blendToggle.checked));
+
+document.querySelectorAll('[data-metric]').forEach((b) =>
+  b.addEventListener('click', () => {
+    curves.setMetric(b.dataset.metric);
+    setPressed('metric', b.dataset.metric);
+    els.metricHint.textContent = METRIC_HINTS[b.dataset.metric];
+    lastStatsUi = 0;
+  }),
+);
+$('resetBtn').addEventListener('click', resetMeasures);
 
 // El marco toma la proporción real de los frames (en vertical, Android los entrega girados).
 els.video.addEventListener('resize', () => {

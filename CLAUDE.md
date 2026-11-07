@@ -24,7 +24,7 @@ Responder a una pregunta: **¿el flujo óptico sobre la región periocular, con 
 ## Pipeline
 
 1. **Entrada**, con dos modos:
-   - **Cámara en directo**: `getUserMedia`, con la cámara trasera por defecto (selector para la frontal). Pide 60 fps y la mayor resolución disponible, y muestra en la interfaz los fps y la resolución reales obtenidos.
+   - **Cámara en directo**: `getUserMedia`, con la cámara trasera por defecto (selector para la frontal). Pide 60 fps y la mayor resolución disponible, y muestra en la interfaz los fps y la resolución reales obtenidos. **En directo la prioridad por defecto es «fps» (720p):** el análisis de la cara no mejora con más resolución y, con la trasera a 4K, cae por debajo de 24 análisis/s; «Resolución» queda como opción y la máxima resolución se reserva para el modo de vídeo grabado.
    - **Vídeo grabado**: carga de un archivo grabado con la app de cámara nativa. Se procesa frame a frame en modo IMAGE, sin el suavizado del tracking. Es el modo de máxima sensibilidad.
 2. **Localización**: Face Landmarker obtiene los landmarks y los blendshapes y, a partir de ellos, define estas regiones (ROI) por lado:
    - párpado superior, párpado inferior, ceja y canto externo (patas de gallo);
@@ -69,6 +69,7 @@ Secuencia con instrucciones en pantalla y duración configurable:
 - **Ningún dato del paciente sale del dispositivo**: sin llamadas de red salvo para cargar la propia app.
 - El vídeo no se guarda por defecto. Solo se exportan métricas y series temporales numéricas.
 - Sin analítica ni cookies de terceros.
+- **MediaPipe intenta enviar un registro de uso a `https://odml.pa.googleapis.com/v1/log`.** Lo bloquean la CSP (`connect-src 'self'` en `public/_headers`) y la barrera de `src/privacy/` (que cubre también el worker y los hostings sin cabeceras). No relajar ninguna de las dos ni añadir orígenes externos. El hub, al copiar orbicula a GitHub Pages, depende de la barrera del código.
 
 ## Exportación
 

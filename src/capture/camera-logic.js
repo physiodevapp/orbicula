@@ -114,16 +114,22 @@ export class FpsMeter {
     return this.fps;
   }
 
-  /** fps = frames entre el primero y el último / tiempo entre ellos. */
+  /**
+   * fps = el mayor de dos recuentos, porque ambos se quedan cortos y ninguno se pasa:
+   *  - los callbacks de vídeo, que se pierden si el hilo principal está ocupado (en el móvil del autor,
+   *    con la trasera a 4K, 44 en el worker y 20 en el hilo principal frente a unos 53 reales);
+   *  - el contador `presentedFrames`, que con la frontal se quedó por debajo de los frames analizados.
+   */
   get fps() {
     const n = this.times.length;
     if (n < 2) return 0;
     const span = this.times[n - 1] - this.times[0];
     if (span <= 0) return 0;
+    const byCallbacks = ((n - 1) * 1000) / span;
     const c0 = this.counts[0];
     const c1 = this.counts[n - 1];
-    const frames = c0 != null && c1 != null && c1 > c0 ? c1 - c0 : n - 1;
-    return (frames * 1000) / span;
+    const byCount = c0 != null && c1 != null && c1 > c0 ? ((c1 - c0) * 1000) / span : 0;
+    return Math.max(byCallbacks, byCount);
   }
 
   reset() {

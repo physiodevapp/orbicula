@@ -33,6 +33,17 @@ const LEFT_EYE = {
 export const EYES = { right: RIGHT_EYE, left: LEFT_EYE };
 
 /**
+ * Pares de puntos (párpado superior, párpado inferior) del EAR de 6 puntos (Soukupová y Čech):
+ *   EAR = (|p2−p6| + |p3−p5|) / (2·|p1−p4|)
+ * con p1 = comisura externa, p4 = interna, p2/p3 = superiores y p6/p5 = inferiores.
+ * Son las posiciones 3 y 5 de cada cadena de párpado (160↔144 y 158↔153 en el ojo derecho;
+ * 387↔373 y 385↔380 en el izquierdo), que quedan a la misma altura horizontal. El par
+ * central (posición 4: 159↔145 y 386↔374) da la apertura palpebral en el centro del ojo.
+ */
+export const EAR_PAIR_POSITIONS = [3, 5];
+export const CENTER_PAIR_POSITION = 4;
+
+/**
  * Dorso nasal (referencia rígida para compensar la cabeza): cadena central de
  * FACEMESH_NOSE, de la glabela al final del dorso. Se deja fuera la punta (5, 4, 1…),
  * que se mueve con las expresiones.

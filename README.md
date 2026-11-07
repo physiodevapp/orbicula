@@ -7,7 +7,7 @@ Cuantificación de movimientos finos de la musculatura periocular (orbicular de 
 
 ## Estado
 
-v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolución reales) y **fase 2** (Face Landmarker, ROI por lado y lateralidad). Ver [`CHANGELOG.md`](CHANGELOG.md).
+v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolución reales) **fase 2** (Face Landmarker, ROI por lado y lateralidad) y **fase 3** (EAR, parpadeos y curvas en tiempo real). Ver [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Uso clínico
 
@@ -26,8 +26,20 @@ v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolu
   | Trasera | 29.9 fps · 2160×4032 | **49.2 fps** · 720×1280 |
   | Frontal | 29.9 fps · 2160×3440 | 29.0 fps · 720×1280 |
 
-  Ambas anuncian 60 fps, pero si solo se piden como «ideal» Chrome se queda en 30: por eso la prioridad «fps» exige un mínimo. La frontal acepta el mínimo pero sigue dando unos 30. Con poca luz la cámara alarga la exposición y baja los fps (la frontal llegó a 24). **Para medir en directo, usa la trasera con prioridad «fps» y buena luz.**
-- **Privacidad:** la imagen se procesa en el propio móvil. No se envía nada a ningún servidor y el vídeo no se guarda.
+  Ambas anuncian 60 fps, pero si solo se piden como «ideal» Chrome se queda en 30: por eso la prioridad «fps» exige un mínimo. **La prioridad por defecto es «fps» (720p)**: el análisis de la cara tarda lo mismo con cualquier resolución (el modelo reduce la imagen) y con la trasera a 4K, copiar cada frame al worker cuesta ~7 ms y el análisis cae a 16–21 por segundo, por debajo de los 24 mínimos. «Resolución» queda como opción. La frontal acepta el mínimo pero sigue dando unos 30. Con poca luz la cámara alarga la exposición y baja los fps (la frontal llegó a 24). **Para medir en directo, usa la trasera con prioridad «fps» y buena luz.**
+- **Privacidad:** la imagen se procesa en el propio móvil. No se envía nada a ningún servidor y el vídeo no se guarda. La librería de MediaPipe intenta enviar un registro de uso a `odml.pa.googleapis.com`: lo bloquean dos barreras independientes, la CSP de `public/_headers` y una barrera en el código (`src/privacy/`), que funciona aunque el hosting no sirva cabeceras. La sección «Verificación de lado» muestra qué dominios se han bloqueado.
+
+## Parpadeos y curvas
+
+- **EAR** (eye aspect ratio): apertura vertical media del ojo dividida por su ancho. Ronda 0,25–0,35 con el ojo abierto. Es la señal del detector de parpadeos.
+- **Reposo**: la apertura habitual del ojo, estimada con los últimos 5 s (la línea discontinua de la curva). Hacen falta unos 1,5 s de señal antes de detectar.
+- **Parpadeo**: cierre que baja del 75 % del reposo y vuelve a subir del 85 %. La **duración** se mide a media altura del cierre; la **completitud** es el cierre respecto al reposo. El EAR no llega a 0 con el ojo cerrado (el contorno del párpado tiene grosor): un cierre completo marca en torno al 70–80 %. Un cierre de más de 0,8 s se anota como «cierre», no como parpadeo.
+- **Asimetría** = (I − D) / (I + D) sobre los últimos 10 s de la métrica elegida; I y D son siempre las del paciente.
+- Todos los umbrales son provisionales y se ajustan con las pruebas en el móvil.
+
+## Asistente de pruebas
+
+Debajo del vídeo hay un asistente que guía por cada prueba y guarda las medidas en un JSON que se puede descargar y compartir. Ver [`docs/pruebas.md`](docs/pruebas.md). Más abajo, una **prueba de rendimiento** compara el análisis en worker y en el hilo principal, con y sin blendshapes ([`docs/rendimiento.md`](docs/rendimiento.md)).
 
 ## Créditos
 

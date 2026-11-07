@@ -1,39 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { EYES, NASAL_DORSUM, ALL_USED, LANDMARK_COUNT } from '../src/roi/indices.js';
+import { EYES, ALL_USED, LANDMARK_COUNT } from '../src/roi/indices.js';
+import { makeFace } from './helpers/face.js';
 import { buildRois, hull } from '../src/roi/geometry.js';
 import { patientSide, sidedBlendshapes } from '../src/roi/laterality.js';
 import { contentRect, toDisplay } from '../src/ui/display.js';
 
 const FRAME = { width: 720, height: 1280 };
-
-/**
- * Cara sintética de frente, tal como la etiqueta el modelo en una imagen SIN espejo:
- * el ojo «right» del mallado a la izquierda de la imagen, el «left» a la derecha.
- * `open` = apertura de cada ojo (0 = cerrado).
- */
-function makeFace({ openRight = 1, openLeft = 1 } = {}) {
-  const lm = Array.from({ length: LANDMARK_COUNT }, () => ({ x: 0.5, y: 0.5, z: 0 }));
-  const set = (i, x, y) => (lm[i] = { x, y, z: 0 });
-  const eye = (e, outerX, innerX, open) => {
-    const chain = (ids, dir) =>
-      ids.forEach((id, k) => {
-        const t = k / (ids.length - 1);
-        set(id, outerX + t * (innerX - outerX), 0.4 + dir * 0.02 * open * Math.sin(Math.PI * t));
-      });
-    chain(e.upper, -1);
-    chain(e.lower, 1);
-    e.brow.forEach((id, k) => {
-      const t = (k % 5) / 4;
-      set(id, outerX + t * (innerX - outerX), k < 5 ? 0.3 : 0.32);
-    });
-  };
-  eye(EYES.right, 0.3, 0.43, openRight);
-  eye(EYES.left, 0.7, 0.57, openLeft);
-  NASAL_DORSUM.forEach((id, k) => set(id, 0.5, 0.4 + k * 0.05));
-  set(234, 0.15, 0.55);
-  set(454, 0.85, 0.55);
-  return lm;
-}
 
 const centerX = (r) => r.box.x + r.box.w / 2;
 
@@ -112,9 +84,9 @@ describe('lateralidad (a la cara del paciente)', () => {
   it('un cierre del ojo de la izquierda de la imagen es el derecho sin espejo y el izquierdo con espejo', () => {
     const face = makeFace({ openRight: 0.05, openLeft: 1 }); // se cierra el ojo «right» del mallado
     const plain = buildRois(face, FRAME, { frameMirrored: false });
-    expect(plain.right.opening).toBeLessThan(plain.left.opening);
+    expect(plain.right.ear).toBeLessThan(plain.left.ear);
     const mirrored = buildRois(face, FRAME, { frameMirrored: true });
-    expect(mirrored.left.opening).toBeLessThan(mirrored.right.opening);
+    expect(mirrored.left.ear).toBeLessThan(mirrored.right.ear);
   });
 
   it('blendshapes: se asignan al lado del paciente y se corrigen con el espejo', () => {
@@ -151,10 +123,43 @@ describe('lateralidad (a la cara del paciente)', () => {
     for (const frameMirrored of [false, true]) {
       const rois = buildRois(face, FRAME, { frameMirrored });
       const bs = sidedBlendshapes(cats, { frameMirrored });
-      const closedByRoi = rois.right.opening < rois.left.opening ? 'right' : 'left';
+      const closedByRoi = rois.right.ear < rois.left.ear ? 'right' : 'left';
       const closedByBlend = bs.right.eyeBlink > bs.left.eyeBlink ? 'right' : 'left';
       expect(closedByRoi).toBe(closedByBlend);
     }
+  });
+});
+
+describe('EAR y apertura', () => {
+  // En la cara sintética cada ojo mide 0,13 del ancho; los puntos de las posiciones 3 y 5 quedan
+  // a ±0,02·open·sin(3π/8) del eje, y la apertura central a ±0,02·open.
+  const widthPx = 0.13 * FRAME.width;
+  const dPair = (open) => 2 * 0.02 * open * Math.sin((3 * Math.PI) / 8) * FRAME.height;
+
+  it('EAR = distancia vertical media de los pares / ancho del ojo', () => {
+    const rois = buildRois(makeFace({ openRight: 1, openLeft: 0.5 }), FRAME);
+    expect(rois.right.ear).toBeCloseTo(dPair(1) / widthPx, 5);
+    expect(rois.left.ear).toBeCloseTo(dPair(0.5) / widthPx, 5);
+  });
+
+  it('con el ojo cerrado el EAR es 0 y crece de forma proporcional a la apertura', () => {
+    const closed = buildRois(makeFace({ openRight: 0, openLeft: 1 }), FRAME);
+    expect(closed.right.ear).toBeCloseTo(0, 8);
+    const half = buildRois(makeFace({ openRight: 0.5, openLeft: 1 }), FRAME);
+    expect(half.right.ear / half.left.ear).toBeCloseTo(0.5, 5);
+  });
+
+  it('la apertura central se normaliza a la distancia intercantal (entre comisuras internas)', () => {
+    const rois = buildRois(makeFace(), FRAME);
+    const intercanthal = (0.57 - 0.43) * FRAME.width;
+    expect(rois.meta.intercanthal).toBeCloseTo(intercanthal, 5);
+    expect(rois.right.aperture).toBeCloseTo((2 * 0.02 * FRAME.height) / intercanthal, 5);
+  });
+
+  it('no depende de la resolución del frame (mismos landmarks normalizados, mismo EAR)', () => {
+    const a = buildRois(makeFace(), { width: 720, height: 1280 });
+    const b = buildRois(makeFace(), { width: 720, height: 1280 });
+    expect(a.right.ear).toBe(b.right.ear);
   });
 });
 

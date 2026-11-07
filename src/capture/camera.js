@@ -10,7 +10,7 @@ export class Camera {
     this.stream = null;
     this.meter = new FpsMeter(1000);
     this.onFrame = null; // (fps) => void
-    this.onVideoFrame = null; // () => void, una vez por frame nuevo
+    this.onVideoFrame = null; // (now, meta) => void, una vez por frame nuevo
     this._rvfc = null;
     this._raf = null;
     this.info = null;
@@ -96,9 +96,10 @@ export class Camera {
         if (!this.stream) return;
         // mediaTime es el instante de captura del frame; si no, el de presentación.
         const t = meta?.mediaTime != null ? meta.mediaTime * 1000 : now;
+        // El medidor usa el mayor de los callbacks y de `presentedFrames` (ver FpsMeter).
         const fps = this.meter.push(t, meta?.presentedFrames);
         this.onFrame?.(fps);
-        this.onVideoFrame?.(); // análisis del frame (landmarks)
+        this.onVideoFrame?.(now, meta); // análisis del frame (landmarks)
         this._rvfc = v.requestVideoFrameCallback(tick);
       };
       this._rvfc = v.requestVideoFrameCallback(tick);
@@ -110,7 +111,7 @@ export class Camera {
         if (v.currentTime !== lastTime) {
           lastTime = v.currentTime;
           this.onFrame?.(this.meter.push(now));
-          this.onVideoFrame?.();
+          this.onVideoFrame?.(now);
         }
         this._raf = requestAnimationFrame(tick);
       };
