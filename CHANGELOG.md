@@ -34,8 +34,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - Prueba de rendimiento pensada para la cámara trasera, sin mirar la pantalla: cuenta atrás de 10 s para colocarse, pitido de inicio, tono grave cada 3 s si se pierde la cara, tres pitidos y vibración al terminar, y pantalla siempre encendida (`src/ui/cues.js`).
 - `WorkerAnalysis` mide el coste de la copia del frame (`bitmapMs`) y la ida y vuelta (`roundTripMs`), y tiene `dispose()`.
 
-### Corregido (a partir de la prueba de rendimiento en el móvil)
-- Los fps de la cámara vuelven a medirse con la marca de tiempo de cada frame, no con `presentedFrames`: con el análisis en el hilo principal se analizaban 28 frames por segundo cuando la cámara «entregaba» 25,9, lo que es imposible. La pastilla de fps y los JSON de las sesiones anteriores (24–25 fps) probablemente infravaloraban la cámara; en el JSON del rendimiento el contador sigue como `presentedFps`.
+### Corregido (a partir de las pruebas de rendimiento con la frontal y la trasera)
+- Los fps de la cámara se miden con el **mayor** de dos recuentos que se quedan cortos en situaciones distintas: los callbacks de vídeo (se pierden con el hilo principal ocupado: con la trasera a 4K, 44 en el worker y 20 en el hilo principal frente a unos 53 reales) y `presentedFrames` (con la frontal quedó por debajo de los frames analizados: 28 por segundo frente a 25,9). Los JSON de rendimiento llevan `callbackFps` y `presentedFps` además de `cameraFps`. Los 24–25 fps de las sesiones anteriores con la frontal probablemente infravaloraban la cámara.
+- **Prioridad por defecto «fps»** en vez de «Resolución»: con la trasera a 4K el análisis iba a 16–21 por segundo.
 
 ### Cambiado (a partir de la primera sesión real con la cámara frontal)
 - Detector de parpadeos: un cierre ya no acaba al recuperar un % fijo del reposo sino al recuperar el 60 % de **su propia profundidad** (o el 90 % del reposo, lo que ocurra antes). Antes, si el ojo se quedaba un rato más entornado, el detector se «atascaba» durante segundos y se tragaba los parpadeos siguientes (en los datos: un cierre de 5,4 s que ocultaba cuatro parpadeos). Reposo de 20 s: de 10 y 7 parpadeos detectados a 14 y 13 (anotados a mano: unos 13).

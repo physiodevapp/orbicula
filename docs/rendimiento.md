@@ -18,7 +18,7 @@ Tarjeta «Prueba de rendimiento» (debajo del asistente de pruebas). Ejecuta sol
 
 ## Qué mide cada pasada
 - **inferMs**: lo que tarda MediaPipe en cada frame (la media es la que se compara).
-- **analysisFps / cameraFps / analysedFraction**: análisis por segundo, fps de la cámara (ritmo de los callbacks de vídeo) y qué fracción de los frames se llega a analizar. `presentedFps` es el contador `presentedFrames` del navegador, solo para diagnóstico: en el móvil del autor se queda corto.
+- **analysisFps / cameraFps / analysedFraction**: análisis por segundo, fps de la cámara y qué fracción de los frames se llega a analizar. `cameraFps` es el mayor de dos recuentos que se quedan cortos en situaciones distintas, ninguno se pasa: `callbackFps` (callbacks de vídeo, que se pierden si el hilo principal está ocupado) y `presentedFps` (contador `presentedFrames` del navegador, que con la frontal se quedó por debajo de los frames analizados).
 - **intervalMs**: tiempo entre resultados (su dispersión).
 - **latencyMs**: de la captura del frame a tener el resultado.
 - **bitmapMs / roundTripMs** (solo worker): lo que cuesta copiar el frame en el hilo principal y la ida y vuelta completa.

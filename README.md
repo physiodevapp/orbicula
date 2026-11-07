@@ -26,7 +26,7 @@ v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolu
   | Trasera | 29.9 fps · 2160×4032 | **49.2 fps** · 720×1280 |
   | Frontal | 29.9 fps · 2160×3440 | 29.0 fps · 720×1280 |
 
-  Ambas anuncian 60 fps, pero si solo se piden como «ideal» Chrome se queda en 30: por eso la prioridad «fps» exige un mínimo. La frontal acepta el mínimo pero sigue dando unos 30. Con poca luz la cámara alarga la exposición y baja los fps (la frontal llegó a 24). **Para medir en directo, usa la trasera con prioridad «fps» y buena luz.**
+  Ambas anuncian 60 fps, pero si solo se piden como «ideal» Chrome se queda en 30: por eso la prioridad «fps» exige un mínimo. **La prioridad por defecto es «fps» (720p)**: el análisis de la cara tarda lo mismo con cualquier resolución (el modelo reduce la imagen) y con la trasera a 4K, copiar cada frame al worker cuesta ~7 ms y el análisis cae a 16–21 por segundo, por debajo de los 24 mínimos. «Resolución» queda como opción. La frontal acepta el mínimo pero sigue dando unos 30. Con poca luz la cámara alarga la exposición y baja los fps (la frontal llegó a 24). **Para medir en directo, usa la trasera con prioridad «fps» y buena luz.**
 - **Privacidad:** la imagen se procesa en el propio móvil. No se envía nada a ningún servidor y el vídeo no se guarda. La librería de MediaPipe intenta enviar un registro de uso a `odml.pa.googleapis.com`: lo bloquean dos barreras independientes, la CSP de `public/_headers` y una barrera en el código (`src/privacy/`), que funciona aunque el hosting no sirva cabeceras. La sección «Verificación de lado» muestra qué dominios se han bloqueado.
 
 ## Parpadeos y curvas

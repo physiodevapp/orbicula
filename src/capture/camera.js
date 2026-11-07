@@ -96,10 +96,8 @@ export class Camera {
         if (!this.stream) return;
         // mediaTime es el instante de captura del frame; si no, el de presentación.
         const t = meta?.mediaTime != null ? meta.mediaTime * 1000 : now;
-        // Solo la marca de tiempo del frame. `presentedFrames` se probó en la fase 3 para no perder
-        // frames con el hilo principal ocupado, pero en el móvil del autor se queda corto (con el
-        // análisis en el hilo principal se analizaban más frames por segundo de los «presentados»).
-        const fps = this.meter.push(t);
+        // El medidor usa el mayor de los callbacks y de `presentedFrames` (ver FpsMeter).
+        const fps = this.meter.push(t, meta?.presentedFrames);
         this.onFrame?.(fps);
         this.onVideoFrame?.(now, meta); // análisis del frame (landmarks)
         this._rvfc = v.requestVideoFrameCallback(tick);

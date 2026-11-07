@@ -117,6 +117,13 @@ describe('FpsMeter', () => {
     expect(sinContador.fps).toBeCloseTo(25, 0);
   });
 
+  it('toma el mayor de los dos recuentos: si presentedFrames se queda corto, valen los callbacks', () => {
+    const m = new FpsMeter(1000);
+    // 30 callbacks por segundo, pero el contador solo avanza a ~26 por segundo (caso de la frontal).
+    for (let i = 0; i <= 60; i++) m.push(i * (1000 / 30), Math.floor(i * 0.87));
+    expect(m.fps).toBeCloseTo(30, 0);
+  });
+
   it('da 0 con menos de dos frames', () => {
     const m = new FpsMeter();
     expect(m.fps).toBe(0);

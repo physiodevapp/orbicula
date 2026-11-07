@@ -60,18 +60,19 @@ export function summarizeRun(raw, { warmupMs }) {
   const raf = raw.rafMs.filter((x) => x.t >= warmupMs).map((x) => x.d);
   const tasks = raw.longTasks.filter((x) => x.t >= warmupMs);
   const analysisFps = rate(t);
+  // Los callbacks de vídeo y `presentedFrames` se quedan cortos en situaciones distintas: se toma el mayor.
+  const cameraFps = Math.max(rate(camT) ?? 0, presentedFps ?? 0) || null;
 
   return {
     results: keep.length,
     faceFraction: keep.length ? r2(pick(raw.faces).filter(Boolean).length / keep.length) : null,
     analysisFps: r2(analysisFps),
-    // fps de la cámara: ritmo de los callbacks de vídeo (un frame distinto cada vez).
-    cameraFps: r2(rate(camT)),
-    // El contador `presentedFrames` del navegador, solo para diagnóstico: en algún móvil se queda corto
-    // (se llegaron a analizar más frames por segundo de los «presentados»).
-    presentedFps: r2(presentedFps),
+    // fps de la cámara: el mayor de los dos recuentos de abajo (ambos se quedan cortos, ninguno se pasa).
+    cameraFps: r2(cameraFps),
+    callbackFps: r2(rate(camT)), // callbacks de vídeo: se pierden con el hilo principal ocupado
+    presentedFps: r2(presentedFps), // contador `presentedFrames` del navegador
     // Fracción de los frames de la cámara que se llegan a analizar.
-    analysedFraction: rate(camT) && analysisFps ? r2(analysisFps / rate(camT)) : null,
+    analysedFraction: cameraFps && analysisFps ? r2(analysisFps / cameraFps) : null,
     inferMs: describe(pick(raw.inferMs)), // lo que tarda MediaPipe en cada frame
     intervalMs: describe(intervals), // tiempo entre resultados
     latencyMs: describe(pick(raw.latencyMs)), // de la captura del frame a tener el resultado

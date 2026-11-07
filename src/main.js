@@ -61,7 +61,7 @@ const camera = new Camera(els.video);
 const overlay = new Overlay(els.overlay, els.stage);
 /** Análisis de la cara: WorkerAnalysis (lo normal) o Analysis en el hilo principal (respaldo). */
 let analysis = null;
-const state = { facing: 'rear', priority: 'resolution', deviceId: null, running: false, displayMirrored: false, showRoi: true };
+const state = { facing: 'rear', priority: 'fps', deviceId: null, running: false, displayMirrored: false, showRoi: true };
 
 // Medidas: series por lado y un detector de parpadeos por lado (sobre el EAR).
 const series = new Series({ maxAgeMs: 120000 });

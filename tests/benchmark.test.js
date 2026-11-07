@@ -63,6 +63,21 @@ suite('summarizeRun', () => {
     expect(s.ui.frameMs.p50).toBeCloseTo(16.7, 1);
   });
 
+  it('si los callbacks de vídeo se pierden (hilo ocupado), la cámara se mide con presentedFrames', () => {
+    const data = raw({ seconds: 10, camFps: 53 });
+    // Hilo principal ocupado: solo llega un callback cada ~48 ms, pero el contador sigue a 53 por segundo.
+    data.camT = [];
+    data.camPresented = [];
+    for (let t = 0; t <= 10000; t += 48) {
+      data.camT.push(t);
+      data.camPresented.push(Math.round((t * 53) / 1000));
+    }
+    const s = summarizeRun(data, { warmupMs: 3000 });
+    expect(s.callbackFps).toBeCloseTo(20.8, 0);
+    expect(s.presentedFps).toBeCloseTo(53, 0);
+    expect(s.cameraFps).toBeCloseTo(53, 0);
+  });
+
   it('cuenta los repintados lentos y las tareas largas del hilo principal', () => {
     const data = raw({});
     data.rafMs.push({ t: 5000, d: 120 }, { t: 6000, d: 70 }, { t: 1000, d: 500 }); // el último cae en el calentamiento
