@@ -4,6 +4,7 @@ import { WorkerAnalysis } from '../landmarks/worker-client.js';
 import { Analysis } from '../landmarks/analysis.js';
 import { buildPlan, summarizeRun, buildBenchmarkReport, groupSummary } from '../assistant/benchmark.js';
 import { downloadJson, shareJson, copyJson, stamp } from './share.js';
+import { createCues } from './cues.js';
 
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -14,7 +15,9 @@ const MODE_LABEL = { worker: 'Worker', main: 'Hilo principal' };
 function params() {
   const k = Number(new URLSearchParams(location.search).get('escala'));
   const runMs = k > 0 && k < 1 ? Math.max(2500, Math.round(12000 * k)) : 12000;
-  return { runMs, warmupMs: Math.min(3000, Math.round(runMs * 0.25)) };
+  // Tiempo para colocar el móvil tras pulsar «Empezar» (con la trasera no se ve la pantalla).
+  const leadMs = k > 0 && k < 1 ? Math.max(2000, Math.round(10000 * k)) : 10000;
+  return { runMs, warmupMs: Math.min(3000, Math.round(runMs * 0.25)), leadMs };
 }
 
 /**
@@ -32,7 +35,10 @@ export function createBenchmark({ camera, video, ensureAnalysis, getBlendshapes,
   let startedAt = null;
   let runMs = 12000;
   let warmupMs = 3000;
+  let leadMs = 10000;
   let cancelled = null; // motivo, si se cancela
+  const cues = createCues(() => $('bSound').checked);
+  let wake = null;
 
   const setState = (s) => { root.dataset.state = s; };
 
@@ -52,8 +58,11 @@ export function createBenchmark({ camera, video, ensureAnalysis, getBlendshapes,
   async function runOne(plan, inst, label) {
     const raw = { tRel: [], inferMs: [], latencyMs: [], bitmapMs: [], roundTripMs: [], faces: [], camT: [], camPresented: [], rafMs: [], longTasks: [] };
     const t0 = performance.now();
+    let lastFaceAt = t0;
+    let lastWarnAt = 0;
     inst.onResult = (r) => {
       const now = performance.now();
+      if (r.face) lastFaceAt = now;
       raw.tRel.push(now - t0);
       raw.inferMs.push(r.ms);
       raw.latencyMs.push(now - r.t);
@@ -87,8 +96,14 @@ export function createBenchmark({ camera, video, ensureAnalysis, getBlendshapes,
     while (performance.now() - t0 < runMs && !cancelled) {
       const done = performance.now() - t0;
       const warm = done < warmupMs;
+      const faceLost = performance.now() - lastFaceAt > 2000;
+      // Sin mirar la pantalla, un tono grave cada 3 s avisa de que la cara no se ve.
+      if (faceLost && performance.now() - lastWarnAt > 3000) {
+        lastWarnAt = performance.now();
+        cues.warn();
+      }
       showProgress(
-        `${warm ? 'Calentando… ' : ''}Quieto y de frente a la cámara.`,
+        faceLost ? 'No se ve la cara: recoloca el móvil.' : `${warm ? 'Calentando… ' : ''}Quieto y de frente a la cámara.`,
         `Pasada ${plan.index} de ${plan.total} · ${label}`,
         (plan.index - 1 + done / runMs) / plan.total,
         runMs - done,
@@ -112,9 +127,11 @@ export function createBenchmark({ camera, video, ensureAnalysis, getBlendshapes,
       return;
     }
     document.body.dataset.busy = 'bench';
+    cues.unlock(); // dentro del clic: si no, el navegador no deja sonar
+    try { wake = await navigator.wakeLock?.request('screen'); } catch { wake = null; } // si la pantalla se apaga, la cámara se para
     cancelled = null;
     runs = [];
-    ({ runMs, warmupMs } = params());
+    ({ runMs, warmupMs, leadMs } = params());
     setState('active');
     onStart();
     el.msg.textContent = '';
@@ -132,6 +149,19 @@ export function createBenchmark({ camera, video, ensureAnalysis, getBlendshapes,
       other = base.mode === 'worker' ? new Analysis() : new WorkerAnalysis();
       await other.load(true);
       const inst = { [base.mode]: base, [other.mode]: other };
+
+      // Cuenta atrás para colocar el móvil: no cuenta en la medida.
+      const leadStart = performance.now();
+      let lastTick = Infinity;
+      while (performance.now() - leadStart < leadMs && !cancelled) {
+        const left = leadMs - (performance.now() - leadStart);
+        showProgress('Coloca el móvil enfocándote la cara, a unos 40 cm, y quédate quieto.', 'Colócate', (performance.now() - leadStart) / leadMs, left);
+        const secs = Math.ceil(left / 1000);
+        if (secs <= 3 && secs < lastTick) { lastTick = secs; cues.tick(); }
+        await sleep(100);
+      }
+      if (cancelled) throw new Error(cancelled);
+      cues.go();
 
       const plan = buildPlan().map((p, _, all) => ({ ...p, total: all.length }));
       startedAt = new Date().toISOString();
@@ -153,8 +183,11 @@ export function createBenchmark({ camera, video, ensureAnalysis, getBlendshapes,
       }
       if (cancelled && !runs.length) throw new Error(cancelled);
       finish(!!cancelled);
+      if (cancelled) cues.warn();
+      else cues.end();
     } catch (err) {
       el.status.textContent = `No se pudo completar: ${err?.message ?? err}`;
+      cues.warn();
       setState(runs.length ? 'done' : 'idle');
       if (runs.length) finish(true);
     } finally {
@@ -164,6 +197,8 @@ export function createBenchmark({ camera, video, ensureAnalysis, getBlendshapes,
         try { await base.setBlendshapes(getBlendshapes()); } catch { /* ya está liberado */ }
       }
       other?.dispose();
+      wake?.release?.().catch(() => {});
+      wake = null;
       el.coach.hidden = true;
       if (document.body.dataset.busy === 'bench') document.body.dataset.busy = '';
     }

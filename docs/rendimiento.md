@@ -4,7 +4,9 @@ Tarjeta «Prueba de rendimiento» (debajo del asistente de pruebas). Ejecuta sol
 
 ## Cómo se usa
 1. Activa la cámara y elige **antes** la cámara y la prioridad (cambiarlas cancela la prueba). Para comparar con otra sesión, usa la misma configuración y la misma luz.
-2. Pulsa **Empezar**. Mantén la cara quieta y de frente durante los ~2 minutos y medio. El aviso sobre el vídeo muestra la pasada en curso y el tiempo restante.
+2. Pulsa **Empezar**. Hay una cuenta atrás de **10 s para colocarte** (no cuenta en la medida; los últimos 3 s suenan). Después, mantén la cara quieta y de frente durante los ~2 minutos y medio. El aviso sobre el vídeo muestra la pasada en curso y el tiempo restante.
+   - **Con la cámara trasera** no ves la pantalla: apoya el móvil a unos 40 cm de tu cara, en un soporte o contra algo. Un pitido largo marca el inicio; si se pierde la cara suena un tono grave cada 3 s (corrige el encuadre de oído); tres pitidos ascendentes y una vibración larga avisan de que **ha terminado** y ya puedes coger el móvil.
+   - La pantalla se mantiene encendida durante la prueba (si se apagara, la cámara se pararía). Los avisos se pueden desactivar con la casilla.
 3. Al terminar: tabla resumen, **Descargar JSON**, **Compartir** o **Copiar resumen** (sin las series).
 
 `?escala=0.25` en la dirección acorta las pasadas (mínimo 2,5 s), para comprobar el flujo rápido.
