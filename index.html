@@ -27,13 +27,18 @@
     <section id="liveView" hidden>
       <div class="stage">
         <video id="video" playsinline muted autoplay></video>
+        <canvas id="overlay" class="overlay" aria-hidden="true"></canvas>
         <div class="stats" aria-live="polite">
           <span class="pill" id="fpsPill">— fps</span>
           <span class="pill" id="resPill">—</span>
           <span class="pill" id="camPill">—</span>
+          <span class="pill" id="anaPill">Cargando modelo…</span>
+          <span class="pill" id="roiPill" hidden>—</span>
         </div>
       </div>
     </section>
+
+    <div class="banner warn" id="qualityBanner" role="status" hidden></div>
 
     <div class="banner warn" id="fpsWarning" hidden>
       El directo no llega a 24 fps. Prueba la prioridad «fps» o, para máxima sensibilidad, graba con la app de cámara y usa el modo de vídeo grabado (llegará en una fase posterior).
@@ -54,10 +59,39 @@
           <button type="button" data-priority="fps" aria-pressed="false">fps</button>
         </div>
       </div>
+      <div class="control-row">
+        <span class="control-label">Superposición</span>
+        <label class="check"><input type="checkbox" id="roiToggle" checked> Mostrar ROI</label>
+      </div>
       <div class="control-row" id="deviceRow" hidden>
         <span class="control-label">Dispositivo</span>
         <select class="select" id="deviceSelect" aria-label="Dispositivo de cámara"></select>
       </div>
+
+      <details class="details">
+        <summary>Verificación de lado (guiño)</summary>
+        <p class="hint">Cierra solo un ojo. I = izquierda del paciente, D = derecha. Si al cerrar el ojo izquierdo sube la barra D, marca «Invertir blendshapes» y avísame.</p>
+        <div class="verify">
+          <span class="control-label">Parpadeo (blendshape)</span>
+          <div class="bars">
+            <div class="bar" data-side="left"><span>I</span><i><b id="blinkL"></b></i><em id="blinkLv">—</em></div>
+            <div class="bar" data-side="right"><span>D</span><i><b id="blinkR"></b></i><em id="blinkRv">—</em></div>
+          </div>
+          <span class="control-label">Apertura (landmarks)</span>
+          <div class="bars">
+            <div class="bar" data-side="left"><span>I</span><i><b id="openL"></b></i><em id="openLv">—</em></div>
+            <div class="bar" data-side="right"><span>D</span><i><b id="openR"></b></i><em id="openRv">—</em></div>
+          </div>
+        </div>
+        <label class="check"><input type="checkbox" id="swapToggle"> Invertir blendshapes</label>
+        <dl class="kv" id="analysisDetails">
+          <dt>Delegado</dt><dd id="kvDelegate">—</dd>
+          <dt>Análisis</dt><dd id="kvTime">—</dd>
+          <dt>Cara en el encuadre</dt><dd id="kvFace">—</dd>
+          <dt>Distancia intercantal</dt><dd id="kvIcd">—</dd>
+          <dt>Ancho del ojo I / D</dt><dd id="kvEye">—</dd>
+        </dl>
+      </details>
 
       <details class="details">
         <summary>Detalle técnico de la captura</summary>

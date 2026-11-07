@@ -9,6 +9,8 @@ import './styles/app.css';
 
 import { Camera } from './capture/camera.js';
 import { describeError, fpsLevel, REQUESTED_FPS, PRIORITIES, STRICT_MIN_FPS } from './capture/camera-logic.js';
+import { Analysis } from './landmarks/analysis.js';
+import { Overlay } from './ui/overlay.js';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -21,6 +23,12 @@ const els = {
   fpsPill: $('fpsPill'),
   resPill: $('resPill'),
   camPill: $('camPill'),
+  anaPill: $('anaPill'),
+  roiPill: $('roiPill'),
+  overlay: $('overlay'),
+  quality: $('qualityBanner'),
+  roiToggle: $('roiToggle'),
+  swapToggle: $('swapToggle'),
   fpsWarning: $('fpsWarning'),
   controls: $('controls'),
   deviceRow: $('deviceRow'),
@@ -32,7 +40,15 @@ const els = {
 els.build.textContent = `v${__APP_VERSION__} · ${__BRANCH__}@${__COMMIT__}`;
 
 const camera = new Camera(els.video);
-const state = { facing: 'rear', priority: 'resolution', deviceId: null, running: false };
+const analysis = new Analysis(els.video);
+const overlay = new Overlay(els.overlay, els.stage);
+const state = { facing: 'rear', priority: 'resolution', deviceId: null, running: false, displayMirrored: false, showRoi: true };
+
+// Preferencias del clínico (solo comodidad: si el almacenamiento falla, no pasa nada).
+const pref = {
+  get(k) { try { return localStorage.getItem(`orbicula.${k}`); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(`orbicula.${k}`, v); } catch { /* sin almacenamiento */ } },
+};
 
 // Los fps solo se dan por bajos tras unos segundos estables (el arranque siempre va lento).
 let lowSince = null;
@@ -93,6 +109,82 @@ function updateStats(fps) {
   els.fpsWarning.hidden = !(lowSince && now - lowSince > 3000);
 }
 
+// ── Análisis (landmarks y ROI) ─────────────────────────────────────────────────
+let lastAnaUi = 0;
+let faceLostSince = null;
+let smallSince = null;
+const SMALL_FACE_RATIO = 0.3; // provisional: la cara ocupa menos del 30 % del lado corto del frame
+const SHOW_AFTER_MS = 1000; // un aviso de calidad solo sale si la condición se mantiene
+
+function setBar(id, valueId, frac, text) {
+  $(id).style.width = `${Math.round(Math.max(0, Math.min(1, frac)) * 100)}%`;
+  $(valueId).textContent = text;
+}
+
+function updateQuality(r, now) {
+  faceLostSince = r.face ? null : (faceLostSince ?? now);
+  smallSince = r.face && r.rois.meta.faceRatio < SMALL_FACE_RATIO ? (smallSince ?? now) : null;
+  let msg = '';
+  if (faceLostSince && now - faceLostSince > SHOW_AFTER_MS) msg = 'No se detecta la cara. Encuádrala de frente y con buena luz.';
+  else if (smallSince && now - smallSince > SHOW_AFTER_MS) msg = 'Cara pequeña en el encuadre: acerca el móvil o el paciente.';
+  els.quality.textContent = msg;
+  els.quality.hidden = !msg;
+}
+
+function updateAnalysisUi(r, now) {
+  if (now - lastAnaUi < 250) return;
+  lastAnaUi = now;
+
+  const level = fpsLevel(analysis.fps);
+  els.anaPill.textContent = `${analysis.fps.toFixed(0)} an/s · ${analysis.ms.toFixed(0)} ms`;
+  els.anaPill.className = `pill ${level === 'none' ? '' : level}`;
+  $('kvDelegate').textContent = analysis.delegate ?? '—';
+  $('kvTime').textContent = `${analysis.ms.toFixed(1)} ms · ${analysis.fps.toFixed(1)} fotogramas/s`;
+
+  if (!r.face) {
+    els.roiPill.hidden = true;
+    for (const id of ['blinkL', 'blinkR', 'openL', 'openR']) setBar(id, `${id}v`, 0, '—');
+    $('kvFace').textContent = $('kvIcd').textContent = $('kvEye').textContent = '—';
+    return;
+  }
+  const { left, right, meta } = r.rois;
+  const eye = Math.round((left.eyeWidth + right.eyeWidth) / 2);
+  els.roiPill.hidden = false;
+  els.roiPill.textContent = `ojo ≈ ${eye} px`;
+  $('kvFace').textContent = `${Math.round(meta.faceRatio * 100)} % del lado corto`;
+  $('kvIcd').textContent = `${Math.round(meta.intercanthal)} px`;
+  $('kvEye').textContent = `${Math.round(left.eyeWidth)} / ${Math.round(right.eyeWidth)} px`;
+
+  const b = r.blend;
+  setBar('blinkL', 'blinkLv', b.left.eyeBlink ?? 0, (b.left.eyeBlink ?? 0).toFixed(2));
+  setBar('blinkR', 'blinkRv', b.right.eyeBlink ?? 0, (b.right.eyeBlink ?? 0).toFixed(2));
+  // La apertura de un ojo abierto ronda 0,25–0,35 del ancho del ojo: la barra llena es 0,4.
+  setBar('openL', 'openLv', left.opening / 0.4, left.opening.toFixed(2));
+  setBar('openR', 'openRv', right.opening / 0.4, right.opening.toFixed(2));
+}
+
+function onVideoFrame() {
+  const r = analysis.step();
+  if (!r) return;
+  const now = performance.now();
+  if (r.face && state.showRoi) overlay.draw(r, { displayMirrored: state.displayMirrored });
+  else overlay.clear();
+  updateQuality(r, now);
+  updateAnalysisUi(r, now);
+}
+
+async function loadModel() {
+  if (analysis.ready) return;
+  els.anaPill.textContent = 'Cargando modelo…';
+  try {
+    await analysis.load();
+    els.anaPill.textContent = 'Modelo listo';
+  } catch (err) {
+    els.anaPill.textContent = 'Sin análisis';
+    showError(`No se pudo cargar el modelo de la cara (${err?.message ?? err}). La cámara sigue funcionando.`);
+  }
+}
+
 async function refreshDevices() {
   const devices = await Camera.listDevices().catch(() => []);
   els.deviceSelect.replaceChildren(
@@ -117,7 +209,10 @@ async function start() {
     state.running = true;
     state.facing = info.facing;
     setPressed('facing', info.facing);
-    els.video.classList.toggle('mirrored', info.facing === 'front');
+    state.displayMirrored = info.facing === 'front';
+    els.video.classList.toggle('mirrored', state.displayMirrored);
+    // Los frames de getUserMedia no van en espejo, tampoco con la frontal: solo la vista previa.
+    analysis.frameMirrored = false;
     els.camPill.textContent = info.facing === 'front' ? 'frontal' : 'trasera';
     els.startCard.hidden = true;
     els.live.hidden = false;
@@ -127,6 +222,7 @@ async function start() {
     if (els.video.videoWidth) onMeta();
     else els.video.addEventListener('loadedmetadata', onMeta, { once: true });
     await refreshDevices();
+    loadModel();
   } catch (err) {
     state.running = false;
     showError(describeError(err));
@@ -137,6 +233,22 @@ async function start() {
 }
 
 camera.onFrame = updateStats;
+camera.onVideoFrame = onVideoFrame;
+
+els.roiToggle.checked = pref.get('showRoi') !== '0';
+state.showRoi = els.roiToggle.checked;
+els.roiToggle.addEventListener('change', () => {
+  state.showRoi = els.roiToggle.checked;
+  pref.set('showRoi', state.showRoi ? '1' : '0');
+  if (!state.showRoi) overlay.clear();
+});
+
+els.swapToggle.checked = pref.get('swapBlend') === '1';
+analysis.swapNames = els.swapToggle.checked;
+els.swapToggle.addEventListener('change', () => {
+  analysis.swapNames = els.swapToggle.checked;
+  pref.set('swapBlend', analysis.swapNames ? '1' : '0');
+});
 
 // El marco toma la proporción real de los frames (en vertical, Android los entrega girados).
 els.video.addEventListener('resize', () => {

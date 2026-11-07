@@ -91,28 +91,43 @@ export class FpsMeter {
   constructor(windowMs = 1000) {
     this.windowMs = windowMs;
     this.times = [];
+    this.counts = [];
   }
 
-  /** Registra un frame (marca de tiempo en ms) y devuelve los fps actuales. */
-  push(t) {
+  /**
+   * Registra un frame y devuelve los fps actuales.
+   * @param {number} t marca de tiempo del frame, en ms
+   * @param {number} [count] contador de frames presentados (`presentedFrames`): si se da,
+   *   los fps cuentan también los frames que el análisis ha dejado sin atender.
+   */
+  push(t, count) {
     const last = this.times[this.times.length - 1];
     // Un frame repetido (misma marca) no cuenta.
     if (last !== undefined && t <= last) return this.fps;
     this.times.push(t);
+    this.counts.push(count ?? null);
     const from = t - this.windowMs;
-    while (this.times.length > 2 && this.times[0] < from) this.times.shift();
+    while (this.times.length > 2 && this.times[0] < from) {
+      this.times.shift();
+      this.counts.shift();
+    }
     return this.fps;
   }
 
-  /** fps = (frames − 1) / tiempo entre el primero y el último. */
+  /** fps = frames entre el primero y el último / tiempo entre ellos. */
   get fps() {
     const n = this.times.length;
     if (n < 2) return 0;
     const span = this.times[n - 1] - this.times[0];
-    return span > 0 ? ((n - 1) * 1000) / span : 0;
+    if (span <= 0) return 0;
+    const c0 = this.counts[0];
+    const c1 = this.counts[n - 1];
+    const frames = c0 != null && c1 != null && c1 > c0 ? c1 - c0 : n - 1;
+    return (frames * 1000) / span;
   }
 
   reset() {
     this.times = [];
+    this.counts = [];
   }
 }

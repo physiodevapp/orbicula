@@ -130,6 +130,8 @@ Trabaja por fases y **detente al final de cada una** para que el autor la pruebe
 6. **Vídeo grabado**: procesado offline frame a frame.
 7. **Exportación e integración**: JSON y CSV, esquema documentado, modo alojado y API `postMessage`.
 
+**Modelo recomendado:** al empezar cada fase (o una tarea suelta), consulta `docs/modelos.md` e indica al autor qué modelo y esfuerzo conviene para el plan y para la implementación, para que lo cambie con `/model` si hace falta. Si la tarea en curso no necesita el modelo activo (por ejemplo, documentación con Opus), dilo.
+
 Mantén un `README.md` con instrucciones de uso clínico (encuadre, distancia, iluminación) y un `CHANGELOG.md`.
 
 ## Despliegue (Cloudflare)
