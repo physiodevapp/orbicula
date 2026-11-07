@@ -30,10 +30,16 @@ export const FLOW_CONFIGS = {
   'farneback-320': cfg('farneback-320', 'Farnebäck · 320 px', 'Farn. 320', { method: 'farneback', maxWidth: 320 }),
   'farneback-320-vf': cfg('farneback-320-vf', 'Farnebäck · 320 px · plano Y', 'Farn. Y', { method: 'farneback', maxWidth: 320, source: 'videoframe' }),
   'lite-320-vf': cfg('lite-320-vf', 'Farnebäck ligero · 320 px · plano Y', 'Ligero Y', { method: 'farneback', maxWidth: 320, params: 'lite', source: 'videoframe' }),
+  'farneback-320-vf-30': cfg('farneback-320-vf-30', 'Farnebäck · 320 px · plano Y · 30/s', 'Farn. Y 30/s', { method: 'farneback', maxWidth: 320, source: 'videoframe', maxRate: 30 }),
   'lite-320-vf-30': cfg('lite-320-vf-30', 'Farnebäck ligero · 320 px · plano Y · 30/s', 'Ligero Y 30/s', { method: 'farneback', maxWidth: 320, params: 'lite', source: 'videoframe', maxRate: 30 }),
   'farneback-640': cfg('farneback-640', 'Farnebäck · 640 px', 'Farn. 640', { method: 'farneback', maxWidth: 640 }),
   'farneback-full': cfg('farneback-full', 'Farnebäck · sin reducir', 'Farn. máx.', { method: 'farneback' }),
   'lk-640': cfg('lk-640', 'Lucas-Kanade · 640 px', 'LK 640', { method: 'lk', maxWidth: 640 }),
 };
 
-export const DEFAULT_FLOW = 'farneback-320';
+/**
+ * Punto de trabajo (4a bis, trasera «fps» en el móvil del autor): leer el plano Y bajó la copia de
+ * 15 a 1,2 ms; el Farnebäck ligero apenas ahorraba (19 frente a 20 ms) y se descarta; el límite de
+ * 30 pares/s deja más procesador al análisis de la cara.
+ */
+export const DEFAULT_FLOW = 'farneback-320-vf-30';

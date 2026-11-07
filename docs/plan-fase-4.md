@@ -77,6 +77,23 @@ Conclusiones:
 ## Paso 4a bis
 Para recuperar los 24 análisis/s con flujo: leer solo el **plano Y** del `VideoFrame` de la franja en el worker (sin RGBA; respaldo con `createImageBitmap` si el frame no es YUV legible, que se anota), **Farnebäck ligero** (2 niveles, ventana 9, 2 iteraciones) y **límite de 30 pares/s**. La prueba de rendimiento compara esas variantes con la referencia de la 4a (Farnebäck 320 px). Hacerla con la trasera en «fps».
 
+### Resultados del 4a bis (trasera «fps», 2026-11-07, commit 72d0f3f)
+La cámara dio ~40 fps en esta sesión (60 en la anterior; probablemente menos luz).
+
+| | pares/s | ms flujo | ms copia | ms worker | análisis de la cara/s |
+|---|---|---|---|---|---|
+| Sin flujo | — | — | — | — | 28,4 |
+| Farnebäck 320 (RGBA, como en la 4a) | 26 | 23 | 14,7 | 38 | 24,1 |
+| Farnebäck 320, plano Y | 41 | 20 | **1,2** | 21 | 23,8 |
+| Farnebäck ligero, plano Y | 40 | 19 | 1,3 | 20 | 23,6 |
+| Ligero, plano Y, «30/s» | 21 | 22 | 1,6 | 24 | 26,0 |
+
+- **El plano Y funciona en el móvil** (`I420`, sin respaldo): la copia baja de 15 a 1,2 ms y la latencia del flujo de 75 a 40 ms.
+- **El Farnebäck ligero apenas ahorra** (19 frente a 20 ms): se descarta, para no perder precisión.
+- El límite de 30/s daba 20/s con la cámara a 40 fps (saltaba un frame de cada dos). Corregido con un límite por crédito (`src/flow/rate.js`).
+- El flujo sigue restando ~4 análisis de la cara por segundo (28 → 24); con el límite, ~2,5.
+- **Punto de trabajo elegido: trasera «fps», Farnebäck 320 px, plano Y, 30 pares/s** (`farneback-320-vf-30`, la configuración por defecto). Se comprobará de paso con los datos de rendimiento del asistente del 4b.
+
 ## Pruebas
 - **Vídeos sintéticos con la respuesta conocida** (ampliar `scripts/dev/make-face-videos.py`): mover solo el párpado 1–2 px (el flujo lo tiene que ver) y, por separado, toda la cara simulando un cabeceo (la compensación lo tiene que anular).
 - **Tests unitarios:** energía, máscaras de ROI en coordenadas de la franja, recolocación de la franja, signos con espejo y el ajuste del movimiento rígido.

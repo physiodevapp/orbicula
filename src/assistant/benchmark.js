@@ -7,12 +7,12 @@
 // el calentamiento del móvil o un cambio de luz no favorezcan siempre a la misma.
 // La versión 1 del esquema (fase 3) comparaba worker / hilo principal y blendshapes: ver docs/rendimiento.md.
 // 4a bis (mismo esquema, otras configuraciones): Farnebäck a 320 px como en la 4a, frente a leer solo el
-// plano Y del frame, Farnebäck ligero y un límite de 30 pares/s.
+// plano Y del frame, con y sin límite de 30 pares/s, y el Farnebäck ligero con límite.
 import { FLOW_CONFIGS } from '../flow/config.js';
 
 export const BENCH_SCHEMA = 'orbicula-benchmark/2';
 
-export const COMBOS = ['none', 'farneback-320', 'farneback-320-vf', 'lite-320-vf', 'lite-320-vf-30'].map((k) => FLOW_CONFIGS[k]);
+export const COMBOS = ['none', 'farneback-320', 'farneback-320-vf', 'farneback-320-vf-30', 'lite-320-vf-30'].map((k) => FLOW_CONFIGS[k]);
 
 /** Lo que define una configuración en el plan y en el informe. */
 const configFields = (c) => ({ flow: c.key, method: c.method, maxWidth: c.maxWidth, params: c.params, source: c.source, maxRate: c.maxRate });

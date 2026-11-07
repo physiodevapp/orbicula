@@ -15,7 +15,7 @@ suite('plan de pasadas', () => {
     expect(plan.find((p) => p.flow === 'lite-320-vf-30')).toMatchObject({ method: 'farneback', maxWidth: 320, params: 'lite', source: 'videoframe', maxRate: 30 });
   });
   it('4a bis: la referencia de la 4a frente al plano Y, Farnebäck ligero y el límite de 30/s', () => {
-    expect(COMBOS.map((c) => c.key)).toEqual(['none', 'farneback-320', 'farneback-320-vf', 'lite-320-vf', 'lite-320-vf-30']);
+    expect(COMBOS.map((c) => c.key)).toEqual(['none', 'farneback-320', 'farneback-320-vf', 'farneback-320-vf-30', 'lite-320-vf-30']);
     expect(COMBOS.find((c) => c.key === 'farneback-320')).toMatchObject({ source: 'bitmap', params: 'standard', maxRate: 0 });
   });
   it('se pueden pedir más rondas', () => {
@@ -164,7 +164,7 @@ suite('summarizeFlow', () => {
 
 suite('informe', () => {
   // Análisis de la cara: 25/s sin flujo; cada configuración con flujo lo frena según su coste.
-  const COST = { none: 0, 'farneback-320': 5, 'farneback-320-vf': 3, 'lite-320-vf': 2, 'lite-320-vf-30': 1 };
+  const COST = { none: 0, 'farneback-320': 5, 'farneback-320-vf': 3, 'farneback-320-vf-30': 2, 'lite-320-vf-30': 1 };
   const mkRuns = () =>
     buildPlan().map((p) => {
       const step = 40 + 4 * COST[p.flow];

@@ -8,6 +8,7 @@ import FlowWorker from './flow.worker.js?worker';
 import { FLOW_CONFIGS, DEFAULT_FLOW, OPENCV_VERSION, FARNEBACK_PARAMS } from './config.js';
 import { stripFromRois, needsNewStrip, workingSize } from './strip.js';
 import { FpsMeter } from '../capture/camera-logic.js';
+import { RateLimiter } from './rate.js';
 
 /** Frames en vuelo: uno calculándose y otro preparándose. Si están los dos, el frame se descarta. */
 const MAX_IN_FLIGHT = 2;
@@ -29,7 +30,7 @@ export class FlowClient {
     this.ms = 0; // media móvil de los ms de flujo
     this.meter = new FpsMeter(1000); // pares de frames con flujo por segundo
     this.counts = emptyCounts();
-    this.lastSubmitT = null; // marca de tiempo del último frame mandado (para el límite de pares/s)
+    this.limiter = new RateLimiter(this.config.maxRate); // límite de pares por segundo
     this.videoFrameOk = typeof VideoFrame === 'function'; // se apaga si `new VideoFrame(video)` falla
     this.blockedHosts = new Set();
     this.meta = new Map(); // id → {submitAt, cropMs}
@@ -97,7 +98,7 @@ export class FlowClient {
     this.config = c;
     if (this.strip) this.work = workingSize(this.strip, c.maxWidth);
     this.stripId++;
-    this.lastSubmitT = null;
+    this.limiter = new RateLimiter(c.maxRate);
   }
 
   /** Últimas ROI de MediaPipe: recoloca la franja si la cara se ha salido de ella. */
@@ -137,9 +138,7 @@ export class FlowClient {
       this.counts.busy++;
       return;
     }
-    // Límite de pares por segundo: el frame se salta si llega antes de tiempo (3 ms de margen).
-    const rate = this.config.maxRate;
-    if (rate && this.lastSubmitT != null && t - this.lastSubmitT < 1000 / rate - 3) {
+    if (!this.limiter.allow(t)) {
       this.counts.capped++;
       return;
     }
@@ -151,7 +150,6 @@ export class FlowClient {
       params: FARNEBACK_PARAMS[this.config.params],
     };
     const submitAt = performance.now();
-    this.lastSubmitT = t;
     this.counts.submitted++;
     this.inflight++;
 

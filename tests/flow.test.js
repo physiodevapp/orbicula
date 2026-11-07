@@ -6,6 +6,7 @@ import { roiCore, stripFromRois, needsNewStrip, workingSize, STRIP_MARGIN } from
 import { denseStats, sparseStats, gridPoints, normalizeCoeffs } from '../src/flow/stats.js';
 import { FLOW_CONFIGS, DEFAULT_FLOW } from '../src/flow/config.js';
 import { patchOpenCv } from '../scripts/opencv-patch.mjs';
+import { RateLimiter } from '../src/flow/rate.js';
 
 const FRAME = { width: 720, height: 1280 };
 const roisOf = (lm, frame = FRAME) => buildRois(lm, frame);
@@ -136,5 +137,28 @@ describe('parche de OpenCV.js (sin eval, para la CSP)', () => {
   });
   it('falla si no reconoce el código (otra versión)', () => {
     expect(() => patchOpenCv('var x=1;')).toThrow(/no se reconoce/);
+  });
+});
+
+describe('límite de pares por segundo', () => {
+  const run = (fps, rate, seconds = 10) => {
+    const r = new RateLimiter(rate);
+    let n = 0;
+    for (let t = 0; t < seconds * 1000; t += 1000 / fps) if (r.allow(t)) n++;
+    return n / seconds;
+  };
+  it('con la cámara a 40 fps y límite 30, salen 30 por segundo (no 20)', () => {
+    expect(run(40, 30)).toBeCloseTo(30, 0);
+  });
+  it('a 60 fps salen 30; a 24 fps salen los 24 (el límite no resta si la cámara va por debajo)', () => {
+    expect(run(60, 30)).toBeCloseTo(30, 0);
+    expect(run(24, 30)).toBeCloseTo(24, 0);
+  });
+  it('sin límite pasan todos; tras un hueco no manda una ráfaga', () => {
+    expect(run(60, 0)).toBeCloseTo(60, 0);
+    const r = new RateLimiter(30);
+    r.allow(0);
+    expect(r.allow(1000)).toBe(true); // hueco de 1 s
+    expect(r.allow(1016.7)).toBe(false); // no hay crédito acumulado del hueco
   });
 });

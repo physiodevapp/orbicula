@@ -10,7 +10,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - La prueba de rendimiento compara ahora: sin flujo, Farnebäck 320 px como en la 4a, con plano Y, ligero con plano Y, y ligero con plano Y a 30/s. Añade la columna «ms copia».
 - Resultados del 4a en el móvil del autor en `docs/plan-fase-4.md`: 4K descartado para el flujo en directo; punto de trabajo trasera «fps» con Farnebäck a 320 px; a 60 fps el flujo bajaba el análisis de la cara de 28 a 22 por segundo.
 
+- **Punto de trabajo del flujo** (tras la prueba en el móvil): trasera «fps», Farnebäck a 320 px leyendo el plano Y, con un máximo de 30 pares por segundo (`farneback-320-vf-30`, por defecto). El plano Y bajó la copia de 15 a 1,2 ms; el Farnebäck ligero apenas ahorraba y se descarta.
+
 ### Corregido (fase 4a bis)
+- El límite de pares por segundo dejaba pasar solo 20 con la cámara a 40 fps (saltaba un frame de cada dos): ahora reparte el ritmo por crédito y da 30.
 - Con la cara en el borde del frame, la franja del flujo se recolocaba en cada análisis (y el flujo casi no se medía): ahora solo cuenta la parte de las ROI que cae dentro del frame.
 - El origen de la franja va en coordenadas pares (necesario para leer frames YUV).
 
