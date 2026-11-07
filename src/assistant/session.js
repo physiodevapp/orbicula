@@ -29,6 +29,7 @@ const emptyFlow = () => ({
   left: Object.fromEntries(FLOW_ROIS.map((r) => [r, Object.fromEntries(Object.keys(FLOW_KEYS).map((k) => [k, []]))])),
   right: Object.fromEntries(FLOW_ROIS.map((r) => [r, Object.fromEntries(Object.keys(FLOW_KEYS).map((k) => [k, []]))])),
   head: { rU: [], rV: [], pU: [], pV: [] },
+  closure: { left: [], right: [] }, // cierre por flujo (DI, + = se cierra; ver processor.js)
 });
 /** 4 cifras significativas (las energías van de 1e-4 a 10). */
 // 4 cifras significativas; por debajo de 1e-6 (DI/s o su cuadrado) es ruido numérico: 0.
@@ -36,17 +37,35 @@ const sig = (v) => (Number.isFinite(v) ? (Math.abs(v) < 1e-6 ? 0 : Number(v.toPr
 
 /**
  * Calendario de repeticiones de un paso: cada una empieza en offsetMs + k·everyMs (pitido «ahora»)
- * y se suelta holdMs después (pitido «suelta»).
- * @returns {{k:number, kind:'hold'|'release', at:number}[]} en orden de tiempo
+ * y se suelta holdMs después (pitido «suelta»). Con `pattern`, cada repetición tiene su condición:
+ * 'act' (hacer el gesto) o 'control' (pitido distinto: no hacer nada), para medir falsos positivos.
+ * @returns {{k:number, kind:'hold'|'release', at:number, cond:'act'|'control'}[]} en orden de tiempo
  */
 export function repSchedule(reps) {
   if (!reps) return [];
   const out = [];
   for (let k = 0; k < reps.count; k++) {
     const at = reps.offsetMs + k * reps.everyMs;
-    out.push({ k, kind: 'hold', at }, { k, kind: 'release', at: at + reps.holdMs });
+    const cond = reps.pattern?.[k] ?? 'act';
+    out.push({ k, kind: 'hold', at, cond }, { k, kind: 'release', at: at + reps.holdMs, cond });
   }
   return out;
+}
+
+/**
+ * Orden al azar de `n` repeticiones con la mitad de controles, sin más de 3 iguales seguidas (para
+ * que no se puedan adivinar). `rand` se inyecta en los tests.
+ */
+export function randomPattern(n, rand = Math.random) {
+  for (let tries = 0; tries < 200; tries++) {
+    const p = [...Array(Math.ceil(n / 2)).fill('act'), ...Array(Math.floor(n / 2)).fill('control')];
+    for (let i = p.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [p[i], p[j]] = [p[j], p[i]];
+    }
+    if (!p.some((x, i) => i >= 3 && p[i - 1] === x && p[i - 2] === x && p[i - 3] === x)) return p;
+  }
+  return Array.from({ length: n }, (_, i) => (i % 2 ? 'control' : 'act'));
 }
 
 const newResult = (step, attempt) => ({
@@ -125,7 +144,7 @@ export class GuidedSession {
     if (this.state === 'running' && step?.reps) {
       const due = repSchedule(step.reps).filter((e) => e.at <= elapsed);
       const last = due.at(-1);
-      rep = { of: step.reps.count, k: last ? last.k + 1 : 0, holding: last?.kind === 'hold' };
+      rep = { of: step.reps.count, k: last ? last.k + 1 : 0, holding: last?.kind === 'hold', control: last?.cond === 'control' };
     }
     return { state: this.state, index: this.index, total: this.steps.length, completed: this.results.length, step, remainingMs, progress, current: this.cur, rep, autoAdvancing: this.autoAdvancing };
   }
@@ -183,10 +202,11 @@ export class GuidedSession {
       // Pitidos de cada repetición, y su marca de tiempo en el reloj de las series.
       const elapsed = t - this.phaseStart;
       const c = this.cur;
+      const step = this.step;
       for (const e of repSchedule(this.step.reps).slice(c.marks.length)) {
         if (e.at > elapsed) break;
-        c.marks.push({ rep: e.k + 1, kind: e.kind, t: Math.round(t - (c.t0 ?? t)) });
-        this.onCue(e.kind);
+        c.marks.push({ rep: e.k + 1, kind: e.kind, t: Math.round(t - (c.t0 ?? t)), ...(step.reps.pattern ? { cond: e.cond } : {}) });
+        this.onCue(e.kind === 'hold' && e.cond === 'control' ? 'control' : e.kind);
       }
     }
   }
@@ -237,6 +257,7 @@ export class GuidedSession {
     f.head.rV.push(sig(s.head?.reference?.v));
     f.head.pU.push(sig(s.head?.pose?.u));
     f.head.pV.push(sig(s.head?.pose?.v));
+    for (const side of ['left', 'right']) f.closure[side].push(sig(s.closure?.[side]));
   }
 
   /** Termina el paso en curso (por tiempo o antes de tiempo) y pasa a la revisión. */

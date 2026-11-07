@@ -124,7 +124,7 @@ Trasera «fps», modo seguido con voz, contracción mínima más pequeña. Luz d
 - **Criterio 4:** párpados, 0 % sobre el p99 del reposo en cabeceo y giro con el dorso nasal (cumple). Canto y ceja no: en el giro, 47–58 % con el dorso nasal y 30–41 % con la postura; en el cabeceo, el dorso nasal empeora el canto (10–20 % frente a 5 % sin compensar). Las regiones laterales necesitan su propia compensación (afín local con puntos cercanos, o la postura para ellas).
 - **Guiños:** en el guiño izquierdo, ojo que no guiña / ojo que guiña: EAR 0,6 y flujo integrado 0,5. Esta vez se parecen; sigue sin estar claro si la malla exagera. El flujo integrado no es fiable con el ojo cerrado del todo.
 
-## Propuesta para terminar la fase 4
+## Propuesta para terminar la fase 4 (1 y 2 hechos; aprobada por el autor)
 1. **Apertura por flujo** como métrica de la app (curva y JSON), con corrección de la deriva (integrador con fuga o restar la línea base de los últimos segundos).
 2. **Prueba de contracción mínima con controles**: ~10 contracciones mínimas y ~10 controles en orden aleatorio, con dos pitidos distintos («contrae» / «no hagas nada»); tasas de acierto y falsos positivos del EAR y del flujo.
 3. **Compensación de las regiones laterales** (canto y ceja).

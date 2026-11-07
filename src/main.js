@@ -83,7 +83,8 @@ let t0 = null; // inicio de las medidas (para el registro de parpadeos)
 
 // Flujo por ROI: velocidad residual (raíz de la energía, DI/s) por ROI y compensación ('upperLid:pose'…).
 const FLOW_SERIES_KEYS = FLOW_ROIS.flatMap((roi) => VARIANTS.map((v) => `${roi}:${v}`));
-const flowSeries = new Series({ maxAgeMs: 120000, keys: FLOW_SERIES_KEYS });
+// …y el cierre por flujo de cada ojo (DI, + = se cierra).
+const flowSeries = new Series({ maxAgeMs: 120000, keys: [...FLOW_SERIES_KEYS, 'closure'] });
 const flowProcessor = new FlowProcessor(onFlowSample);
 let lastField = null; // última muestra del campo de flujo (para dibujarla)
 
@@ -264,6 +265,7 @@ const METRIC_HINTS = {
   ear: 'EAR: apertura vertical media del ojo / ancho del ojo. Ronda 0,25–0,35 con el ojo abierto y baja al cerrar. Es la señal que usa el detector (la línea discontinua es el reposo estimado).',
   aperture: 'Apertura palpebral central normalizada a la distancia entre las comisuras internas de los dos ojos.',
   blink: 'Blendshape de parpadeo de MediaPipe (0 abierto, 1 cerrado). Es una señal más lenta y de menor rango que el EAR; sirve de apoyo.',
+  closure: 'Cierre del ojo medido con el flujo: cuánto ha bajado el párpado superior menos lo que ha subido el inferior, en distancias intercantales (DI), compensado con el dorso nasal. Sube al entrecerrar y vuelve a 0 en unos segundos (para que no derive). Es la señal que detecta contracciones más finas que el EAR.',
   flow: 'Flujo óptico de la ROI elegida: velocidad del movimiento que queda tras restar el de la cabeza, en distancias intercantales por segundo (DI/s). Escala logarítmica, con líneas en 0,01, 0,17 y 3 DI/s. Por defecto, compensado con el dorso nasal (en los vídeos de prueba, la postura añadía el temblor de la malla).',
 };
 els.metricHint.textContent = METRIC_HINTS.ear;
@@ -283,9 +285,9 @@ function updateCurveStats(now) {
     r.base.textContent = b == null ? '—' : b.toFixed(2);
   }
   // Con la curva del flujo, la asimetría es la de la ROI y la compensación elegidas.
-  const flowCurve = curves.metric === 'flow';
+  const flowCurve = curves.metric === 'flow' || curves.metric === 'closure';
   const src = flowCurve ? flowSeries : series;
-  const key = flowCurve ? curves.flowKey : curves.metric;
+  const key = curves.metric === 'flow' ? curves.flowKey : curves.metric;
   const tEnd = flowCurve ? (flowSeries.t.at(-1) ?? lastT) : lastT;
   const a = asymmetry(src.mean('left', key, tEnd, 10000) ?? NaN, src.mean('right', key, tEnd, 10000) ?? NaN);
   els.asymVal.textContent = a == null ? '—' : `${a > 0 ? '+' : ''}${a.toFixed(2)}`;
@@ -453,9 +455,12 @@ function onFlowSample(s) {
     const e = x?.[roi]?.[v]?.energy;
     return [k, Number.isFinite(e) ? Math.sqrt(e) : NaN];
   }));
-  flowSeries.push(s.t, { left: side(s.left), right: side(s.right) });
+  flowSeries.push(s.t, {
+    left: { ...side(s.left), closure: s.closure?.left ?? NaN },
+    right: { ...side(s.right), closure: s.closure?.right ?? NaN },
+  });
   assistant.recordFlow(s);
-  if (curves.metric === 'flow') curves.requestDraw();
+  if (curves.metric === 'flow' || curves.metric === 'closure') curves.requestDraw();
 }
 
 function onFlowResult(m) {
@@ -631,7 +636,7 @@ document.querySelectorAll('[data-metric]').forEach((b) =>
     curves.setMetric(b.dataset.metric);
     setPressed('metric', b.dataset.metric);
     els.flowSelect.hidden = b.dataset.metric !== 'flow';
-    if (b.dataset.metric === 'flow' && !state.showFlow) {
+    if ((b.dataset.metric === 'flow' || b.dataset.metric === 'closure') && !state.showFlow) {
       els.flowToggle.checked = true;
       setFlow(true); // la curva del flujo necesita el flujo encendido
     }

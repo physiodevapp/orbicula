@@ -343,8 +343,8 @@ describe('asistente de la fase 4', () => {
 
   it('calendario: «ahora» y «suelta» de cada repetición', () => {
     expect(repSchedule(REPS)).toEqual([
-      { k: 0, kind: 'hold', at: 200 }, { k: 0, kind: 'release', at: 600 },
-      { k: 1, kind: 'hold', at: 1200 }, { k: 1, kind: 'release', at: 1600 },
+      { k: 0, kind: 'hold', at: 200, cond: 'act' }, { k: 0, kind: 'release', at: 600, cond: 'act' },
+      { k: 1, kind: 'hold', at: 1200, cond: 'act' }, { k: 1, kind: 'release', at: 1600, cond: 'act' },
     ]);
     expect(repSchedule(null)).toEqual([]);
   });
@@ -366,7 +366,7 @@ describe('asistente de la fase 4', () => {
     at(100); // empieza a grabar
     s.record(150, sample(0.3, 0.3)); // t0 de las series = 150
     at(300); // 200 ms desde el inicio: «ahora» 1
-    expect(s.snapshot().rep).toEqual({ of: 2, k: 1, holding: true });
+    expect(s.snapshot().rep).toEqual({ of: 2, k: 1, holding: true, control: false });
     at(700); // «suelta» 1
     expect(s.snapshot().rep.holding).toBe(false);
     at(1350);
@@ -490,5 +490,39 @@ describe('voz del asistente', () => {
     expect(s.snapshot().remainingMs).toBe(1);
     t = 5000; s.tick();
     expect(s.state).toBe('running');
+  });
+});
+
+describe('prueba con controles', () => {
+  it('orden al azar: mitad y mitad y nunca más de 3 iguales seguidas', async () => {
+    const { randomPattern } = await import('../src/assistant/session.js');
+    let seed = 1;
+    const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (let k = 0; k < 50; k++) {
+      const p = randomPattern(10, rand);
+      expect(p.filter((x) => x === 'act')).toHaveLength(5);
+      expect(p.some((x, i) => i >= 3 && p[i - 1] === x && p[i - 2] === x && p[i - 3] === x)).toBe(false);
+    }
+  });
+  it('los controles suenan distinto y quedan marcados en el JSON', () => {
+    let t = 0;
+    const cues = [];
+    const reps = { count: 2, everyMs: 1000, holdMs: 400, offsetMs: 200, pattern: ['control', 'act'] };
+    const s = new GuidedSession([{ id: 'micro-1', title: 'M', instruction: '', durationMs: 2200, reps }], { now: () => t, prepMs: 100, onCue: (c) => cues.push(c) });
+    s.start();
+    t = 100; s.tick();
+    s.record(100, sample(0.3, 0.3));
+    for (const v of [300, 700, 1300, 1700]) { t = v; s.tick(); if (v === 300) expect(s.snapshot().rep.control).toBe(true); }
+    expect(cues.filter((c) => ['hold', 'control', 'release'].includes(c))).toEqual(['control', 'release', 'hold', 'release']);
+    expect(s.cur.marks.map((m) => `${m.kind}:${m.cond}`)).toEqual(['hold:control', 'release:control', 'hold:act', 'release:act']);
+  });
+  it('el plan con controles sortea el orden y tiene reposo al principio y al final', async () => {
+    const { MICRO_STEPS, PLANS } = await import('../src/assistant/steps.js');
+    expect(PLANS.micro.flow).toBe(true);
+    expect(MICRO_STEPS.map((s) => s.id)).toEqual(['check', 'rest', 'micro-1', 'micro-2', 'rest-end']);
+    for (const s of MICRO_STEPS.filter((x) => x.reps)) {
+      expect(s.reps.randomize).toBe(true);
+      expect(s.say).toMatch(/Dos pitidos cortos: no hagas nada/);
+    }
   });
 });

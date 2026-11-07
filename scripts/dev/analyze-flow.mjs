@@ -74,7 +74,7 @@ const earAt = (s, side, t0, t1) => s.series.t.map((t, i) => [t, s.series[side].e
 
 function reps(s) {
   const holds = s.marks.filter((m) => m.kind === 'hold');
-  return holds.map((h) => ({ rep: h.rep, hold: h.t, release: s.marks.find((m) => m.kind === 'release' && m.rep === h.rep)?.t }));
+  return holds.map((h) => ({ rep: h.rep, hold: h.t, cond: h.cond ?? 'act', release: s.marks.find((m) => m.kind === 'release' && m.rep === h.rep)?.t }));
 }
 
 /**
@@ -184,7 +184,7 @@ for (const id of ['nod', 'turn']) {
     return out;
   };
   const nul = [];
-  for (const id of ['check', 'rest', 'natural']) {
+  for (const id of ['check', 'rest', 'natural', 'rest-end']) {
     const s = step(id);
     if (!s) continue;
     const bw = blinkWindows(s, 200, 400);
@@ -197,6 +197,36 @@ for (const id of ['nod', 'turn']) {
   const rank = (k, v) => Math.round((100 * nul.filter((x) => x[k] < v).length) / nul.length);
   console.log(`\nDETECCIÓN FRENTE AL REPOSO: percentil de cada repetición en ${nul.length} ventanas de reposo sin parpadeos (≥ 95 = detectada; las ventanas se solapan, así que es orientativo).`);
   console.log(`  p95 nulo: ${keys.map((k) => `${k} ${f(pct(nul.map((x) => x[k]), 0.95), 3)}`).join(' · ')}`);
+  // Prueba con controles (plan «micro»): aciertos, falsas alarmas y AUC de cada medida.
+  const micro = ['micro-1', 'micro-2'].map(step).filter(Boolean);
+  if (micro.length) {
+    // Se apartan las repeticiones con un parpadeo dentro de la ventana (falsearían las dos medidas).
+    const all = micro.flatMap((s) => {
+      const bw = blinkWindows(s, 200, 400);
+      return reps(s).map((r) => ({ ...r, blink: bw.some(([a, b]) => b >= r.hold - 800 && a <= r.release + 800 + 600), x: statsAt(s, r.hold, r.release) }));
+    });
+    const trials = all.filter((t) => !t.blink);
+    const act = trials.filter((t) => t.cond === 'act');
+    const ctl = trials.filter((t) => t.cond === 'control');
+    console.log(`\n(${all.length - trials.length} de ${all.length} repeticiones apartadas por un parpadeo en la ventana: ${all.filter((t) => t.blink).map((t) => t.cond).join(', ') || 'ninguna'})`);
+    // AUC = probabilidad de que una contracción dé más que un control (0,5 = azar, 1 = separación perfecta).
+    const auc = (k) => {
+      let w = 0;
+      for (const a of act) for (const c of ctl) w += a.x[k] > c.x[k] ? 1 : a.x[k] === c.x[k] ? 0.5 : 0;
+      return w / (act.length * ctl.length);
+    };
+    console.log(`\nCRITERIO 3 CON CONTROLES: ${act.length} contracciones mínimas y ${ctl.length} controles. Detectada = por encima del p95 del reposo.`);
+    console.log('medida        aciertos   falsas alarmas   AUC (contracción frente a control)');
+    for (const k of keys) {
+      const p95 = pct(nul.map((x) => x[k]), 0.95);
+      const hit = act.filter((t) => t.x[k] > p95).length;
+      const fa = ctl.filter((t) => t.x[k] > p95).length;
+      console.log(`${k.padEnd(12)}  ${`${hit}/${act.length}`.padStart(7)}   ${`${fa}/${ctl.length}`.padStart(13)}   ${f(auc(k), 2).padStart(6)}`);
+    }
+    console.log('Por repetición (orden de la prueba):');
+    for (const t of all) console.log(`${t.blink ? '  [parpadeo] ' : ''}` + `  ${t.cond === 'act' ? 'CONTRAE ' : 'control '} ${keys.map((k) => `${k} ${f(t.x[k], 3)} (${rank(k, t.x[k])})`).join(' · ')}`);
+  }
+
   for (const id of ['minimal', 'more']) {
     const s = step(id);
     if (!s) continue;

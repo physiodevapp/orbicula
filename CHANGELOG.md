@@ -25,6 +25,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 - `analyze-flow.mjs`: detección calibrada frente al reposo (percentil de cada repetición entre ventanas de reposo sin parpadeos) para el EAR y la apertura por flujo integrada. Segundo análisis en `docs/plan-fase-4.md`: con contracciones más pequeñas, el flujo integrado detecta 3 de 5 que el EAR no ve.
 
+- **Cierre por flujo** (curva «Cierre F» y serie `flow.closure` del JSON): desplazamiento acumulado del párpado superior hacia abajo menos el del inferior, compensado con el dorso nasal, en DI (+ = se cierra), con un integrador con fuga de 5 s para que no derive. Es la medida que detectó contracciones que el EAR no distinguía del reposo.
+- **Prueba «contracción mínima con controles»** (nuevo plan del asistente, unos 3 min): reposo, 2 × 10 repeticiones en orden al azar (mitad contracciones mínimas con el pitido agudo, mitad controles con **dos pitidos cortos: no hacer nada**) y reposo final. Las marcas guardan la condición de cada repetición. `analyze-flow.mjs` da, para el EAR y el flujo, aciertos, falsas alarmas y AUC (criterio 3).
+
 ### Corregido (fase 4b)
 - La asimetría de las curvas fallaba al elegir una métrica que no está en la serie de la cara.
 

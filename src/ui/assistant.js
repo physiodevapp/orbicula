@@ -1,7 +1,7 @@
 // Asistente de pruebas: guía paso a paso (GuidedSession), avisa sobre el vídeo con la cuenta
 // atrás y guarda el registro como un JSON que se descarga o se comparte. Todo en el
 // dispositivo: no hay ninguna llamada de red.
-import { GuidedSession, AUTO_PAUSE_MS } from '../assistant/session.js';
+import { GuidedSession, AUTO_PAUSE_MS, randomPattern } from '../assistant/session.js';
 import { PLANS, DEFAULT_PLAN, spokenPrepMs } from '../assistant/steps.js';
 import { buildReport, describeSummary } from '../assistant/report.js';
 import { downloadJson, shareJson, copyJson, stamp } from './share.js';
@@ -23,7 +23,11 @@ function stepsOf(planId) {
     ...s,
     flow: plan.flow,
     durationMs: shorten(s.durationMs, 1500),
-    ...(s.reps ? { reps: { ...s.reps, everyMs: shorten(s.reps.everyMs, 800), holdMs: shorten(s.reps.holdMs, 300), offsetMs: shorten(s.reps.offsetMs, 300) } } : {}),
+    ...(s.reps ? { reps: {
+      ...s.reps, everyMs: shorten(s.reps.everyMs, 800), holdMs: shorten(s.reps.holdMs, 300), offsetMs: shorten(s.reps.offsetMs, 300),
+      // Orden al azar de contracciones y controles: se sortea en cada sesión.
+      ...(s.reps.randomize ? { pattern: randomPattern(s.reps.count) } : {}),
+    } } : {}),
   })).map((s) => (s.reps && k < 1 ? { ...s, durationMs: s.reps.offsetMs + s.reps.count * s.reps.everyMs } : s));
 }
 
@@ -104,6 +108,8 @@ export function createAssistant({ getContext, getPerf, onStart }) {
     // Repeticiones: agudo y largo = «ahora»; grave = «suelta».
     else if (cue === 'hold') { beep(1175, 260); buzz(120); }
     else if (cue === 'release') { beep(392, 220); buzz(40); }
+    // Control: dos pitidos cortos medios = «no hagas nada».
+    else if (cue === 'control') { beep(660, 90); beep(660, 90, 0.16); buzz([30, 60, 30]); }
   }
 
   // ── Pantalla encendida mientras dura la sesión ──────────────────────────────
@@ -140,7 +146,9 @@ export function createAssistant({ getContext, getPerf, onStart }) {
     } else if (s.rep) {
       // Repeticiones: lo que toca ahora, en grande; el resto de la instrucción, en el paso.
       el.coachText.className = 'coach-text big';
-      el.coachText.textContent = !s.rep.k ? 'Preparado…' : s.rep.holding ? `¡Ahora! (${s.rep.k}/${s.rep.of})` : `Suelta (${s.rep.k}/${s.rep.of})`;
+      el.coachText.textContent = !s.rep.k ? 'Preparado…'
+        : s.rep.holding ? `${s.rep.control ? 'Nada, quieto' : '¡Ahora!'} (${s.rep.k}/${s.rep.of})`
+        : `Suelta (${s.rep.k}/${s.rep.of})`;
       el.coachTime.textContent = mmss(s.remainingMs);
     } else {
       el.coachText.className = 'coach-text';

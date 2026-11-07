@@ -218,3 +218,44 @@ describe('compensación del movimiento de la cabeza', () => {
     expect(out).toHaveLength(3);
   });
 });
+
+describe('cierre por flujo', () => {
+  const W = 260, H = 120, STRIP = { x: 100, y: 400, w: 520, h: 240 }, SCALE = 0.5;
+  const faceRes = () => ({ face: true, frame: FRAME, rois: buildRois(makeFace(), FRAME) });
+  const momentsFor = (r, fn) => {
+    const f = field(W, H, fn);
+    const out = new Float64Array(ROI_KEYS.length * MOMENTS);
+    ROI_KEYS.forEach((key, k) => {
+      const [side, name] = key.split('.');
+      const poly = key === 'reference' ? r.rois.reference.polygon : r.rois[side][name].polygon;
+      out.set(moments(f, W, rasterize(toWork(poly, STRIP, SCALE), W, H)), k * MOMENTS);
+    });
+    return out;
+  };
+  it('sube si el párpado superior baja, vuelve a 0 con la fuga y no cambia con la cabeza', async () => {
+    const { CLOSURE_TAU_MS } = await import('../src/flow/processor.js');
+    const out = [];
+    const p = new FlowProcessor((s) => out.push(s));
+    const r = faceRes();
+    const lid = new Set(rasterize(toWork(r.rois.right.upperLid.polygon, STRIP, SCALE), W, H));
+    let t = 0;
+    p.pushFace(t, r);
+    // 10 pares: el párpado superior derecho baja 0,3 px de trabajo por par.
+    for (let k = 0; k < 10; k++) {
+      t += 33;
+      p.pushFace(t, r);
+      p.pushFlow({ t, dt: 33, moments: momentsFor(r, (x, y) => (lid.has(Math.floor(y) * W + Math.floor(x)) ? [0, 0.3] : [0, 0])), strip: STRIP, scale: SCALE });
+    }
+    const peak = out.at(-1).closure.right;
+    expect(peak).toBeGreaterThan(0);
+    expect(out.at(-1).closure.left).toBeCloseTo(0, 6);
+    // Cabeza que baja entera: con el dorso nasal no suma cierre; tras 5 s el cierre ha caído a ~1/e.
+    for (let k = 0; k < 150; k++) {
+      t += 33;
+      p.pushFace(t, r);
+      p.pushFlow({ t, dt: 33, moments: momentsFor(r, () => [0, 0.5]), strip: STRIP, scale: SCALE });
+    }
+    expect(out.at(-1).closure.right).toBeCloseTo(peak * Math.exp(-(150 * 33) / CLOSURE_TAU_MS), 3);
+    expect(out.at(-1).closure.left).toBeCloseTo(0, 6);
+  });
+});

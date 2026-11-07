@@ -9,6 +9,8 @@ export const METRICS = {
   // Flujo residual de una ROI: velocidad cuadrática media (raíz de la energía), en distancias
   // intercantales por segundo. Escala logarítmica: el reposo y una contracción difieren en órdenes de magnitud.
   flow: { label: 'Flujo (DI/s)', min: 0.01, max: 3, digits: 2, log: true, series: 'flow' },
+  // Cierre del ojo por flujo integrado (DI, + = se cierra): ver CLOSURE_TAU_MS en flow/processor.js.
+  closure: { label: 'Cierre por flujo (DI)', min: -0.05, max: 0.2, digits: 3, series: 'flow', key: 'closure' },
 };
 
 export class Curves {
@@ -83,7 +85,7 @@ export class Curves {
     const hi = tr(m.max);
     const y = (v) => h - padY - ((tr(Math.min(m.max, Math.max(m.min, v))) - lo) / (hi - lo)) * (h - 2 * padY);
     const src = m.series === 'flow' ? this.flowSeries : this.series;
-    const key = m.series === 'flow' ? this.flowKey : this.metric;
+    const key = m.key ?? (m.series === 'flow' ? this.flowKey : this.metric);
     const { t, [side]: data } = src;
     // El tiempo lo marcan las dos series (la del flujo va unos 70 ms por detrás de la de la cara).
     const tNow = Math.max(this.series.t.at(-1) ?? 0, this.flowSeries?.t.at(-1) ?? 0);

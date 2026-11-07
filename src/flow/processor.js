@@ -8,6 +8,15 @@
 // no llega a tiempo, la variante «postura» de ese par queda vacía (null) y las otras dos se dan igual.
 import { ROI_KEYS, FLOW_ROIS, VARIANTS, ZERO, translationOf, residual, affineMotion, lerpPoints, toWork, roiMetrics, MOMENTS } from './metrics.js';
 
+/**
+ * Cierre por flujo: desplazamiento acumulado del párpado superior hacia abajo menos el del inferior
+ * (compensado con el dorso nasal), en distancias intercantales. Positivo = el ojo se cierra.
+ * Integrador con fuga (constante de tiempo CLOSURE_TAU_MS): sin ella, el ruido se acumula y la curva
+ * deriva; con 5 s, una contracción mantenida 1,5 s pierde ~26 % al final. Es la señal que detectó
+ * contracciones que el EAR no distinguía del reposo (docs/plan-fase-4.md, 4c).
+ */
+export const CLOSURE_TAU_MS = 5000;
+
 /** Cuánto puede esperar un par a la postura (ms de marca de tiempo de la cámara). */
 export const MAX_WAIT_MS = 300;
 /** Histórico de posturas que se guarda (ms). */
@@ -23,6 +32,7 @@ export class FlowProcessor {
   reset() {
     this.poses = []; // { t, points, intercanthal, axes: {left, right} } en orden de t
     this.queue = []; // pares de flujo esperando la postura
+    this.closure = { left: 0, right: 0 };
   }
 
   /** Un análisis de la cara (con su marca de tiempo de captura). */
@@ -106,6 +116,16 @@ export class FlowProcessor {
     const k = 1000 / (unit * f.dt);
     const head = (g) => (g ? { u: (g.a * cx + g.b * cy + g.c) * k, v: (g.d * cx + g.e * cy + g.f) * k } : null);
     out.head = { reference: head(motion.reference), pose: head(motion.pose) };
+    // Cierre por flujo de cada ojo (ver CLOSURE_TAU_MS).
+    out.closure = {};
+    const leak = Math.exp(-f.dt / CLOSURE_TAU_MS);
+    for (const side of ['left', 'right']) {
+      const up = out[side].upperLid.reference?.down;
+      const lo = out[side].lowerLid.reference?.down;
+      const step = Number.isFinite(up) && Number.isFinite(lo) ? ((up - lo) * f.dt) / 1000 : 0;
+      this.closure[side] = this.closure[side] * leak + step;
+      out.closure[side] = this.closure[side];
+    }
     return out;
   }
 }

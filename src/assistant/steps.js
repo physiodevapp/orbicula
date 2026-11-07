@@ -192,9 +192,29 @@ export function spokenPrepMs(text, minMs = 3000) {
   return Math.max(minMs, Math.round((text?.length ?? 0) * 70 + 2500));
 }
 
+// ── Fase 4: contracción mínima con controles (criterio 3) ────────────────────────────────────
+// Repeticiones de contracción mínima mezcladas al azar con controles (pitido distinto: no hacer
+// nada). Da, para el EAR y para el flujo, la tasa de aciertos (contracciones detectadas) y la de
+// falsos positivos (controles «detectados»). `randomize`: el orden se sortea al empezar la sesión
+// (mitad y mitad, sin más de 3 iguales seguidas) y queda en el JSON (marcas con `cond`).
+const MICRO = { ...rep(10, 5000, 1500), randomize: true };
+const MICRO_SAY = 'Atención, hay dos avisos. Pitido agudo: entrecierra los ojos lo mínimo, como si sonrieras con los ojos, tan poco que casi no lo notes, y mantenlo hasta el pitido grave. Dos pitidos cortos: no hagas nada y quédate quieto hasta el pitido grave. Diez veces, en orden al azar.';
+const MICRO_TEXT = 'Pitido agudo: entrecierra los ojos lo mínimo y mantén hasta el grave. Dos pitidos cortos: no hagas nada, quieto hasta el grave. 10 veces, al azar.';
+
+export const MICRO_STEPS = [
+  PHASE4_STEPS[0],
+  PHASE4_STEPS[1],
+  { id: 'micro-1', title: 'Contracción mínima con controles (1)', instruction: MICRO_TEXT, durationMs: repDuration(MICRO), reps: MICRO, say: MICRO_SAY,
+    hint: 'Lo más pequeño que puedas notar tú. En los controles, quieto y sin gestos.' },
+  { id: 'micro-2', title: 'Contracción mínima con controles (2)', instruction: MICRO_TEXT, durationMs: repDuration(MICRO), reps: MICRO, say: MICRO_SAY },
+  { id: 'rest-end', title: 'Reposo final', instruction: 'Mira al frente, quieto, sin hacer nada. Parpadea con naturalidad.', durationMs: 20000,
+    say: 'Mira al frente sin hacer nada y parpadea con naturalidad.' },
+];
+
 /** Planes del asistente. `flow`: necesita el flujo óptico encendido. */
 export const PLANS = {
   phase4: { id: 'phase4', label: 'Fase 4: flujo óptico (unos 4 min)', steps: PHASE4_STEPS, flow: true },
+  micro: { id: 'micro', label: 'Fase 4: contracción mínima con controles (unos 3 min)', steps: MICRO_STEPS, flow: true },
   phase3: { id: 'phase3', label: 'Fase 3: parpadeos (unos 7 min)', steps: PHASE3_STEPS, flow: false },
 };
 export const DEFAULT_PLAN = 'phase4';

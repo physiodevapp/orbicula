@@ -6,6 +6,7 @@ Guía paso a paso dentro de la app (tarjeta «Asistente de pruebas», debajo del
 
 ## Pruebas disponibles
 - **Fase 4: flujo óptico** (por defecto, unos 4 min): reposo 20 s, contracción mínima («Entrecierra los ojos lo mínimo, como si sonrieras con los ojos») ×5, contracción algo mayor ×3, cabeceo 15 s, giro 12 s, cejas ×3, guiño izquierdo ×3, guiño derecho ×3 y parpadeo espontáneo 20 s. Enciende el flujo óptico al empezar (la primera vez descarga OpenCV.js). Las repeticiones van con pitidos: **agudo = ahora, grave = suelta**, y sobre el vídeo se lee «¡Ahora!» o «Suelta» con el número de repetición; se puede hacer con la cámara trasera sin mirar.
+- **Fase 4: contracción mínima con controles** (unos 3 min): reposo 20 s; dos tandas de 10 repeticiones en orden al azar, la mitad **contracción mínima** (pitido agudo: entrecerrar lo mínimo y mantener hasta el grave) y la mitad **control** (dos pitidos cortos: no hacer nada, quieto hasta el grave); reposo final 20 s. Sirve para medir aciertos y falsas alarmas del EAR y del flujo (criterio 3). El orden se sortea en cada sesión y queda en las marcas (`cond`).
 - **Fase 3: parpadeos** (unos 7 min): reposo, parpadeo espontáneo, guiños, parpadeo flojo, cierre mantenido, mirada y cabeceo.
 
 ## Cómo se usa
@@ -57,13 +58,14 @@ Solo medidas numéricas y la configuración: ninguna imagen, ningún nombre. Inc
     "summary": { "samples": 0, "faceFraction": 0, "left": { /* parpadeos, cierres, duración, completitud, EAR… */ }, "right": {} },
     "events": { "left": [ { "kind": "blink|closure|narrowing", "t": 0, "duration": 0, "min": 0, "baseline": 0, "completeness": 0 } ], "right": [] },
     "reps": { "count": 5, "everyMs": 5000, "holdMs": 1500, "offsetMs": 2500 },   // repeticiones guiadas (o null)
-    "marks": [ { "rep": 1, "kind": "hold|release", "t": 0 } ],                  // pitidos «ahora» / «suelta», en el reloj de las series
+    "marks": [ { "rep": 1, "kind": "hold|release", "t": 0, "cond": "act|control" } ],   // pitidos «ahora» / «suelta», en el reloj de las series; cond solo en la prueba con controles
     "series": { "t": [], "left": { "ear": [], "aperture": [], "blink": [], "lookDown": [], "lookUp": [], "irisH": [], "irisV": [] }, "right": { } },   // t en ms desde el inicio del paso; null = sin cara
     "flow": {                                     // un elemento por par de frames con flujo
       "t": [], "dt": [],                          // ms (mismo reloj que series.t) y ms entre los dos frames del par
       "left": { "upperLid": { "eN": [], "eR": [], "eP": [], "dR": [], "tR": [], "dP": [], "tP": [] }, "lowerLid": {}, "brow": {}, "canthus": {} },
       "right": { },
-      "head": { "rU": [], "rV": [], "pU": [], "pV": [] }
+      "head": { "rU": [], "rV": [], "pU": [], "pV": [] },
+      "closure": { "left": [], "right": [] }      // cierre por flujo (DI, + = se cierra; integrador con fuga de 5 s)
     }
   }]
 }

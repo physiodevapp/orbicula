@@ -138,7 +138,7 @@ export function buildReport({ results, startedAt, code = null, plan = null, buil
       reps: step.reps ?? null,
       marks: step.marks ?? [],
       ...(includeSeries ? { series: { t: step.rel, left: step.series.left, right: step.series.right } } : {}),
-      ...(includeSeries && step.flow?.rel.length ? { flow: { t: step.flow.rel, dt: step.flow.dt, left: step.flow.left, right: step.flow.right, head: step.flow.head } } : {}),
+      ...(includeSeries && step.flow?.rel.length ? { flow: { t: step.flow.rel, dt: step.flow.dt, left: step.flow.left, right: step.flow.right, head: step.flow.head, closure: step.flow.closure } } : {}),
     })),
   };
 }
