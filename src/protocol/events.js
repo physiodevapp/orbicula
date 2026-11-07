@@ -19,6 +19,7 @@ export const EVENT_DEFAULTS = {
   medianMs: 600, // ventana de la mediana de «cómo estaba antes»
   riseMs: 1500, // hasta cuánto antes se busca ese «antes»
   endRatio: 0.5, // un evento acaba cuando la subida baja de esta fracción del umbral
+  riseMargin: 1, // umbral = margen × máximo de la subida en el reposo válido
   riseFloor: 0.001, // suelo del umbral (DI), provisional hasta repetirlo con los JSON reales: que un reposo muy quieto no dé un umbral ridículo
   headK: 3, // cabeza quieta: velocidad del dorso nasal < headK × su mediana en el reposo…
   headFloor: 0.1, // …y nunca menos de esto (DI/s); la misma regla que analyze-flow.mjs…
@@ -62,7 +63,8 @@ export class RiseTracker {
     // Solo cuentan las medianas con la ventana completa.
     if (t - this.t0 >= medianMs) this.meds.push({ t, m: median(this.buf.map((s) => s.v)) });
     while (this.meds.length && this.meds[0].t < t - riseMs) this.meds.shift();
-    if (!this.meds.length) return NaN;
+    // Sin la historia completa (0,6 + 1,5 s) la subida no es comparable con la del reposo.
+    if (!this.meds.length || t - this.t0 < medianMs + riseMs) return NaN;
     let min = Infinity;
     for (const x of this.meds) if (x.m < min) min = x.m;
     return v - min;
@@ -141,7 +143,7 @@ export function calibrate(step, options = {}) {
 
   const out = {
     version: 1,
-    options: { riseFloor: o.riseFloor, energyK: o.energyK, headK: o.headK, headFloor: o.headFloor, headMax: o.headMax },
+    options: { riseMargin: o.riseMargin, riseFloor: o.riseFloor, energyK: o.energyK, headK: o.headK, headFloor: o.headFloor, headMax: o.headMax },
     headStill: r4(headStill),
     validMs: Math.round(validMs),
     cleanMs: Math.round(cleanMs),
@@ -162,7 +164,7 @@ export function calibrate(step, options = {}) {
     const rises = v.ft.map((t, i) => tr.push(t, v.closure[side][i])).filter((r, i) => clean[i] && Number.isFinite(r));
     const max = rises.length ? Math.max(...rises) : NaN;
     out.riseNull[side] = { n: rises.length, p95: r4(percentile(rises, 0.95)), max: r4(max) };
-    out.rise[side] = r4(Math.max(o.riseFloor, Number.isFinite(max) ? max : o.riseFloor));
+    out.rise[side] = r4(Math.max(o.riseFloor, Number.isFinite(max) ? o.riseMargin * max : o.riseFloor));
 
     const restEar = v.st.map((t, i) => (overlaps(blinkWins, t, t) ? NaN : v.ear[side][i])).filter(Number.isFinite);
     const restAp = v.st.map((t, i) => (overlaps(blinkWins, t, t) ? NaN : v.aperture[side][i])).filter(Number.isFinite);

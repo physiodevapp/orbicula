@@ -1,7 +1,9 @@
 // Repite la calibración y el detector de eventos de la fase 5 (src/protocol/events.js) sobre un JSON
 // del asistente de pruebas, como si fuera en directo, e informa por paso y por repetición.
 //
-//   node scripts/dev/replay-events.mjs informe.json ['{"riseFloor":0.004}']
+//   node scripts/dev/replay-events.mjs informe.json ['{"riseFloor":0.004}'] [--fix micro-1:1=act]
+//
+// --fix corrige la condición de una repetición (si quien hizo la prueba se equivocó de gesto).
 //
 // Con marcas de repeticiones (pitidos), una repetición se da por detectada si hay una contracción
 // válida de ese ojo entre el pitido «ahora» y 1 s después del «suelta» (el gesto llega ~0,5–1 s tarde).
@@ -9,8 +11,16 @@
 // y el giro, cualquier contracción válida es una falsa alarma (criterio 4).
 import { readFileSync } from 'node:fs';
 import { calibrate, EventDetector, stepView } from '../../src/protocol/events.js';
+import { CLOSURE_TAU_MS, SHUT_FRACTION, SHUT_PAD_MS } from '../../src/flow/processor.js';
 
-const [file, optJson] = process.argv.slice(2);
+const argv = process.argv.slice(2);
+const fixes = {};
+for (let i = argv.indexOf('--fix'); i >= 0; i = argv.indexOf('--fix')) {
+  const [, id, rep, cond] = argv[i + 1].match(/^(.+):(\d+)=(act|control)$/) ?? [];
+  if (id) fixes[`${id}:${rep}`] = cond;
+  argv.splice(i, 2);
+}
+const [file, optJson] = argv;
 if (!file) {
   console.error('Uso: node scripts/dev/replay-events.mjs informe.json [opciones JSON]');
   process.exit(1);
@@ -27,9 +37,38 @@ if (!rest) {
   process.exit(1);
 }
 
+/**
+ * Los JSON anteriores a la fase 5a no congelan el cierre durante los parpadeos (ver SHUT_FRACTION en
+ * processor.js): se recalcula desde el flujo de los párpados (dR) congelándolo igual que en directo, con
+ * el reposo del EAR de una primera calibración. También sirve para los JSON sin `closure` (17:47).
+ */
+function refreeze(steps, earBase) {
+  for (const s of steps) {
+    const f = s.flow;
+    const shut = s.series.t.filter((t, i) => ['left', 'right'].some((x) => Number.isFinite(s.series[x].ear[i]) && s.series[x].ear[i] < SHUT_FRACTION * earBase[x]));
+    f.closure = { left: [], right: [] };
+    f.frozen = [];
+    let j = 0;
+    const acc = { left: 0, right: 0 };
+    f.t.forEach((t, i) => {
+      const dt = f.dt[i];
+      while (j < shut.length && shut[j] < t - dt - SHUT_PAD_MS) j++;
+      const frozen = j < shut.length && shut[j] <= t + SHUT_PAD_MS;
+      f.frozen.push(frozen ? 1 : 0);
+      for (const side of ['left', 'right']) {
+        const step = (((f[side].upperLid.dR[i] ?? NaN) - (f[side].lowerLid.dR[i] ?? NaN)) * dt) / 1000;
+        acc[side] = acc[side] * Math.exp(-dt / CLOSURE_TAU_MS) + (!frozen && Number.isFinite(step) ? step : 0);
+        f.closure[side].push(acc[side]);
+      }
+    });
+  }
+}
+const legacy = !rest.flow.frozen;
+if (legacy) refreeze(steps, Object.fromEntries(SIDES.map((x) => [x, calibrate(rest, { minValidMs: 0 }).ear[x].baseline])));
+
 // Una tolerancia más baja para los JSON de la fase 4 (reposo de 20 s); el protocolo pedirá 15 s.
 const cal = calibrate(rest, { minValidMs: 8000, ...options });
-console.log(`${file}\nplan ${report.plan ?? '—'} · commit ${report.build?.commit ?? '—'}`);
+console.log(`${file}\nplan ${report.plan ?? '—'} · commit ${report.build?.commit ?? '—'}${legacy ? ' · JSON anterior a la 5a: cierre recalculado y congelado en los parpadeos' : ''}`);
 console.log(`Calibración: ${cal.valid ? 'válida' : `NO VÁLIDA (${cal.reason})`} · tiempo válido ${f(cal.validMs / 1000, 1)} s · ventanas limpias ${f(cal.cleanMs / 1000, 1)} s · cabeza quieta < ${f(cal.headStill)} DI/s`);
 for (const side of SIDES) {
   const n = cal.riseNull[side];
@@ -68,7 +107,7 @@ function replay(step) {
 function repsOf(step) {
   const r = {};
   for (const m of step.marks ?? []) {
-    r[m.rep] ??= { rep: m.rep, cond: m.cond ?? 'act' };
+    r[m.rep] ??= { rep: m.rep, cond: fixes[`${step.id}:${m.rep}`] ?? m.cond ?? 'act' };
     r[m.rep][m.kind] = m.t;
   }
   return Object.values(r).filter((x) => x.hold != null && x.release != null);

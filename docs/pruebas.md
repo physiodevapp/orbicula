@@ -67,7 +67,8 @@ Solo medidas numéricas y la configuración: ninguna imagen, ningún nombre. Inc
       "left": { "upperLid": { "eN": [], "eR": [], "eP": [], "eH": [], "dR": [], "tR": [], "dP": [], "tP": [], "dH": [], "tH": [] }, "lowerLid": {}, "brow": {}, "canthus": {} },
       "right": { },
       "head": { "rU": [], "rV": [], "pU": [], "pV": [] },
-      "closure": { "left": [], "right": [] }      // cierre por flujo (DI, + = se cierra; integrador con fuga de 5 s)
+      "closure": { "left": [], "right": [] },     // cierre por flujo (DI, + = se cierra; integrador con fuga de 5 s)
+      "frozen": []                                // 1 = cierre congelado en ese par (algún ojo cerrado más de la mitad; desde la versión 3)
     }
   }]
 }

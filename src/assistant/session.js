@@ -33,6 +33,7 @@ const emptyFlow = () => ({
   right: Object.fromEntries(FLOW_ROIS.map((r) => [r, Object.fromEntries(Object.keys(FLOW_KEYS).map((k) => [k, []]))])),
   head: { rU: [], rV: [], pU: [], pV: [] },
   closure: { left: [], right: [] }, // cierre por flujo (DI, + = se cierra; ver processor.js)
+  frozen: [], // 1 = cierre congelado en ese par (algún ojo cerrado más de la mitad; fase 5)
 });
 /** 4 cifras significativas (las energías van de 1e-4 a 10). */
 // 4 cifras significativas; por debajo de 1e-6 (DI/s o su cuadrado) es ruido numérico: 0.
@@ -264,6 +265,7 @@ export class GuidedSession {
     f.head.pU.push(sig(s.head?.pose?.u));
     f.head.pV.push(sig(s.head?.pose?.v));
     for (const side of ['left', 'right']) f.closure[side].push(sig(s.closure?.[side]));
+    f.frozen.push(s.closureFrozen ? 1 : 0);
   }
 
   /**

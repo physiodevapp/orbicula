@@ -26,7 +26,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - JSON del asistente **`orbicula-test-session/3`**: `calibration` (en el reposo) y `detections` (eventos de cada paso).
 - `scripts/dev/replay-events.mjs`: repite la calibración y el detector sobre un JSON del asistente. Da aciertos y falsas alarmas en las pruebas con controles, y eventos en el cabeceo y el giro.
 - **Selector de la curva:** en el móvil, en dos filas de tres.
-- 16 tests nuevos.
+- **El cierre por flujo se congela durante los parpadeos.** Mientras algún ojo está cerrado más de la mitad según el EAR, no se integra. Así un parpadeo no deja el cierre desplazado ni da falsos eventos en los 2 s siguientes. El JSON guarda en `flow.frozen` los pares congelados.
+- **La subida del cierre necesita 2,1 s de historia:** sin ella no hay eventos al empezar.
+- **Repetición sobre los cuatro JSON de la fase 4:** contracciones mínimas detectadas por ojo, 17/19 y 16/19, con 3/17 y 4/17 falsas alarmas (dos de ellas, movimientos reales). Ningún evento en el cabeceo y el giro. Detalle en `docs/plan-fase-5.md`.
+- `replay-events.mjs` recalcula el cierre congelado en los JSON antiguos y acepta `--fix paso:rep=act|control`.
+- 17 tests nuevos.
 
 ### Añadido (fase 4b: medida del flujo por ROI)
 - **Flujo por ROI y por lado del paciente** (párpado superior e inferior, ceja y canto externo). El worker devuelve, por ROI, 14 sumas de su campo de flujo («momentos», `src/flow/metrics.js`); con ellas el hilo principal calcula el flujo medio y la energía residual frente a cualquier movimiento afín de la cabeza, sin volver a recorrer los píxeles.

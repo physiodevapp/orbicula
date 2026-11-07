@@ -439,6 +439,10 @@ function onResult(r) {
 
   const sample = sampleOf(r);
   series.push(r.t, sample);
+  // Reposo del EAR para congelar el cierre por flujo durante los parpadeos: el de la calibración o,
+  // hasta tenerla, el que estima el detector de parpadeos.
+  const bl = (side) => calibration?.ear?.[side]?.baseline ?? detectors[side].baseline;
+  flowProcessor.earBaseline = bl('left') && bl('right') ? { left: bl('left'), right: bl('right') } : null;
   const newEvents = { left: [], right: [] };
   for (const side of SIDES) {
     const event = detectors[side].push(r.t, sample ? sample[side].ear : NaN);

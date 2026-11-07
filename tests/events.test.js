@@ -62,6 +62,10 @@ describe('subida del cierre (RiseTracker)', () => {
     const got = t.map((x, i) => tr.push(x, v[i]));
     for (let i = 0; i < t.length; i += 7) {
       const hs = t.filter((h) => h >= t[0] + 600 && h >= t[i] - 1500 && h <= t[i]);
+      if (t[i] - t[0] < 2100) { // sin la historia completa no hay subida
+        expect(got[i]).toBeNaN();
+        continue;
+      }
       if (!hs.length) {
         expect(got[i]).toBeNaN();
         continue;
@@ -74,7 +78,7 @@ describe('subida del cierre (RiseTracker)', () => {
   it('es el máximo del estadístico por ventanas de la fase 4 (analyze-flow.mjs) con ventanas que empiezan en un par', () => {
     const tr = new RiseTracker();
     const got = t.map((x, i) => tr.push(x, v[i]));
-    for (const h of t.filter((x, i) => i % 9 === 0 && x >= t[0] + 600 && x + 1500 < t.at(-1))) {
+    for (const h of t.filter((x, i) => i % 9 === 0 && x >= t[0] + 2100 && x + 1500 < t.at(-1))) {
       const before = median(v.filter((_, j) => t[j] >= h - 600 && t[j] <= h));
       const inWin = t.map((x, j) => j).filter((j) => t[j] >= h && t[j] <= h + 1500);
       const stat = Math.max(...inWin.map((j) => v[j])) - before;

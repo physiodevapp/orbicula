@@ -132,18 +132,37 @@ Se calcula en la fase de sonrisa y, como referencia, en el reposo.
   - Ajustes con los datos.
   - `README.md` con las instrucciones de uso clínico del protocolo, `CHANGELOG.md` y la conclusión en este documento.
 
-## Estado del paso 5a (hecho; pendiente de los JSON y de la prueba en el móvil)
-- Módulo puro `src/protocol/events.js`: `RiseTracker`, `calibrate` y `EventDetector`, con 16 tests.
+## Paso 5a (hecho; pendiente de la prueba en el móvil)
+- Módulo puro `src/protocol/events.js`: `RiseTracker`, `calibrate` y `EventDetector`, con sus tests.
 - **Cambios respecto al plan:**
   - El umbral de «cabeza quieta» tiene también un techo provisional de 0,3 DI/s. Si la cabeza se mueve casi todo el reposo, la mediana ya es movimiento y el umbral relativo se inflaría.
   - La velocidad de la cabeza se suaviza con la mediana de 3 pares.
-- **Cámara simulada** (vídeo `lid.y4m`, plan de la fase 4 con `?escala=0.6`): calibra, sin errores ni peticiones externas, y no da ningún evento.
-  - El párpado sintético de 1,5 px da un cierre máximo de 0,0014 DI. Ese cierre queda por debajo del máximo del reposo, porque el vídeo en bucle también lo tiene en el reposo. No sirve para validar la sensibilidad.
-  - Por eso el suelo del umbral se deja en 0,001 DI, que solo protege de umbrales ridículos.
-- **Falta:**
-  - Repetir el detector sobre los JSON reales de la fase 4 (`node scripts/dev/replay-events.mjs informe.json`). No están en el repo: el autor tiene que volver a pasarlos.
-  - Comprobar que reproduce las cifras de la fase 4: 12/13 aciertos y 2/15 falsas alarmas por ojo en las pruebas con controles, y 0 % en el cabeceo y el giro.
-  - Con esos datos, fijar el suelo.
+- **Cámara simulada:** el asistente se recorre entero, calibra, sin errores ni peticiones externas. Los vídeos sintéticos no sirven para la sensibilidad: el párpado de 1,5 px da un cierre de 0,0014 DI, por debajo del ruido del reposo.
+
+### Repetición sobre los JSON de la fase 4 (17:47, 18:38, 18:55 y 19:14)
+Comando: `node scripts/dev/replay-events.mjs informe.json`. Para las 18:38, con `--fix micro-1:1=act`.
+
+**Dos problemas en la primera versión:**
+1. **Eventos falsos al empezar cada paso:** la subida se calculaba sin la historia completa. Ahora no hay subida hasta tener 2,1 s de señal.
+2. **Eventos falsos hasta ~2 s después de cada parpadeo:** con el ojo tapado, el flujo pierde el seguimiento. Al integrarlo, el cierre queda desplazado, sobre todo en el parpadeo espontáneo y en un control de las 19:14. Alargar la ventana de fusión con el parpadeo lo quitaba, pero también quitaba contracciones.
+
+   **Solución:** **congelar el cierre** (no integrarlo) mientras algún ojo esté cerrado más de la mitad según el EAR, con 150 ms de margen (`SHUT_FRACTION` en `src/flow/processor.js`). Las contracciones mínimas cierran un 14–38 %, así que no se congelan. El script recalcula así los JSON antiguos.
+
+**Umbral.** Un margen sobre el máximo del reposo no ayuda. Con ×1,25 se perdían casi todas las contracciones de las 18:38: poca luz, reposo ruidoso y un umbral el doble de alto. Se queda en el **máximo del reposo**, como se aprobó. El suelo (0,001 DI) no actúa en ningún JSON real: los umbrales van de 0,020 a 0,057 DI.
+
+**Resultados** (umbral = máximo del reposo, cierre congelado en los parpadeos):
+
+| Prueba | Contracciones detectadas | Falsas alarmas |
+|---|---|---|
+| Con controles, 18:38 + 19:14 | I 17/19 · D 16/19 | I 3/17 · D 4/17 |
+| Contracción mínima, 17:47 | 3/4 en los dos ojos | — |
+| Contracción mínima, 18:55 | 5/5 en los dos ojos | — |
+| Cabeceo y giro, 17:47 y 18:55 | — | **0 eventos** (criterio 4) |
+
+- Las dos pruebas con controles excluyen las repeticiones con un parpadeo de verdad.
+- De las falsas alarmas, dos son movimientos reales ya identificados en la fase 4: el control 4 de las 18:38, con un cierre parcial del 23 %, y el control 2 de las 19:14. Quedan sin explicar el control 7 de las 18:38, al borde de la ventana, y el 6 de las 19:14, en el ojo derecho, que supera el umbral solo 1,06 veces.
+- **Reposos y parpadeo espontáneo:** quedan 0–1 eventos por paso. Son cortos y apenas pasan el umbral (1,0–1,1 veces). La contracción mínima más débil lo pasó 1,57 veces.
+- **Ceja y canto** (experimentales): demasiados eventos (decenas por paso con contracciones o parpadeos). No se muestran en el resumen hasta revisarlos en el 5c.
 
 ## Pruebas
 - **Tests unitarios:**
