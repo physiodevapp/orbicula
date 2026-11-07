@@ -1,0 +1,72 @@
+# Plan de la fase 4: flujo óptico
+
+Aprobado por el autor el 2026-11-07. Este documento recoge también el estado al final de la fase 3, para que una sesión nueva pueda empezar sin el historial de la anterior. Léelo junto con `CLAUDE.md`, `CHANGELOG.md`, `docs/rendimiento.md`, `docs/pruebas.md` y `docs/desarrollo.md`.
+
+## Qué tiene que demostrar
+La pregunta de la v0: **¿el flujo óptico sobre la región periocular da una señal útil para detectar movimientos más finos que los que capta un landmark?** Se cierra con dos criterios de aceptación de `CLAUDE.md`, con estos umbrales (aprobados):
+
+- **Criterio 3:** con la cabeza quieta, durante la contracción mínima la energía del flujo es **≥ 3 veces el percentil 95 del reposo**, mientras el EAR cambia **menos que su propio ruido** (su desviación típica en reposo).
+- **Criterio 4:** durante un cabeceo suave sin contracción, con la compensación, **ninguna ROI supera el percentil 99 del reposo**.
+
+**Maniobra de contracción mínima** (frase elegida por el autor para el asistente): «Entrecierra los ojos lo mínimo, como si sonrieras con los ojos.»
+
+## Estado al final de la fase 3 (medido en el móvil del autor)
+Android 10, Chrome 156, 9 núcleos, 8 GB.
+
+| | Frontal «fps» (720p) | Trasera «Resolución» (4K) | **Trasera «fps» (720p)** |
+|---|---|---|---|
+| Cámara real (`presentedFps`) | ~25–30 (dudoso) | ~53 | **60** |
+| Análisis (worker), ms | 40 | 53 | **34** |
+| Análisis (worker), análisis/s | 24 | 19 | **29** |
+| Latencia captura → resultado (worker) | 74 ms | 117 ms | 67 ms |
+| Copia del frame al worker | 1,3 ms | 7 ms | 1,5 ms |
+| Pantalla con el worker / con el hilo principal | 60 / 14 Hz | 60 / 22 Hz | 60 / 27 Hz |
+
+Decisiones tomadas: análisis de la cara **en worker** (el hilo principal congela la interfaz); **blendshapes encendidos** (cuestan < 1 ms); **prioridad por defecto «fps»**; **trasera «fps» es el punto de trabajo** (60 fps de cámara, EAR cada ~34 ms). El tiempo de MediaPipe no depende de la resolución (el modelo reduce la imagen). Con la trasera a 4K el móvil se calienta y se ralentiza al cabo de ~1,5 min.
+
+Problemas abiertos que afectan a esta fase:
+- **Falsos cierres al mirar hacia abajo.** El EAR y el blendshape de parpadeo no los distinguen (el párpado baja de verdad). El flujo tampoco lo resolverá. Las series del asistente ya guardan `lookDown`/`lookUp`; en esta fase, guardar también la **posición del iris** (landmarks 468 y 473, normalizada a las comisuras) para estudiarlo.
+- **Medida de fps de cámara:** ni los callbacks de vídeo ni `presentedFrames` aciertan siempre; se usa el mayor de los dos (`FpsMeter`).
+- **Latencia del worker (~67 ms):** la ROI dibujada va ~4 frames por detrás. Para el flujo no importa si se usan marcas de tiempo de captura.
+- Idea no aplicada: `MediaStreamTrackProcessor` evitaría la copia del frame al worker (ganancia estimada 2–3 análisis/s).
+
+## Arquitectura propuesta
+1. **Worker de flujo propio** (`src/flow/flow.worker.js`) con OpenCV.js, separado del de MediaPipe (el flujo usa CPU/WASM, MediaPipe GPU: trabajan en paralelo). Importa `src/privacy/install.js` **lo primero**, como el worker de análisis.
+2. **OpenCV.js 5.0.0-release.1** (`@techstark/opencv-js`, junio de 2026): un solo `opencv.js` de 13 MB con el WASM embebido; incluye `calcOpticalFlowFarneback`, `calcOpticalFlowPyrLK` y, en apariencia, `DISOpticalFlow` (verificar que está exportado). Servido desde el propio sitio (como el WASM de MediaPipe: copiado en el build, caché `immutable` con la versión en la ruta), **cargado solo al activar el flujo**. La CSP ya tiene `'wasm-unsafe-eval'`; comprobar que no necesita `eval`. Liberar siempre los `cv.Mat` (`delete()`) o se agota el heap de WASM: reutilizar buffers.
+3. **Una franja periocular por frame** (ambos ojos, cejas y dorso nasal, con margen), recortada **del frame completo** en el hilo principal con `createImageBitmap(video, sx, sy, sw, sh)` (recorte en GPU), en **cada frame de la cámara** (hasta 60/s, no solo los ~29 que analiza MediaPipe), con su marca de tiempo de captura.
+   - El flujo se calcula entre dos frames **con el mismo recorte**. La franja solo se recoloca cuando la cara se ha movido bastante; ese par no se mide.
+   - Dentro de la franja, cada ROI (párpado superior e inferior, ceja, canto externo por lado; dorso nasal de referencia) se separa con su polígono, tomado de los últimos landmarks y pasado a coordenadas de la franja.
+   - Escala de trabajo configurable (a 4K la franja ronda 1000 px de ancho: puede hacer falta reducirla).
+   - Normalizar el brillo de cada recorte (media y varianza) contra el parpadeo de las luces a 50 Hz.
+4. **Compensación de la cabeza: tres variantes calculadas a la vez** sobre el mismo flujo, para compararlas con los mismos datos:
+   - **ninguna** (control);
+   - **referencia:** restar el movimiento del dorso nasal (traslación, o afín si está bien condicionada);
+   - **postura:** restar el movimiento rígido que predicen landmarks estables (dorso nasal, sienes, frente; o la matriz de transformación facial, `outputFacialTransformationMatrixes`), interpolado entre análisis. Sospecha: será la mejor, porque el dorso nasal no es rígido en el cierre forzado (prócer).
+5. **Métricas por ROI y por lado del paciente:**
+   - **energía residual** = media de |flujo − flujo de la cabeza|² en la ROI, con el desplazamiento normalizado a la distancia intercantal y por segundo (independiente de la distancia y de los fps);
+   - **componente vertical con signo** (el párpado baja o sube);
+   - **componente horizontal con signo «hacia la sien»** (comparable entre lados; con test de espejo, como en `tests/roi.test.js`).
+6. **Interfaz:** métrica «Flujo» por ROI en las curvas (I y D); superposición opcional del campo de flujo; ms de flujo por frame en «Verificación de lado».
+
+## Pasos (detenerse al final de cada uno para que el autor pruebe en el móvil)
+- **4a. Rendimiento primero.** OpenCV.js en el worker, recorte de la franja, Farnebäck, y **ampliar la prueba de rendimiento** (`src/ui/benchmark.js`, `src/assistant/benchmark.js`) para medir los ms de flujo por frame y los frames por segundo que da, con la trasera «fps» (720p, 60 fps) y «Resolución» (4K). Si Farnebäck no llega, probar DIS o Lucas-Kanade sobre una rejilla. Sale de aquí el punto de operación.
+- **4b. Medida completa:** métricas, las tres compensaciones, curvas, superposición y un **asistente de la fase 4** (pasos nuevos en `src/assistant/steps.js` o un segundo plan) que guarde en el JSON las series de flujo, EAR e iris. Pasos propuestos: reposo 20 s; «Entrecierra los ojos lo mínimo, como si sonrieras con los ojos» ×5 con pausas; entrecerrar algo más (que el EAR sí lo note) ×3; cabeceo suave 15 s; giro lateral suave 10 s; elevación de cejas ×3; parpadeo espontáneo 20 s.
+- **4c. Análisis del JSON del autor** y decisión de la compensación y la normalización, con los números delante. Comprobar los criterios 3 y 4 con los umbrales de arriba.
+
+## Pruebas
+- **Vídeos sintéticos con la respuesta conocida** (ampliar `scripts/dev/make-face-videos.py`): mover solo el párpado 1–2 px (el flujo lo tiene que ver) y, por separado, toda la cara simulando un cabeceo (la compensación lo tiene que anular).
+- **Tests unitarios:** energía, máscaras de ROI en coordenadas de la franja, recolocación de la franja, signos con espejo y el ajuste del movimiento rígido.
+- La prueba de punta a punta con la CSP real: `docs/desarrollo.md`.
+
+## Riesgos
+- Tamaño de OpenCV.js (13 MB, una vez y en caché).
+- Velocidad en el móvil: quizá solo 30 fps o escala reducida (lo dice el paso 4a).
+- Parpadeo de las luces a 50 Hz → flujo falso: normalizar brillo; para las pruebas, luz natural o lámpara sin parpadeo.
+- Poca textura en la piel lisa → flujo ruidoso; las pestañas y las cejas dan buena señal.
+- Calentamiento del móvil con dos workers y la cámara: vigilarlo en la prueba de rendimiento.
+
+## Forma de trabajar con el autor
+- Responde en español, claro y sin jerga innecesaria; el autor es fisioterapeuta y trabaja solo desde el móvil.
+- Al terminar cada paso: URL de la previsualización de la rama y qué probar. El autor prefiere **asistentes guiados que exporten JSON** a pasar capturas, con pitidos y cuenta atrás para cuando usa la cámara trasera y no ve la pantalla.
+- PR y fusión solo cuando el autor lo pida. Commits sin `Co-Authored-By`.
+- Modelo: Opus para el plan y la implementación de esta fase (`docs/modelos.md`).

@@ -41,6 +41,10 @@ v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolu
 
 Debajo del vídeo hay un asistente que guía por cada prueba y guarda las medidas en un JSON que se puede descargar y compartir. Ver [`docs/pruebas.md`](docs/pruebas.md). Más abajo, una **prueba de rendimiento** compara el análisis en worker y en el hilo principal, con y sin blendshapes ([`docs/rendimiento.md`](docs/rendimiento.md)).
 
+## Desarrollo en la nube
+
+Cómo probar la app de punta a punta sin móvil (cámara simulada con una cara, CSP real, repetición del detector con datos reales): [`docs/desarrollo.md`](docs/desarrollo.md). Plan de la fase 4: [`docs/plan-fase-4.md`](docs/plan-fase-4.md).
+
 ## Créditos
 
 Modelo Face Landmarker y librería `@mediapipe/tasks-vision` de Google (licencia Apache 2.0), servidos desde este repositorio.
