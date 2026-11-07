@@ -17,6 +17,7 @@ const envSha = process.env.WORKERS_CI_COMMIT_SHA;
 const commit = gitCommit() ?? (/^[0-9a-f]{7,40}$/i.test(envSha ?? '') ? envSha.slice(0, 7) : 'dev');
 const branch = process.env.WORKERS_CI_BRANCH ?? 'local';
 const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
+const mediapipe = JSON.parse(readFileSync('node_modules/@mediapipe/tasks-vision/package.json', 'utf8')).version;
 
 export default defineConfig({
   // Rutas relativas: la misma build sirve en la raíz de Cloudflare y en un
@@ -26,6 +27,7 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(version),
     __COMMIT__: JSON.stringify(commit),
     __BRANCH__: JSON.stringify(branch),
+    __MEDIAPIPE_VERSION__: JSON.stringify(mediapipe),
   },
   build: {
     target: 'es2022',

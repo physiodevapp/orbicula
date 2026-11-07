@@ -106,6 +106,17 @@ describe('FpsMeter', () => {
     expect(m.fps).toBeCloseTo(30, 0);
   });
 
+  it('con el contador de frames presentados no pierde los frames que el análisis se salta', () => {
+    const m = new FpsMeter(1000);
+    // Cámara a 50 fps, pero solo se atiende un frame de cada dos: el contador sigue de 2 en 2.
+    for (let i = 0; i <= 100; i += 2) m.push(i * 20, i);
+    expect(m.fps).toBeCloseTo(50, 0);
+    // Sin el contador, saldrían 25.
+    const sinContador = new FpsMeter(1000);
+    for (let i = 0; i <= 100; i += 2) sinContador.push(i * 20);
+    expect(sinContador.fps).toBeCloseTo(25, 0);
+  });
+
   it('da 0 con menos de dos frames', () => {
     const m = new FpsMeter();
     expect(m.fps).toBe(0);

@@ -7,7 +7,7 @@ Cuantificación de movimientos finos de la musculatura periocular (orbicular de 
 
 ## Estado
 
-v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolución reales). Ver [`CHANGELOG.md`](CHANGELOG.md).
+v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolución reales) y **fase 2** (Face Landmarker, ROI por lado y lateralidad). Ver [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Uso clínico
 
@@ -28,6 +28,10 @@ v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolu
 
   Ambas anuncian 60 fps, pero si solo se piden como «ideal» Chrome se queda en 30: por eso la prioridad «fps» exige un mínimo. La frontal acepta el mínimo pero sigue dando unos 30. Con poca luz la cámara alarga la exposición y baja los fps (la frontal llegó a 24). **Para medir en directo, usa la trasera con prioridad «fps» y buena luz.**
 - **Privacidad:** la imagen se procesa en el propio móvil. No se envía nada a ningún servidor y el vídeo no se guarda.
+
+## Créditos
+
+Modelo Face Landmarker y librería `@mediapipe/tasks-vision` de Google (licencia Apache 2.0), servidos desde este repositorio.
 
 ## Desarrollo
 

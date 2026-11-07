@@ -1,12 +1,20 @@
 # Privacidad: la CSP solo deja hablar a la página con su propio origen (ninguna llamada externa).
-# Las fases con MediaPipe/OpenCV añadirán 'wasm-unsafe-eval' a script-src.
+# 'wasm-unsafe-eval' permite compilar el WASM de MediaPipe (y, luego, el de OpenCV.js).
 # frame-ancestors permite que el hub PhysiQ la cargue en un iframe.
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
   Permissions-Policy: camera=(self), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'self' https://physiodevapp.github.io
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'self' https://physiodevapp.github.io
 
 # Vite pone un hash en el nombre de estos archivos: si cambian, cambia el nombre.
 /assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# El WASM de MediaPipe va en una carpeta con su versión: si cambia, cambia la ruta.
+/mediapipe/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# El modelo lleva su versión en el nombre del archivo.
+/modelos/*
   Cache-Control: public, max-age=31536000, immutable
