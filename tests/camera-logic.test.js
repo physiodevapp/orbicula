@@ -27,6 +27,11 @@ describe('buildConstraints', () => {
     expect(video.facingMode).toBeUndefined();
   });
 
+  it('el intento estricto exige un mínimo de fps', () => {
+    expect(buildConstraints({ priority: 'fps', strict: true }).video.frameRate).toEqual({ min: 55, ideal: 60 });
+    expect(buildConstraints({ priority: 'fps' }).video.frameRate).toEqual({ ideal: 60 });
+  });
+
   it('la prioridad fps baja la resolución pedida', () => {
     expect(buildConstraints({ priority: 'fps' }).video.width.ideal).toBe(1280);
   });

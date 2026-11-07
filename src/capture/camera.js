@@ -41,7 +41,7 @@ export class Camera {
   async start(opts) {
     Camera.checkSupport();
     this.stop();
-    const stream = await navigator.mediaDevices.getUserMedia(buildConstraints(opts));
+    const stream = await Camera._open(opts);
     this.stream = stream;
     this.video.srcObject = stream;
     await this.video.play().catch(() => {});
@@ -60,9 +60,26 @@ export class Camera {
       maxHeight: caps?.height?.max ?? null,
       maxFrameRate: caps?.frameRate?.max ?? null,
       priority: opts.priority,
+      strictFps: stream.strictFps,
     };
     this._startMeter();
     return this.info;
+  }
+
+  /** En prioridad «fps», intenta primero exigir ≥55 fps; si no se puede, sin exigirlos. */
+  static async _open(opts) {
+    if (opts.priority === 'fps') {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia(buildConstraints({ ...opts, strict: true }));
+        s.strictFps = true;
+        return s;
+      } catch (err) {
+        if (err?.name !== 'OverconstrainedError' && err?.name !== 'NotReadableError') throw err;
+      }
+    }
+    const s = await navigator.mediaDevices.getUserMedia(buildConstraints(opts));
+    s.strictFps = false;
+    return s;
   }
 
   /** Resolución real de los frames que llegan (puede diferir de getSettings). */

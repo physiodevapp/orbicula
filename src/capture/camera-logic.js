@@ -14,16 +14,23 @@ export const PRIORITIES = {
   fps: { width: 1280, height: 720 },
 };
 
+/** Mínimo que se exige en el intento estricto de la prioridad «fps». */
+export const STRICT_MIN_FPS = 55;
+
 /**
  * Restricciones para getUserMedia.
- * @param {{ facing?: 'rear'|'front', deviceId?: string|null, priority?: keyof PRIORITIES }} opts
+ *
+ * Con frameRate solo «ideal», Chrome para Android se queda en 30 fps aunque la
+ * cámara anuncie 60. Por eso la prioridad «fps» hace primero un intento estricto
+ * (`strict`), con un mínimo de 55 fps; si la cámara no puede, se repite sin él.
+ * @param {{ facing?: 'rear'|'front', deviceId?: string|null, priority?: keyof PRIORITIES, strict?: boolean }} opts
  */
-export function buildConstraints({ facing = 'rear', deviceId = null, priority = 'resolution' } = {}) {
+export function buildConstraints({ facing = 'rear', deviceId = null, priority = 'resolution', strict = false } = {}) {
   const size = PRIORITIES[priority] ?? PRIORITIES.resolution;
   const video = {
     width: { ideal: size.width },
     height: { ideal: size.height },
-    frameRate: { ideal: REQUESTED_FPS },
+    frameRate: strict ? { min: STRICT_MIN_FPS, ideal: REQUESTED_FPS } : { ideal: REQUESTED_FPS },
   };
   if (deviceId) video.deviceId = { exact: deviceId };
   else video.facingMode = { ideal: facing === 'front' ? 'user' : 'environment' };

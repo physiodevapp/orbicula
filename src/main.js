@@ -8,7 +8,7 @@ import './styles/tokens.css';
 import './styles/app.css';
 
 import { Camera } from './capture/camera.js';
-import { describeError, fpsLevel, REQUESTED_FPS, PRIORITIES } from './capture/camera-logic.js';
+import { describeError, fpsLevel, REQUESTED_FPS, PRIORITIES, STRICT_MIN_FPS } from './capture/camera-logic.js';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -54,6 +54,9 @@ function renderDetails(info, frame) {
     ['Dispositivo', info.label || '—'],
     ['Cámara obtenida', info.facing === 'front' ? 'frontal (vista en espejo)' : 'trasera'],
     ['Pedido', `${PRIORITIES[state.priority].width} × ${PRIORITIES[state.priority].height} · ${REQUESTED_FPS} fps`],
+    ...(state.priority === 'fps'
+      ? [['Mínimo de fps exigido', info.strictFps ? `sí (≥ ${STRICT_MIN_FPS})` : 'no lo admite la cámara']]
+      : []),
     ['Resolución (frames)', `${frame.width} × ${frame.height}`],
     ['Resolución (ajustes)', `${info.width ?? '—'} × ${info.height ?? '—'}`],
     ['fps (ajustes)', info.frameRate != null ? info.frameRate.toFixed(1) : '—'],
