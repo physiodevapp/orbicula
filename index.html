@@ -117,7 +117,7 @@
       </div>
 
       <div class="as-view" data-view="idle">
-        <p class="hint">Compara el análisis en el worker y en el hilo principal, con y sin blendshapes: 8 pasadas de 12 s (unos 2 minutos y medio), en orden cruzado para que el calentamiento del móvil no falsee la comparación. Mantén la cara quieta y de frente a la cámara todo el rato. Elige antes la cámara y la prioridad.</p>
+        <p class="hint">Mide el flujo óptico (fase 4) con el análisis de la cara funcionando a la vez: Farnebäck a tres tamaños, Lucas-Kanade y una pasada sin flujo. Son 10 pasadas de 12 s (unos 2 minutos y medio), en orden cruzado para que el calentamiento del móvil no falsee la comparación. Mantén la cara quieta y de frente a la cámara todo el rato. Elige antes la cámara y la prioridad. La primera vez descarga OpenCV.js (13 MB).</p>
         <p class="hint">Con la cámara trasera no verás la pantalla: pulsa «Empezar», apoya el móvil a unos 40 cm de tu cara y espera. Tienes 10 s para colocarte (los últimos 3 s suenan). Un pitido largo marca el inicio; si pierde la cara suena un tono grave cada 3 s; tres pitidos ascendentes y una vibración larga avisan de que ha terminado.</p>
         <label class="check"><input type="checkbox" id="bSound" checked> Cuenta atrás, pitidos y vibración</label>
         <button class="btn btn-primary" id="bStart" type="button">Empezar</button>
@@ -231,6 +231,14 @@
           <dt>Cara en el encuadre</dt><dd id="kvFace">—</dd>
           <dt>Distancia intercantal</dt><dd id="kvIcd">—</dd>
           <dt>Ancho del ojo I / D</dt><dd id="kvEye">—</dd>
+        </dl>
+        <label class="check"><input type="checkbox" id="flowToggle"> Calcular flujo óptico (en pruebas)</label>
+        <select class="select" id="flowConfig" aria-label="Configuración del flujo óptico"></select>
+        <p class="hint">Fase 4a: solo mide lo que tarda el flujo sobre la franja de los ojos (rectángulo de puntos). La primera vez descarga OpenCV.js (13 MB).</p>
+        <dl class="kv">
+          <dt>Flujo</dt><dd id="kvFlow">apagado</dd>
+          <dt>Franja (frame → trabajo)</dt><dd id="kvStrip">—</dd>
+          <dt>Carga de OpenCV.js</dt><dd id="kvFlowLoad">—</dd>
         </dl>
       </details>
 

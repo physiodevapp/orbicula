@@ -4,7 +4,7 @@ Cómo comprobar la app de punta a punta desde una sesión de Claude Code en la n
 
 ## Servir la build
 ```bash
-npm run build                      # copia también el WASM de MediaPipe (prebuild)
+npm run build                      # copia también el WASM de MediaPipe y OpenCV.js parcheado (prebuild)
 # Con las cabeceras de public/_headers (CSP incluida), como en Cloudflare:
 CI=1 WRANGLER_SEND_METRICS=false npx wrangler dev --port 4173 --ip 127.0.0.1 &
 # Sin cabeceras, como en GitHub Pages (sirve para probar la barrera de privacidad sola):
@@ -23,6 +23,7 @@ Descarga la foto de ejemplo de MediaPipe (no se guarda en el repo). `blink.y4m` 
 node scripts/dev/check-app.cjs --video /tmp/caras/blink.y4m --wait 14000 --shot /tmp/captura.png
 node scripts/dev/check-app.cjs --video /tmp/caras/crop.y4m --query '?escala=0.25' --bench /tmp/rendimiento.json
 node scripts/dev/check-app.cjs --url http://127.0.0.1:4174/   # sin cabeceras; sin --video = sin cara
+node scripts/dev/check-app.cjs --video /tmp/caras/crop.y4m --flow --wait 15000   # con el flujo óptico activado
 ```
 Vuelca las pastillas y el panel «Verificación de lado», las peticiones externas que salieron y los errores de consola (incluidas las llamadas que bloqueó la barrera). Playwright y Chromium están instalados de forma global: `require('playwright')`, sin `npm install`.
 

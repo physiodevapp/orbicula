@@ -21,6 +21,8 @@ import { Series } from './metrics/series.js';
 import { asymmetry } from './metrics/asymmetry.js';
 import { Overlay } from './ui/overlay.js';
 import { Curves } from './ui/curves.js';
+import { FlowClient } from './flow/flow-client.js';
+import { FLOW_CONFIGS, DEFAULT_FLOW } from './flow/config.js';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -50,6 +52,8 @@ const els = {
   deviceSelect: $('deviceSelect'),
   details: $('captureDetails'),
   build: $('buildInfo'),
+  flowToggle: $('flowToggle'),
+  flowConfig: $('flowConfig'),
 };
 
 els.build.textContent = `v${__APP_VERSION__} · ${__BRANCH__}@${__COMMIT__}`;
@@ -61,7 +65,9 @@ const camera = new Camera(els.video);
 const overlay = new Overlay(els.overlay, els.stage);
 /** Análisis de la cara: WorkerAnalysis (lo normal) o Analysis en el hilo principal (respaldo). */
 let analysis = null;
-const state = { facing: 'rear', priority: 'fps', deviceId: null, running: false, displayMirrored: false, showRoi: true };
+/** Flujo óptico (worker con OpenCV.js): se carga solo al activarlo o en la prueba de rendimiento. */
+let flow = null;
+const state = { facing: 'rear', priority: 'fps', deviceId: null, running: false, displayMirrored: false, showRoi: true, showFlow: false };
 
 // Medidas: series por lado y un detector de parpadeos por lado (sobre el EAR).
 const series = new Series({ maxAgeMs: 120000 });
@@ -108,7 +114,7 @@ function captureContext() {
       blendshapes: els.blendToggle.checked,
       swapNames: els.swapToggle.checked,
       // Dominios a los que MediaPipe intentó llamar y la barrera de privacidad bloqueó.
-      blockedHosts: [...new Set([...guard.blockedHosts, ...(analysis?.blockedHosts ?? [])])],
+      blockedHosts: [...new Set([...guard.blockedHosts, ...(analysis?.blockedHosts ?? []), ...(flow?.blockedHosts ?? [])])],
     },
     detector: { ...detectors.left.opt },
   };
@@ -127,6 +133,7 @@ const bench = createBenchmark({
     await loadModel();
     return analysis;
   },
+  ensureFlow: () => loadFlow(),
   getBlendshapes: () => els.blendToggle.checked,
   getContext: captureContext,
   onStart: () => {
@@ -310,7 +317,7 @@ function updateAnalysisUi(r, now) {
   $('kvTime').textContent = `${analysis.ms.toFixed(1)} ms por análisis · ${analysis.fps.toFixed(1)} análisis/s`;
   const sz = analysis.analysisSize;
   $('kvSize').textContent = sz ? `${sz.width} × ${sz.height}` : '—';
-  const blocked = [...new Set([...guard.blockedHosts, ...(analysis.blockedHosts ?? [])])];
+  const blocked = [...new Set([...guard.blockedHosts, ...(analysis.blockedHosts ?? []), ...(flow?.blockedHosts ?? [])])];
   $('kvBlocked').textContent = blocked.length ? blocked.join(', ') : 'ninguna';
 
   if (!r.face) {
@@ -353,8 +360,10 @@ function onResult(r) {
   }
   assistant.record(r.t, sample, newEvents);
 
+  flow?.setFace(r);
   if (r.face && state.showRoi) overlay.draw(r, { displayMirrored: state.displayMirrored });
   else overlay.clear();
+  if (r.face && state.showFlow && flow?.strip) overlay.drawStrip(flow.strip, r.frame, { displayMirrored: state.displayMirrored });
   updateQuality(r, now);
   updateAnalysisUi(r, now);
   updateCurveStats(now);
@@ -376,6 +385,56 @@ async function createAnalysis() {
     const main = new Analysis();
     await main.load(blendshapes);
     return main;
+  }
+}
+
+// ── Flujo óptico (paso 4a: solo rendimiento) ──────────────────────────────────
+let flowPromise = null;
+let lastFlowUi = 0;
+/** Carga el worker de flujo y OpenCV.js una sola vez. */
+function loadFlow() {
+  flowPromise ??= (async () => {
+    const f = new FlowClient();
+    f.setConfig(els.flowConfig.value);
+    try {
+      await f.load();
+    } catch (err) {
+      f.dispose();
+      flowPromise = null;
+      throw err;
+    }
+    f.onResult = onFlowResult;
+    flow = f;
+    return f;
+  })();
+  return flowPromise;
+}
+
+function onFlowResult(m) {
+  const now = performance.now();
+  if (now - lastFlowUi < 250) return;
+  lastFlowUi = now;
+  const f = flow;
+  $('kvFlow').textContent = `${f.ms.toFixed(1)} ms · ${f.fps.toFixed(1)} pares/s · worker ${m.totalMs.toFixed(1)} ms (copia ${m.readMs.toFixed(1)})`;
+  $('kvStrip').textContent = f.strip ? `${f.strip.w} × ${f.strip.h} → ${m.size.width} × ${m.size.height}` : '—';
+  $('kvFlowLoad').textContent = f.loadMs != null ? `${(f.loadMs / 1000).toFixed(1)} s` : '—';
+}
+
+async function setFlow(on) {
+  state.showFlow = on;
+  if (!on) {
+    $('kvFlow').textContent = 'apagado';
+    return;
+  }
+  $('kvFlow').textContent = 'cargando OpenCV.js…';
+  try {
+    await loadFlow();
+    $('kvFlowLoad').textContent = `${(flow.loadMs / 1000).toFixed(1)} s`;
+    if (state.showFlow) $('kvFlow').textContent = 'esperando a la cara…';
+  } catch (err) {
+    state.showFlow = false;
+    els.flowToggle.checked = false;
+    $('kvFlow').textContent = `no se pudo cargar (${err?.message ?? err})`;
   }
 }
 
@@ -421,6 +480,7 @@ async function start() {
   assistant.interrupt('la cámara se reinició (cambio de cámara, de prioridad o de pestaña)');
   bench.interrupt('la cámara se reinició');
   resetMeasures(); // otra cámara u otra resolución: el reposo y las series ya no valen
+  flow?.resetStrip();
   try {
     const info = await camera.start(state);
     state.running = true;
@@ -455,7 +515,11 @@ async function start() {
 camera.onFrame = updateStats;
 // La marca de tiempo del frame es la de captura de la cámara (si el navegador la da), no la
 // de cuando acaba el análisis: así las duraciones de los parpadeos no dependen de la latencia.
-camera.onVideoFrame = (now, meta) => analysis?.submit(els.video, meta?.captureTime ?? now);
+camera.onVideoFrame = (now, meta) => {
+  const t = meta?.captureTime ?? now;
+  analysis?.submit(els.video, t);
+  if (state.showFlow) flow?.submit(els.video, t);
+};
 
 els.roiToggle.checked = pref.get('showRoi') !== '0';
 state.showRoi = els.roiToggle.checked;
@@ -472,6 +536,18 @@ els.swapToggle.addEventListener('change', () => {
 });
 
 els.blendToggle.addEventListener('change', () => analysis?.setBlendshapes(els.blendToggle.checked));
+
+els.flowConfig.replaceChildren(
+  ...Object.values(FLOW_CONFIGS)
+    .filter((c) => c.method !== 'none')
+    .map((c) => Object.assign(document.createElement('option'), { value: c.key, textContent: c.label })),
+);
+els.flowConfig.value = FLOW_CONFIGS[pref.get('flowConfig')] && pref.get('flowConfig') !== 'none' ? pref.get('flowConfig') : DEFAULT_FLOW;
+els.flowConfig.addEventListener('change', () => {
+  pref.set('flowConfig', els.flowConfig.value);
+  flow?.setConfig(els.flowConfig.value);
+});
+els.flowToggle.addEventListener('change', () => setFlow(els.flowToggle.checked));
 
 document.querySelectorAll('[data-metric]').forEach((b) =>
   b.addEventListener('click', () => {

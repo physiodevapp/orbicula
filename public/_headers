@@ -18,3 +18,7 @@
 # El modelo lleva su versión en el nombre del archivo.
 /modelos/*
   Cache-Control: public, max-age=31536000, immutable
+
+# OpenCV.js va en una carpeta con su versión: si cambia, cambia la ruta.
+/opencv/*
+  Cache-Control: public, max-age=31536000, immutable

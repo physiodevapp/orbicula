@@ -4,6 +4,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (fase 4a: rendimiento del flujo óptico)
+- **Worker de flujo óptico** (`src/flow/flow.worker.js`) con **OpenCV.js 5.0.0-release.1** (`@techstark/opencv-js`), separado del de MediaPipe para que trabajen en paralelo, con la barrera de privacidad importada lo primero. OpenCV.js (13 MB, WASM embebido) se sirve desde `opencv/<versión>/` con caché `immutable` y se carga solo al activar el flujo o al empezar la prueba de rendimiento.
+- **Parche de OpenCV.js sin `eval`** (`scripts/opencv-patch.mjs`, aplicado al copiarlo): su capa embind genera funciones con `new Function`, que la CSP bloquea; se sustituyen por cierres equivalentes. Comprobado que da los mismos resultados que el original. La CSP no cambia (sin `'unsafe-eval'`).
+- **Franja periocular** (`src/flow/strip.js`): rectángulo con los dos ojos, cejas, cantos y dorso nasal, con margen, recortado del frame **completo** con `createImageBitmap` en cada frame de la cámara (no solo en los que analiza MediaPipe), reducido al tamaño de trabajo y con la marca de tiempo de captura. Solo se recoloca cuando la cara se sale de ella o se aleja; el par de ese cambio no se mide.
+- Farnebäck (flujo denso) y Lucas-Kanade piramidal sobre una rejilla, con el brillo de cada recorte normalizado (media y desviación). DIS no está disponible en OpenCV.js 5.0.0 (solo exporta sus constantes).
+- **Prueba de rendimiento del flujo** (`orbicula-benchmark/2`): 10 pasadas (Farnebäck a 320 px, 640 px y sin reducir, Lucas-Kanade a 640 px, y sin flujo), con el análisis de la cara a la vez; mide ms de flujo, pares por segundo, copia, latencia y cuánto frena al análisis de la cara.
+- Casilla «Calcular flujo óptico (en pruebas)» en «Verificación de lado», con selector de configuración, ms y pares por segundo, y la franja dibujada sobre el vídeo.
+- 21 tests nuevos (franja, tamaño de trabajo, resumen del flujo, parche y prueba de rendimiento).
+
 ### Añadido (fase 3: EAR y parpadeos)
 - El análisis de la cara corre en un Web Worker (`src/landmarks/analysis.worker.js`): el hilo principal queda libre para las curvas. Los frames se mandan como `ImageBitmap` reducido (lado corto ≤ 720 px, que no empeora los landmarks), con dos frames en vuelo para que el worker no espere, y las ROI se calculan sobre el frame completo. Si el worker no arranca se usa el hilo principal; `?analysis=main` lo fuerza para comparar tiempos.
 - EAR de 6 puntos por lado (posiciones 3 y 5 de las cadenas de los párpados) y apertura palpebral central normalizada a la distancia intercantal; sustituyen a la «apertura rápida» de la fase 2.

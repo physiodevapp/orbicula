@@ -90,4 +90,19 @@ export class Overlay {
     ctx.setLineDash([]);
     ctx.globalAlpha = 1;
   }
+
+  /** Franja periocular que se recorta para el flujo óptico (rectángulo en píxeles del frame completo). */
+  drawStrip(strip, frame, { displayMirrored }) {
+    const { ctx } = this;
+    const rect = contentRect(this.w, this.h, frame.width, frame.height);
+    const a = toDisplay({ x: strip.x, y: strip.y }, rect, displayMirrored);
+    const b = toDisplay({ x: strip.x + strip.w, y: strip.y + strip.h }, rect, displayMirrored);
+    ctx.strokeStyle = this.colors.reference;
+    ctx.globalAlpha = 0.8;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([2, 3]);
+    ctx.strokeRect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y));
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+  }
 }

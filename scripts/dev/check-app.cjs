@@ -1,10 +1,10 @@
 // Abre la app en Chromium con una cámara simulada y vuelca lo que se ve (ver docs/desarrollo.md).
 //
 //   node scripts/dev/check-app.cjs --video /ruta/crop.y4m [--url http://127.0.0.1:4173/] [--query '?escala=0.25']
-//                                  [--wait 12000] [--shot /ruta/captura.png] [--bench /ruta/rendimiento.json]
+//                                  [--wait 12000] [--shot /ruta/captura.png] [--bench /ruta/rendimiento.json] [--flow]
 //
 // Sin --video usa el patrón de prueba de Chromium (sin cara). Con --bench lanza la prueba de rendimiento,
-// espera a que termine y guarda su JSON. Playwright está instalado de forma global: require('playwright').
+// espera a que termine y guarda su JSON. Con --flow activa el flujo óptico en directo antes de esperar. Playwright está instalado de forma global: require('playwright').
 const { chromium } = require('playwright');
 
 const arg = (name, def) => {
@@ -17,6 +17,7 @@ const QUERY = arg('query', '');
 const WAIT = Number(arg('wait', 12000));
 const SHOT = arg('shot', null);
 const BENCH = arg('bench', null);
+const FLOW = process.argv.includes('--flow');
 
 (async () => {
   const args = ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--enable-unsafe-swiftshader'];
@@ -40,6 +41,10 @@ const BENCH = arg('bench', null);
 
   await page.goto(URL_BASE + QUERY);
   await page.click('#startBtn');
+  if (FLOW) {
+    await page.click('summary:has-text("Verificación")');
+    await page.check('#flowToggle');
+  }
   await page.waitForTimeout(BENCH ? 5000 : WAIT);
 
   if (BENCH) {
@@ -51,9 +56,9 @@ const BENCH = arg('bench', null);
     console.log('rendimiento guardado en', BENCH);
   }
 
-  await page.click('summary:has-text("Verificación")');
+  if (!FLOW) await page.click('summary:has-text("Verificación")');
   const text = async (sel) => ((await page.$(sel)) ? (await page.textContent(sel)).trim() : '—');
-  for (const sel of ['#fpsPill', '#resPill', '#camPill', '#anaPill', '#roiPill', '#kvDelegate', '#kvTime', '#kvSize', '#kvEye', '#kvBlocked', '#earLv', '#earRv', '#blinkLv', '#blinkRv', '#asymVal', '#qualityBanner', '#errorBanner']) {
+  for (const sel of ['#fpsPill', '#resPill', '#camPill', '#anaPill', '#roiPill', '#kvDelegate', '#kvTime', '#kvSize', '#kvEye',  '#kvBlocked', '#kvFlow', '#kvStrip', '#kvFlowLoad', '#earLv', '#earRv', '#blinkLv', '#blinkRv', '#asymVal', '#qualityBanner', '#errorBanner']) {
     console.log(sel.padEnd(16), await text(sel));
   }
   if (SHOT) await page.screenshot({ path: SHOT, fullPage: true });
