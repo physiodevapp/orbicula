@@ -33,6 +33,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - **Barrera de privacidad** (`src/privacy/`): bloquea fetch, XMLHttpRequest, WebSocket, EventSource y sendBeacon a cualquier otro origen, en la página y en el worker. Motivo: la librería de MediaPipe intenta enviar un registro de uso a `odml.pa.googleapis.com/v1/log`; la CSP lo bloqueaba, pero solo si el hosting sirve `_headers` (GitHub Pages, donde copiará el hub, no lo hace) y un worker no hereda la CSP de la página. Los dominios bloqueados se muestran en «Verificación de lado» y se guardan en los JSON.
 - `WorkerAnalysis` mide el coste de la copia del frame (`bitmapMs`) y la ida y vuelta (`roundTripMs`), y tiene `dispose()`.
 
+### Corregido (a partir de la prueba de rendimiento en el móvil)
+- Los fps de la cámara vuelven a medirse con la marca de tiempo de cada frame, no con `presentedFrames`: con el análisis en el hilo principal se analizaban 28 frames por segundo cuando la cámara «entregaba» 25,9, lo que es imposible. La pastilla de fps y los JSON de las sesiones anteriores (24–25 fps) probablemente infravaloraban la cámara; en el JSON del rendimiento el contador sigue como `presentedFps`.
+
 ### Cambiado (a partir de la primera sesión real con la cámara frontal)
 - Detector de parpadeos: un cierre ya no acaba al recuperar un % fijo del reposo sino al recuperar el 60 % de **su propia profundidad** (o el 90 % del reposo, lo que ocurra antes). Antes, si el ojo se quedaba un rato más entornado, el detector se «atascaba» durante segundos y se tragaba los parpadeos siguientes (en los datos: un cierre de 5,4 s que ocultaba cuatro parpadeos). Reposo de 20 s: de 10 y 7 parpadeos detectados a 14 y 13 (anotados a mano: unos 13).
 - Umbral de inicio 0,75 → 0,8 del reposo (y fin 0,85 → 0,9): recoge bajadas flojas que el muestreo de ~20 Hz apenas ve. Sin falsos eventos en mirada y cabeceo.

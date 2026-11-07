@@ -55,6 +55,7 @@ suite('summarizeRun', () => {
     expect(s.inferMs.mean).toBeCloseTo(30, 1); // sin los 200 ms del calentamiento
     expect(s.analysisFps).toBeCloseTo(25, 0);
     expect(s.cameraFps).toBeCloseTo(30, 0);
+    expect(s.presentedFps).toBeCloseTo(30, 0);
     expect(s.analysedFraction).toBeCloseTo(25 / 30, 1);
     expect(s.intervalMs.mean).toBeCloseTo(40, 1);
     expect(s.faceFraction).toBe(1);

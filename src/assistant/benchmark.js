@@ -65,9 +65,13 @@ export function summarizeRun(raw, { warmupMs }) {
     results: keep.length,
     faceFraction: keep.length ? r2(pick(raw.faces).filter(Boolean).length / keep.length) : null,
     analysisFps: r2(analysisFps),
-    cameraFps: r2(presentedFps ?? rate(camT)),
+    // fps de la cámara: ritmo de los callbacks de vídeo (un frame distinto cada vez).
+    cameraFps: r2(rate(camT)),
+    // El contador `presentedFrames` del navegador, solo para diagnóstico: en algún móvil se queda corto
+    // (se llegaron a analizar más frames por segundo de los «presentados»).
+    presentedFps: r2(presentedFps),
     // Fracción de los frames de la cámara que se llegan a analizar.
-    analysedFraction: presentedFps && analysisFps ? r2(analysisFps / presentedFps) : null,
+    analysedFraction: rate(camT) && analysisFps ? r2(analysisFps / rate(camT)) : null,
     inferMs: describe(pick(raw.inferMs)), // lo que tarda MediaPipe en cada frame
     intervalMs: describe(intervals), // tiempo entre resultados
     latencyMs: describe(pick(raw.latencyMs)), // de la captura del frame a tener el resultado
