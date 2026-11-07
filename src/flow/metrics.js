@@ -13,8 +13,13 @@
 export const FLOW_ROIS = ['upperLid', 'lowerLid', 'brow', 'canthus'];
 export const ROI_KEYS = [...FLOW_ROIS.map((r) => `left.${r}`), ...FLOW_ROIS.map((r) => `right.${r}`), 'reference'];
 
-/** Compensaciones que se calculan a la vez. */
-export const VARIANTS = ['none', 'reference', 'pose'];
+/**
+ * Compensaciones que se calculan a la vez:
+ *   none: ninguna; reference: traslación del dorso nasal; pose: afín 2D de puntos estables;
+ *   hybrid: «dorso nasal + giro»: la traslación del dorso nasal más, para cada ROI, la diferencia de
+ *   movimiento que da el giro 3D de la cabeza entre esa ROI y el dorso nasal (para canto y ceja).
+ */
+export const VARIANTS = ['none', 'reference', 'pose', 'hybrid'];
 
 /** Índices de los momentos. u, v = componentes del flujo; x, y = posición del píxel. */
 export const M = { n: 0, u: 1, v: 2, uu: 3, vv: 4, x: 5, y: 6, xx: 7, yy: 8, xy: 9, ux: 10, uy: 11, vx: 12, vy: 13 };
@@ -148,10 +153,70 @@ export function affineMotion(from, to) {
   return { a: pu[0], b: pu[1], c: pu[2], d: pv[0], e: pv[1], f: pv[2] };
 }
 
-/** Interpolación lineal de dos listas de puntos. */
+/** Interpolación lineal de dos listas de puntos (2D o 3D). */
 export function lerpPoints(p, q, k) {
-  return p.map((a, i) => ({ x: a.x + (q[i].x - a.x) * k, y: a.y + (q[i].y - a.y) * k }));
+  return p.map((a, i) => {
+    const o = { x: a.x + (q[i].x - a.x) * k, y: a.y + (q[i].y - a.y) * k };
+    if (a.z != null) o.z = a.z + (q[i].z - a.z) * k;
+    return o;
+  });
 }
+
+/** Resuelve A·x = b (n×n) por eliminación gaussiana con pivote. null si es singular. */
+function solveLinear(A, b) {
+  const n = b.length;
+  const M = A.map((row, i) => [...row, b[i]]);
+  for (let c = 0; c < n; c++) {
+    let p = c;
+    for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    if (Math.abs(M[p][c]) < 1e-9) return null;
+    [M[c], M[p]] = [M[p], M[c]];
+    for (let r = 0; r < n; r++) {
+      if (r === c) continue;
+      const k = M[r][c] / M[c][c];
+      for (let j = c; j <= n; j++) M[r][j] -= k * M[c][j];
+    }
+  }
+  return M.map((row, i) => row[n] / row[i]);
+}
+
+/**
+ * Movimiento rígido 3D pequeño (de un frame al siguiente) que lleva `from` a `to`, por mínimos
+ * cuadrados: d(p) = ω × (p − c) + T, con c el centroide de `from`. Devuelve una función que da el
+ * desplazamiento de cualquier punto 3D, o null si los puntos no bastan.
+ */
+export function rigidMotion3d(from, to) {
+  const n = Math.min(from.length, to.length);
+  if (n < 3) return null;
+  const c = { x: 0, y: 0, z: 0 };
+  for (let i = 0; i < n; i++) { c.x += from[i].x / n; c.y += from[i].y / n; c.z += from[i].z / n; }
+  const AtA = Array.from({ length: 6 }, () => new Array(6).fill(0));
+  const Atb = new Array(6).fill(0);
+  const add = (row, v) => {
+    for (let i = 0; i < 6; i++) {
+      Atb[i] += row[i] * v;
+      for (let j = 0; j < 6; j++) AtA[i][j] += row[i] * row[j];
+    }
+  };
+  for (let i = 0; i < n; i++) {
+    const q = { x: from[i].x - c.x, y: from[i].y - c.y, z: from[i].z - c.z };
+    const d = { x: to[i].x - from[i].x, y: to[i].y - from[i].y, z: to[i].z - from[i].z };
+    // ω × q = (ωy·qz − ωz·qy, ωz·qx − ωx·qz, ωx·qy − ωy·qx); incógnitas [ωx, ωy, ωz, Tx, Ty, Tz].
+    add([0, q.z, -q.y, 1, 0, 0], d.x);
+    add([-q.z, 0, q.x, 0, 1, 0], d.y);
+    add([q.y, -q.x, 0, 0, 0, 1], d.z);
+  }
+  const s = solveLinear(AtA, Atb);
+  if (!s) return null;
+  const [wx, wy, wz, tx, ty, tz] = s;
+  return (p) => {
+    const q = { x: p.x - c.x, y: p.y - c.y, z: p.z - c.z };
+    return { x: wy * q.z - wz * q.y + tx, y: wz * q.x - wx * q.z + ty, z: wx * q.y - wy * q.x + tz };
+  };
+}
+
+/** Puntos 3D del frame → coordenadas de trabajo (x, y como toWork; z con la misma escala). */
+export const toWork3 = (points, strip, scale) => points.map((p) => ({ x: (p.x - strip.x) * scale, y: (p.y - strip.y) * scale, z: p.z * scale }));
 
 /** Puntos del frame completo → píxeles de trabajo de la franja. */
 export const toWork = (points, strip, scale) => points.map((p) => ({ x: (p.x - strip.x) * scale, y: (p.y - strip.y) * scale }));

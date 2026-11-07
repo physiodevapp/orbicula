@@ -145,7 +145,7 @@ Plan «contracción mínima con controles»: 20 repeticiones al azar (10 contrac
 ## Propuesta para terminar la fase 4 (1 y 2 hechos; aprobada por el autor)
 1. **Apertura por flujo** como métrica de la app (curva y JSON), con corrección de la deriva (integrador con fuga o restar la línea base de los últimos segundos).
 2. **Prueba de contracción mínima con controles**: ~10 contracciones mínimas y ~10 controles en orden aleatorio, con dos pitidos distintos («contrae» / «no hagas nada»); tasas de acierto y falsos positivos del EAR y del flujo.
-3. **Compensación de las regiones laterales** (canto y ceja).
+3. **Compensación de las regiones laterales** (canto y ceja). **Hecho:** variante «dorso nasal + giro» (giro 3D estimado con los landmarks; ver `CHANGELOG.md`), junto con el ajuste automático del ritmo del flujo. Pendiente de la prueba completa de la fase 4 en el móvil para comparar `eR` y `eH` en el cabeceo y el giro (criterio 4).
 
 ## Pruebas
 - **Vídeos sintéticos con la respuesta conocida** (ampliar `scripts/dev/make-face-videos.py`): mover solo el párpado 1–2 px (el flujo lo tiene que ver) y, por separado, toda la cara simulando un cabeceo (la compensación lo tiene que anular).

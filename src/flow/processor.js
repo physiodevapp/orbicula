@@ -6,7 +6,11 @@
 // rodean a cada frame. El flujo llega antes (~40 ms) que el análisis del frame siguiente (~70 ms),
 // así que cada par espera en una cola hasta que hay un análisis posterior a su segundo frame. Si
 // no llega a tiempo, la variante «postura» de ese par queda vacía (null) y las otras dos se dan igual.
-import { ROI_KEYS, FLOW_ROIS, VARIANTS, ZERO, translationOf, residual, affineMotion, lerpPoints, toWork, roiMetrics, MOMENTS } from './metrics.js';
+import { ROI_KEYS, FLOW_ROIS, VARIANTS, ZERO, translationOf, residual, affineMotion, lerpPoints, toWork, toWork3, rigidMotion3d, roiMetrics, MOMENTS } from './metrics.js';
+
+/** Claves de los puntos 3D por ROI (orden fijo para interpolarlos como una lista). */
+const ANCHOR_KEYS = ['reference', ...['left', 'right'].flatMap((s) => FLOW_ROIS.map((r) => `${s}.${r}`))];
+const anchorList = (a) => ANCHOR_KEYS.map((k) => (k === 'reference' ? a.reference : a[k.split('.')[0]][k.split('.')[1]]));
 
 /**
  * Cierre por flujo: desplazamiento acumulado del párpado superior hacia abajo menos el del inferior
@@ -41,7 +45,10 @@ export class FlowProcessor {
     const r = result.rois;
     const last = this.poses.at(-1);
     if (last && t <= last.t) return;
-    this.poses.push({ t, points: r.pose, intercanthal: r.meta.intercanthal, axes: { left: r.left.axes, right: r.right.axes } });
+    this.poses.push({
+      t, points: r.pose, intercanthal: r.meta.intercanthal, axes: { left: r.left.axes, right: r.right.axes },
+      p3: r.pose3d ?? null, anchors: r.anchors3d ? anchorList(r.anchors3d) : null,
+    });
     while (this.poses.length > 2 && this.poses[0].t < t - KEEP_MS) this.poses.shift();
     this.#drain(false);
   }
@@ -72,7 +79,11 @@ export class FlowProcessor {
     const a = P[Math.max(0, i - 1)];
     if (a === b || b.t === a.t) return b;
     const k = (t - a.t) / (b.t - a.t);
-    return { t, points: lerpPoints(a.points, b.points, k), intercanthal: a.intercanthal + (b.intercanthal - a.intercanthal) * k, axes: k < 0.5 ? a.axes : b.axes };
+    return {
+      t, points: lerpPoints(a.points, b.points, k), intercanthal: a.intercanthal + (b.intercanthal - a.intercanthal) * k, axes: k < 0.5 ? a.axes : b.axes,
+      p3: a.p3 && b.p3 ? lerpPoints(a.p3, b.p3, k) : null,
+      anchors: a.anchors && b.anchors ? lerpPoints(a.anchors, b.anchors, k) : null,
+    };
   }
 
   #drain(force) {
@@ -103,12 +114,27 @@ export class FlowProcessor {
       reference: translationOf(mom(refIdx)),
       pose: p1 && p2 ? affineMotion(toWork(p1.points, f.strip, f.scale), toWork(p2.points, f.strip, f.scale)) : null,
     };
+    // «Dorso nasal + giro»: movimiento rígido 3D entre los dos frames (puntos estables en coordenadas
+    // de trabajo) y, para cada ROI, la diferencia entre su desplazamiento y el del dorso nasal.
+    let rigid = null;
+    let anchors = null;
+    if (motion.reference && p1?.p3 && p2?.p3 && p1.anchors) {
+      rigid = rigidMotion3d(toWork3(p1.p3, f.strip, f.scale), toWork3(p2.p3, f.strip, f.scale));
+      anchors = toWork3(p1.anchors, f.strip, f.scale);
+    }
+    const hybridFor = (key) => {
+      if (!rigid) return null;
+      const dRef = rigid(anchors[0]);
+      const d = rigid(anchors[ANCHOR_KEYS.indexOf(key)]);
+      return { ...motion.reference, c: motion.reference.c + d.x - dRef.x, f: motion.reference.f + d.y - dRef.y };
+    };
     const out = { t: f.t, dt: f.dt, left: {}, right: {} };
     ROI_KEYS.forEach((key, k) => {
       if (key === 'reference') return;
       const [side, roi] = key.split('.');
       const m = mom(k);
-      out[side][roi] = Object.fromEntries(VARIANTS.map((v) => [v, roiMetrics(residual(m, motion[v]), ref.axes[side], unit, f.dt)]));
+      const g = { ...motion, hybrid: hybridFor(key) };
+      out[side][roi] = Object.fromEntries(VARIANTS.map((v) => [v, roiMetrics(residual(m, g[v]), ref.axes[side], unit, f.dt)]));
     });
     // Movimiento de la cabeza que se resta (en el centro de la franja), en distancias intercantales/s.
     const cx = (f.strip.w * f.scale) / 2;

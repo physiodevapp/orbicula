@@ -155,6 +155,20 @@ export function buildRois(lm, frame, { frameMirrored = false } = {}) {
   const faceWidth = dist(pt(lm, FACE_WIDTH.right, frame), pt(lm, FACE_WIDTH.left, frame));
   // Puntos estables (píxeles del frame) para estimar el movimiento rígido de la cabeza.
   out.pose = POSE_POINTS.map((i) => pt(lm, i, frame));
+  // Lo mismo en 3D (z del modelo, en la escala de x: píxeles del ancho) y un punto 3D por ROI:
+  // la compensación «dorso nasal + giro» estima con ellos cuánto se mueve cada ROI respecto al dorso
+  // nasal cuando la cabeza gira (las regiones laterales están más atrás y se mueven distinto).
+  const p3 = (i) => ({ x: lm[i].x * frame.width, y: lm[i].y * frame.height, z: (lm[i].z ?? 0) * frame.width });
+  const mean3 = (ids) => {
+    const ps = ids.map(p3);
+    return { x: ps.reduce((s, p) => s + p.x, 0) / ps.length, y: ps.reduce((s, p) => s + p.y, 0) / ps.length, z: ps.reduce((s, p) => s + p.z, 0) / ps.length };
+  };
+  out.pose3d = POSE_POINTS.map(p3);
+  out.anchors3d = { reference: mean3(NASAL_DORSUM) };
+  for (const meshSide of SIDES) {
+    const e = EYES[meshSide];
+    out.anchors3d[patientSide(meshSide, frameMirrored)] = { upperLid: mean3(e.upper), lowerLid: mean3(e.lower), brow: mean3(e.brow), canthus: p3(e.outer) };
+  }
 
   out.meta = {
     intercanthal,

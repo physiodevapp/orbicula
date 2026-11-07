@@ -17,12 +17,15 @@ const emptySide = () => Object.fromEntries(SERIES_KEYS.map((k) => [k, []]));
 
 /**
  * Flujo óptico por ROI que se guarda en cada paso (fase 4). Por ROI y lado:
- *   eN, eR, eP: energía residual sin compensar, con la referencia y con la postura ((DI/s)²);
- *   dR, tR, dP, tP: componente hacia abajo y hacia la sien (DI/s), con la referencia y con la postura.
+ *   eN, eR, eP, eH: energía residual sin compensar, con la referencia, con la postura y con «dorso nasal
+ *   + giro» ((DI/s)²); dR, tR, dP, tP, dH, tH: componente hacia abajo y hacia la sien (DI/s) con cada una.
  * `head`: movimiento de la cabeza que se resta (DI/s), con la referencia (rU, rV) y con la postura (pU, pV).
  */
 export const FLOW_ROIS = ['upperLid', 'lowerLid', 'brow', 'canthus'];
-export const FLOW_KEYS = { eN: ['none', 'energy'], eR: ['reference', 'energy'], eP: ['pose', 'energy'], dR: ['reference', 'down'], tR: ['reference', 'temple'], dP: ['pose', 'down'], tP: ['pose', 'temple'] };
+export const FLOW_KEYS = {
+  eN: ['none', 'energy'], eR: ['reference', 'energy'], eP: ['pose', 'energy'], eH: ['hybrid', 'energy'],
+  dR: ['reference', 'down'], tR: ['reference', 'temple'], dP: ['pose', 'down'], tP: ['pose', 'temple'], dH: ['hybrid', 'down'], tH: ['hybrid', 'temple'],
+};
 const emptyFlow = () => ({
   rel: [],
   dt: [],

@@ -30,6 +30,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 - Prueba con controles en el móvil: el cierre por flujo detectó 6/7 contracciones mínimas en cada ojo frente a 2/7 y 4/7 del EAR, con las mismas falsas alarmas (1/8). Criterio 3 cumplido de forma provisional (`docs/plan-fase-4.md`).
 
+- **Compensación «dorso nasal + giro»** (cuarta variante, `hybrid`, serie `eH`/`dH`/`tH`): la traslación del dorso nasal más, para cada ROI, la diferencia de movimiento que produce el giro 3D de la cabeza entre esa ROI y el dorso nasal. El giro se estima por mínimos cuadrados con los puntos estables en 3D (la z del modelo); cada ROI tiene su punto 3D. Pensada para el canto externo y la ceja, que fallaban al girar la cabeza. En un giro sintético deja en el canto menos de 1/20 del error del dorso nasal solo; con la cabeza solo trasladándose añade algo de ruido (la z de los landmarks también tiembla).
+- **Ajuste automático del ritmo del flujo** (`src/flow/governor.js`): si el análisis de la cara pasa 3 s por debajo de 24/s, el flujo baja a 20 pares/s; vuelve a su ritmo cuando el análisis pasa de 27/s durante 10 s. Se ve en «Verificación de lado» y queda en el JSON (`perf.flowRateCap`). No actúa durante la prueba de rendimiento.
+
 ### Corregido (fase 4b)
 - `analyze-flow.mjs`: en la detección calibrada solo se apartan los parpadeos de verdad (cierre ≥ 50 %); antes apartaba también los eventos poco profundos que provoca la propia contracción mínima.
 - La asimetría de las curvas fallaba al elegir una métrica que no está en la serie de la cara.

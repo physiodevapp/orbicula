@@ -162,3 +162,24 @@ describe('límite de pares por segundo', () => {
     expect(r.allow(1016.7)).toBe(false); // no hay crédito acumulado del hueco
   });
 });
+
+describe('ajuste automático del ritmo del flujo', () => {
+  it('rebaja el flujo si el análisis de la cara pasa 3 s por debajo de 24/s, y lo devuelve al recuperarse con margen', async () => {
+    const { RateGovernor, GOVERNOR } = await import('../src/flow/governor.js');
+    const g = new RateGovernor();
+    let t = 0;
+    const run = (fps, ms) => { let c; for (const end = t + ms; t <= end; t += 500) c = g.update(t, fps); return c; };
+    expect(run(28, 5000)).toBe(0);
+    expect(run(22, 2000)).toBe(0); // aún no 3 s
+    expect(run(22, 1500)).toBe(GOVERNOR.cap);
+    expect(run(25, 20000)).toBe(GOVERNOR.cap); // 25 no basta para recuperar (hace falta 27)
+    expect(run(28, 9000)).toBe(GOVERNOR.cap);
+    expect(run(28, 1500)).toBe(0);
+  });
+  it('una bajada breve no rebaja el flujo; sin análisis (0) tampoco', async () => {
+    const { RateGovernor } = await import('../src/flow/governor.js');
+    const g = new RateGovernor();
+    expect([g.update(0, 20), g.update(2000, 20), g.update(2500, 28), g.update(5000, 20)].at(-1)).toBe(0);
+    expect(new RateGovernor().update(10000, 0)).toBe(0);
+  });
+});

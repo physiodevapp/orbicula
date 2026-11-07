@@ -8,7 +8,7 @@
 export const REPORT_SCHEMA = 'orbicula-test-session/2';
 
 const FLOW_ROIS = ['upperLid', 'lowerLid', 'brow', 'canthus'];
-const FLOW_VARIANTS = { none: 'eN', reference: 'eR', pose: 'eP' };
+const FLOW_VARIANTS = { none: 'eN', reference: 'eR', pose: 'eP', hybrid: 'eH' };
 
 const r3 = (v) => (Number.isFinite(v) ? Math.round(v * 1000) / 1000 : null);
 

@@ -259,3 +259,50 @@ describe('cierre por flujo', () => {
     expect(out.at(-1).closure.left).toBeCloseTo(0, 6);
   });
 });
+
+describe('compensación «dorso nasal + giro»', () => {
+  it('rigidMotion3d recupera una rotación pequeña y su traslación', async () => {
+    const { rigidMotion3d } = await import('../src/flow/metrics.js');
+    const pts = [{ x: 0, y: 0, z: 0 }, { x: 100, y: 0, z: 40 }, { x: -100, y: 5, z: 40 }, { x: 0, y: -80, z: 20 }, { x: 10, y: 60, z: -10 }];
+    const th = 0.01; // giro alrededor del eje vertical (y)
+    const rot = (p) => ({ x: Math.cos(th) * p.x + Math.sin(th) * p.z + 2, y: p.y - 1, z: -Math.sin(th) * p.x + Math.cos(th) * p.z });
+    const g = rigidMotion3d(pts, pts.map(rot));
+    const probe = { x: 60, y: -30, z: 50 };
+    const d = g(probe);
+    const truth = rot(probe);
+    expect(d.x).toBeCloseTo(truth.x - probe.x, 1);
+    expect(d.y).toBeCloseTo(truth.y - probe.y, 1);
+    expect(rigidMotion3d(pts.slice(0, 2), pts.slice(0, 2))).toBeNull();
+  });
+
+  it('con un giro de la cabeza, compensa el canto mejor que la traslación del dorso nasal', () => {
+    const STRIP = { x: 100, y: 400, w: 520, h: 240 }, SCALE = 0.5, W = 260, H = 120;
+    // Cara con profundidad: lo lateral queda más atrás (z mayor) que la nariz.
+    const base = makeFace().map((p) => ({ ...p, z: 0.25 * Math.abs(p.x - 0.5) }));
+    const yaw = (lm, th) => lm.map((p) => ({ ...p, x: 0.5 + Math.cos(th) * (p.x - 0.5) + Math.sin(th) * p.z * (FRAME.width / FRAME.width), z: -Math.sin(th) * (p.x - 0.5) + Math.cos(th) * p.z }));
+    const res = (lm) => ({ face: true, frame: FRAME, rois: buildRois(lm, FRAME) });
+    const r0 = res(base);
+    const r1 = res(yaw(base, 0.03));
+    // Flujo verdadero: cada ROI se desplaza lo que se desplaza su punto 3D (en px de trabajo).
+    const shiftOf = (a0, a1) => [(a1.x - a0.x) * SCALE, (a1.y - a0.y) * SCALE];
+    const field2 = (fnByIdx) => {
+      const out = new Float64Array(ROI_KEYS.length * MOMENTS);
+      ROI_KEYS.forEach((key, k) => {
+        const [side, name] = key.split('.');
+        const poly = key === 'reference' ? r0.rois.reference.polygon : r0.rois[side][name].polygon;
+        const [u, v] = fnByIdx(key);
+        out.set(moments(field(W, H, () => [u, v]), W, rasterize(toWork(poly, STRIP, SCALE), W, H)), k * MOMENTS);
+      });
+      return out;
+    };
+    const anchor = (r, key) => (key === 'reference' ? r.rois.anchors3d.reference : r.rois.anchors3d[key.split('.')[0]][key.split('.')[1]]);
+    const out = [];
+    const p = new FlowProcessor((s) => out.push(s));
+    p.pushFace(0, r0);
+    p.pushFace(33, r1);
+    p.pushFlow({ t: 33, dt: 33, moments: field2((key) => shiftOf(anchor(r0, key), anchor(r1, key))), strip: STRIP, scale: SCALE });
+    const c = out[0].left.canthus;
+    expect(c.reference.energy).toBeGreaterThan(0.01);
+    expect(c.hybrid.energy).toBeLessThan(c.reference.energy / 20);
+  });
+});

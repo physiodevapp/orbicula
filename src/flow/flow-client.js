@@ -32,6 +32,7 @@ export class FlowClient {
     this.meter = new FpsMeter(1000); // pares de frames con flujo por segundo
     this.counts = emptyCounts();
     this.limiter = new RateLimiter(this.config.maxRate); // límite de pares por segundo
+    this.rateCap = 0; // rebaja automática (0 = ninguna) cuando el análisis de la cara no llega (governor.js)
     this.videoFrameOk = typeof VideoFrame === 'function'; // se apaga si `new VideoFrame(video)` falla
     this.blockedHosts = new Set();
     this.meta = new Map(); // id → {submitAt, cropMs}
@@ -104,7 +105,20 @@ export class FlowClient {
     if (this.strip) this.work = workingSize(this.strip, c.maxWidth);
     this.stripId++;
     this.polys = null; // con otra escala, los polígonos se recalculan con el siguiente análisis
-    this.limiter = new RateLimiter(c.maxRate);
+    this.limiter = new RateLimiter(this.effectiveRate);
+  }
+
+  /** Pares por segundo como máximo: el de la configuración, rebajado por `rateCap` si lo hay. */
+  get effectiveRate() {
+    const out = Math.min(this.config.maxRate || Infinity, this.rateCap || Infinity);
+    return Number.isFinite(out) ? out : 0;
+  }
+
+  /** Rebaja (o quita, con 0) el límite de pares por segundo sin cambiar de configuración. */
+  setRateCap(cap) {
+    if (cap === this.rateCap) return;
+    this.rateCap = cap;
+    this.limiter = new RateLimiter(this.effectiveRate);
   }
 
   /** Últimas ROI de MediaPipe: recoloca la franja si la cara se ha salido de ella. */

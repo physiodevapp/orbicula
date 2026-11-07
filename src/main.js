@@ -24,6 +24,7 @@ import { Curves } from './ui/curves.js';
 import { FlowClient } from './flow/flow-client.js';
 import { FLOW_CONFIGS, DEFAULT_FLOW, OPENCV_VERSION, FARNEBACK_PARAMS } from './flow/config.js';
 import { FlowProcessor } from './flow/processor.js';
+import { RateGovernor } from './flow/governor.js';
 import { FLOW_ROIS, VARIANTS } from './flow/metrics.js';
 
 const $ = (id) => document.getElementById(id);
@@ -142,6 +143,7 @@ const assistant = createAssistant({
   getPerf: () => ({
     cameraFps: round1(camera.meter.fps), analysisFps: round1(analysis?.fps), analysisMs: round1(analysis?.ms),
     flowFps: state.showFlow ? round1(flow?.fps) : null, flowMs: state.showFlow ? round1(flow?.ms) : null,
+    flowRateCap: state.showFlow ? (flow?.rateCap ?? 0) : null, // pares/s de la rebaja automática (0 = sin rebaja)
   }),
   // El reposo y las series empiezan de cero; el plan de la fase 4 enciende el flujo (y espera a OpenCV.js).
   onStart: async (plan) => {
@@ -426,6 +428,18 @@ async function createAnalysis() {
   }
 }
 
+// ── Ritmo del flujo: se rebaja solo si el análisis de la cara no llega a 24/s ─────────────
+const governor = new RateGovernor();
+setInterval(() => {
+  // La prueba de rendimiento mide configuraciones fijas: ahí no se toca.
+  if (!flow || !state.showFlow || !analysis || document.body.dataset.busy === 'bench') return;
+  const cap = governor.update(performance.now(), analysis.fps);
+  if (cap !== flow.rateCap) {
+    flow.setRateCap(cap);
+    console.info(`orbicula: flujo ${cap ? `rebajado a ${cap} pares/s (análisis de la cara a ${analysis.fps.toFixed(1)}/s)` : 'de vuelta a su ritmo normal'}`);
+  }
+}, 500);
+
 // ── Flujo óptico (paso 4a: solo rendimiento) ──────────────────────────────────
 let flowPromise = null;
 let lastFlowUi = 0;
@@ -470,7 +484,7 @@ function onFlowResult(m) {
   if (now - lastFlowUi < 250) return;
   lastFlowUi = now;
   const f = flow;
-  $('kvFlow').textContent = `${f.ms.toFixed(1)} ms · ${f.fps.toFixed(1)} pares/s · worker ${m.totalMs.toFixed(1)} ms (copia ${m.readMs.toFixed(1)})`;
+  $('kvFlow').textContent = `${f.ms.toFixed(1)} ms · ${f.fps.toFixed(1)} pares/s${f.rateCap ? ` (rebajado a ${f.rateCap})` : ''} · worker ${m.totalMs.toFixed(1)} ms (copia ${m.readMs.toFixed(1)})`;
   $('kvStrip').textContent = f.strip ? `${f.strip.w} × ${f.strip.h} → ${m.size.width} × ${m.size.height}` : '—';
   $('kvFlowLoad').textContent = f.loadMs != null ? `${(f.loadMs / 1000).toFixed(1)} s` : '—';
 }

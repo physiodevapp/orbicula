@@ -20,7 +20,7 @@ const FIXES = process.argv.includes('--fix')
   ? Object.fromEntries(fixArg.split(',').map((x) => { const [k, v] = x.split('='); return [k, v]; }))
   : {};
 const ROIS = ['upperLid', 'lowerLid', 'brow', 'canthus'];
-const VAR = { eN: 'sin comp.', eR: 'dorso nasal', eP: 'postura' };
+const VAR = { eN: 'sin comp.', eR: 'dorso nasal', eP: 'postura', eH: 'dorso+giro' };
 const SIDES = ['left', 'right'];
 const L = { left: 'I', right: 'D' };
 const step = (id) => j.steps.find((s) => s.id === id && s.status === 'completed');

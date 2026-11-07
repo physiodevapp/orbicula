@@ -54,7 +54,7 @@ Solo medidas numéricas y la configuración: ninguna imagen, ningún nombre. Inc
     "startedAt": "ISO-8601", "plannedMs": 0, "durationMs": 0,
     "expect": { "left": 5, "right": 0 },          // lo que se debería detectar
     "user": { "counted": null, "notes": "" },     // lo que anota el usuario
-    "perf": { "cameraFps": 0, "analysisFps": 0, "analysisMs": 0, "flowFps": 0, "flowMs": 0 },
+    "perf": { "cameraFps": 0, "analysisFps": 0, "analysisMs": 0, "flowFps": 0, "flowMs": 0, "flowRateCap": 0 },   // flowRateCap: rebaja automática del flujo (pares/s; 0 = ninguna)
     "summary": { "samples": 0, "faceFraction": 0, "left": { /* parpadeos, cierres, duración, completitud, EAR… */ }, "right": {} },
     "events": { "left": [ { "kind": "blink|closure|narrowing", "t": 0, "duration": 0, "min": 0, "baseline": 0, "completeness": 0 } ], "right": [] },
     "reps": { "count": 5, "everyMs": 5000, "holdMs": 1500, "offsetMs": 2500 },   // repeticiones guiadas (o null)
@@ -62,7 +62,7 @@ Solo medidas numéricas y la configuración: ninguna imagen, ningún nombre. Inc
     "series": { "t": [], "left": { "ear": [], "aperture": [], "blink": [], "lookDown": [], "lookUp": [], "irisH": [], "irisV": [] }, "right": { } },   // t en ms desde el inicio del paso; null = sin cara
     "flow": {                                     // un elemento por par de frames con flujo
       "t": [], "dt": [],                          // ms (mismo reloj que series.t) y ms entre los dos frames del par
-      "left": { "upperLid": { "eN": [], "eR": [], "eP": [], "dR": [], "tR": [], "dP": [], "tP": [] }, "lowerLid": {}, "brow": {}, "canthus": {} },
+      "left": { "upperLid": { "eN": [], "eR": [], "eP": [], "eH": [], "dR": [], "tR": [], "dP": [], "tP": [], "dH": [], "tH": [] }, "lowerLid": {}, "brow": {}, "canthus": {} },
       "right": { },
       "head": { "rU": [], "rV": [], "pU": [], "pV": [] },
       "closure": { "left": [], "right": [] }      // cierre por flujo (DI, + = se cierra; integrador con fuga de 5 s)
@@ -72,6 +72,6 @@ Solo medidas numéricas y la configuración: ninguna imagen, ningún nombre. Inc
 ```
 Tipos de evento: `blink` (parpadeo, ≤ 0,8 s), `closure` (cierre de más de 0,8 s con el ojo muy cerrado, p. ej. un guiño mantenido) y `narrowing` («entornado»: más de 0,8 s pero con un cierre poco profundo, < 50 %). `lookDown` y `lookUp` son los blendshapes de mirada del modelo, para estudiar los falsos cierres al mirar hacia abajo.
 
-**Flujo** (`flow`, fase 4), por ROI y lado del paciente: `eN`, `eR`, `eP` = energía residual sin compensar, compensada con el dorso nasal y con la postura, en (DI/s)² (DI = distancia intercantal); `dR`/`dP` = componente **hacia abajo** (+ = el tejido baja) y `tR`/`tP` = **hacia la sien** (+ = hacia fuera), en DI/s, con cada compensación. `head` = movimiento de la cabeza que se resta, en el centro de la franja (DI/s). `summary.flow` da por ROI y compensación el p50, p95 y p99 de la energía. `irisH` = posición del iris a lo largo del ojo (0 = comisura interna, 1 = externa); `irisV` = hacia abajo (+), ambos respecto al ancho del ojo.
+**Flujo** (`flow`, fase 4), por ROI y lado del paciente: `eN`, `eR`, `eP`, `eH` = energía residual sin compensar, compensada con el dorso nasal, con la postura y con «dorso nasal + giro», en (DI/s)² (DI = distancia intercantal); `dR`/`dP`/`dH` = componente **hacia abajo** (+ = el tejido baja) y `tR`/`tP`/`tH` = **hacia la sien** (+ = hacia fuera), en DI/s, con cada compensación. `closure` = cierre por flujo de cada ojo (DI, + = se cierra). `head` = movimiento de la cabeza que se resta, en el centro de la franja (DI/s). `summary.flow` da por ROI y compensación el p50, p95 y p99 de la energía. `irisH` = posición del iris a lo largo del ojo (0 = comisura interna, 1 = externa); `irisV` = hacia abajo (+), ambos respecto al ancho del ojo.
 
 Los lados son siempre los del paciente. Las series completas permiten reproducir el detector con los datos reales y ajustar los umbrales sin repetir la prueba.
