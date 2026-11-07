@@ -13,7 +13,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - Casilla «Calcular blendshapes» para medir su coste.
 - **Asistente de pruebas** (`src/assistant/`, `src/ui/assistant.js`, `docs/pruebas.md`): guía paso a paso (reposo, parpadeo espontáneo, guiños, parpadeo flojo, cierre mantenido, mirada arriba y abajo, cabeceo) con cuenta atrás, instrucción sobre el vídeo, pitidos y vibración, pantalla encendida y revisión de cada paso (lo detectado, lo contado por el usuario y observaciones). Guarda un JSON de diagnóstico (`orbicula-test-session/1`) con configuración, rendimiento, eventos y series, que se descarga, se comparte o se copia sin series. El motor de pasos (`GuidedSession`) es la base del protocolo guiado de la fase 5.
 - Asistente: **Repetir este paso** en cualquier momento (también durante la cuenta atrás o la grabación), **← Paso anterior**, **Rehacer el último paso** al terminar, y **Detener** que guarda lo hecho y permite **Retomar sesión** en el paso en curso. Lo ya guardado se conserva y el JSON anota el nº de intento de cada paso.
-- 73 tests (señales sintéticas de parpadeo con ruido, jitter, deriva, pérdida de cara y espejo).
+- 91 tests (señales sintéticas de parpadeo con ruido, jitter, deriva, pérdida de cara y espejo).
 
 ### Añadido (fase 2: landmarks)
 - MediaPipe Face Landmarker 1.1.0 con el modelo (`public/modelos/`) y el WASM servidos desde el propio sitio; `scripts/copy-wasm.mjs` copia el WASM antes de `dev` y `build`. GPU con respaldo a CPU.
@@ -27,6 +27,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 ### Verificado en el móvil del autor
 - Lateralidad con guiños de cada ojo, con la cámara frontal y con la trasera: la apertura por landmarks y el blendshape de parpadeo suben en el lado correcto (I = izquierda del paciente). La asignación por defecto de los blendshapes es la correcta (no hace falta invertirla).
 - Análisis con la frontal en prioridad «Resolución»: 25–28 análisis/s, 33–37 ms, GPU; ojo de ≈ 250 px de ancho.
+
+### Añadido: prueba de rendimiento y barrera de privacidad
+- **Prueba de rendimiento** (`src/assistant/benchmark.js`, `src/ui/benchmark.js`, `docs/rendimiento.md`): 8 pasadas de 12 s (worker / hilo principal × con / sin blendshapes, dos rondas en orden cruzado) que registran el tiempo de cada análisis, los fps, la latencia, el coste de copiar el frame al worker y la fluidez del hilo principal (repintados lentos y tareas largas). Exporta un JSON `orbicula-benchmark/1`.
+- **Barrera de privacidad** (`src/privacy/`): bloquea fetch, XMLHttpRequest, WebSocket, EventSource y sendBeacon a cualquier otro origen, en la página y en el worker. Motivo: la librería de MediaPipe intenta enviar un registro de uso a `odml.pa.googleapis.com/v1/log`; la CSP lo bloqueaba, pero solo si el hosting sirve `_headers` (GitHub Pages, donde copiará el hub, no lo hace) y un worker no hereda la CSP de la página. Los dominios bloqueados se muestran en «Verificación de lado» y se guardan en los JSON.
+- `WorkerAnalysis` mide el coste de la copia del frame (`bitmapMs`) y la ida y vuelta (`roundTripMs`), y tiene `dispose()`.
 
 ### Cambiado (a partir de la primera sesión real con la cámara frontal)
 - Detector de parpadeos: un cierre ya no acaba al recuperar un % fijo del reposo sino al recuperar el 60 % de **su propia profundidad** (o el 90 % del reposo, lo que ocurra antes). Antes, si el ojo se quedaba un rato más entornado, el detector se «atascaba» durante segundos y se tragaba los parpadeos siguientes (en los datos: un cierre de 5,4 s que ocultaba cuatro parpadeos). Reposo de 20 s: de 10 y 7 parpadeos detectados a 14 y 13 (anotados a mano: unos 13).

@@ -27,7 +27,7 @@ v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolu
   | Frontal | 29.9 fps · 2160×3440 | 29.0 fps · 720×1280 |
 
   Ambas anuncian 60 fps, pero si solo se piden como «ideal» Chrome se queda en 30: por eso la prioridad «fps» exige un mínimo. La frontal acepta el mínimo pero sigue dando unos 30. Con poca luz la cámara alarga la exposición y baja los fps (la frontal llegó a 24). **Para medir en directo, usa la trasera con prioridad «fps» y buena luz.**
-- **Privacidad:** la imagen se procesa en el propio móvil. No se envía nada a ningún servidor y el vídeo no se guarda.
+- **Privacidad:** la imagen se procesa en el propio móvil. No se envía nada a ningún servidor y el vídeo no se guarda. La librería de MediaPipe intenta enviar un registro de uso a `odml.pa.googleapis.com`: lo bloquean dos barreras independientes, la CSP de `public/_headers` y una barrera en el código (`src/privacy/`), que funciona aunque el hosting no sirva cabeceras. La sección «Verificación de lado» muestra qué dominios se han bloqueado.
 
 ## Parpadeos y curvas
 
@@ -39,7 +39,7 @@ v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolu
 
 ## Asistente de pruebas
 
-Debajo del vídeo hay un asistente que guía por cada prueba y guarda las medidas en un JSON que se puede descargar y compartir. Ver [`docs/pruebas.md`](docs/pruebas.md).
+Debajo del vídeo hay un asistente que guía por cada prueba y guarda las medidas en un JSON que se puede descargar y compartir. Ver [`docs/pruebas.md`](docs/pruebas.md). Más abajo, una **prueba de rendimiento** compara el análisis en worker y en el hilo principal, con y sin blendshapes ([`docs/rendimiento.md`](docs/rendimiento.md)).
 
 ## Créditos
 

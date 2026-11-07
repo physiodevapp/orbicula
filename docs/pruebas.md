@@ -22,6 +22,8 @@ No hace falta empezar de cero: solo se rehace lo que falló y lo ya guardado se 
 `?escala=0.2` en la dirección acorta las duraciones de los pasos (mínimo 1,5 s), para comprobar el flujo rápido.
 
 ## Privacidad
+`analysis.blockedHosts` lista los dominios a los que la librería de MediaPipe intentó llamar y la barrera de privacidad bloqueó (ver el README).
+
 Solo medidas numéricas y la configuración: ninguna imagen, ningún nombre. Incluye el modelo de navegador (`userAgent`) y datos del dispositivo (núcleos, memoria, pantalla) para interpretar los tiempos. Nada sale del móvil salvo que el usuario comparta el archivo.
 
 ## Estructura
@@ -32,7 +34,7 @@ Solo medidas numéricas y la configuración: ninguna imagen, ningún nombre. Inc
   "build":    { "version": "", "branch": "", "commit": "" },
   "device":   { "userAgent": "", "hardwareConcurrency": 0, "deviceMemory": 0, "language": "", "screen": {} },
   "capture":  { "facing": "rear|front", "priority": "resolution|fps", "requested": {}, "settings": {}, "frame": {}, "strictFps": false, "previewMirrored": false },
-  "analysis": { "mode": "worker|main", "delegate": "GPU|CPU", "imageSize": {}, "blendshapes": true, "swapNames": false },
+  "analysis": { "mode": "worker|main", "delegate": "GPU|CPU", "imageSize": {}, "blendshapes": true, "swapNames": false, "blockedHosts": [] },
   "detector": { /* umbrales del detector de parpadeos usados */ },
   "steps": [{
     "id": "wink-left", "title": "", "instruction": "",

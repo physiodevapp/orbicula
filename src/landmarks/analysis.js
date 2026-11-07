@@ -22,6 +22,7 @@ export class Analysis {
     this.meter = new FpsMeter(1000);
     this.analysisSize = null;
     this.onResult = null;
+    this.inflight = 0; // misma interfaz que WorkerAnalysis: aquí el análisis es síncrono
   }
 
   get ready() {
@@ -41,7 +42,14 @@ export class Analysis {
   }
 
   setBlendshapes(on) {
-    this.landmarker?.setOptions({ outputFaceBlendshapes: on });
+    return this.landmarker?.setOptions({ outputFaceBlendshapes: on });
+  }
+
+  /** Libera el modelo. */
+  dispose() {
+    this.landmarker?.close();
+    this.landmarker = null;
+    this._loading = null;
   }
 
   /** Analiza el frame actual del vídeo y entrega el resultado por `onResult`. */

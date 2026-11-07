@@ -1,4 +1,5 @@
 // Worker del análisis: detecta la cara y calcula ROI y blendshapes fuera del hilo principal.
+import '../privacy/install.js'; // la barrera de red va la primera, antes que MediaPipe
 import { createLandmarker } from './landmarker.js';
 import { processResult } from './process.js';
 

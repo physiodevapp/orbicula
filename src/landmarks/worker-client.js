@@ -1,6 +1,6 @@
 // Cliente del worker de análisis. Interfaz común con Analysis (hilo principal):
 //   load(blendshapes), ready, delegate, mode, ms, fps, submit(video, t), onResult(result),
-//   frameMirrored, swapNames, setBlendshapes(on), analysisSize.
+//   frameMirrored, swapNames, setBlendshapes(on), analysisSize, inflight, dispose().
 import AnalysisWorker from './analysis.worker.js?worker';
 import { assetUrls } from './landmarker.js';
 import { FpsMeter } from '../capture/camera-logic.js';
@@ -28,6 +28,8 @@ export class WorkerAnalysis {
     this.onResult = null;
     this.inflight = 0;
     this.seq = 0;
+    this.blockedHosts = new Set(); // dominios que el worker intentó llamar y la barrera bloqueó
+    this.meta = new Map(); // id → {submitAt, bitmapMs}: para medir lo que cuesta copiar y enviar el frame
     this._loading = null;
   }
 
@@ -54,13 +56,24 @@ export class WorkerAnalysis {
           case 'result': {
             this.inflight = Math.max(0, this.inflight - 1);
             this.ms = this.ms ? this.ms * 0.9 + m.ms * 0.1 : m.ms;
-            this.meter.push(performance.now());
+            const now = performance.now();
+            this.meter.push(now);
+            const meta = this.meta.get(m.id);
+            this.meta.delete(m.id);
+            if (meta) {
+              m.bitmapMs = meta.bitmapMs; // tiempo en el hilo principal hasta tener la copia del frame
+              m.roundTripMs = now - meta.submitAt; // desde que se pide hasta que vuelve el resultado
+            }
             this.onResult?.(m);
             break;
           }
+          case 'blocked':
+            this.blockedHosts.add(m.host);
+            break;
           case 'skipped':
           case 'frameError':
             this.inflight = Math.max(0, this.inflight - 1);
+            this.meta.delete(m.id);
             break;
         }
       };
@@ -69,8 +82,10 @@ export class WorkerAnalysis {
     return this._loading;
   }
 
+  /** Activa o desactiva los blendshapes. El worker lo aplica de forma asíncrona: se espera un poco. */
   setBlendshapes(on) {
     this.worker?.postMessage({ type: 'options', blendshapes: on });
+    return new Promise((resolve) => setTimeout(resolve, 400));
   }
 
   /** Manda una copia del frame actual al worker. Si está ocupado, el frame se descarta. */
@@ -80,17 +95,32 @@ export class WorkerAnalysis {
     const scale = Math.min(1, ANALYSIS_SHORT_SIDE / Math.min(frame.width, frame.height));
     const size = { width: Math.round(frame.width * scale), height: Math.round(frame.height * scale) };
     this.analysisSize = size;
+    const id = ++this.seq;
+    const submitAt = performance.now();
+    this.meta.set(id, { submitAt, bitmapMs: null });
     this.inflight++;
     const options = scale < 1 ? { resizeWidth: size.width, resizeHeight: size.height, resizeQuality: 'low' } : undefined;
     createImageBitmap(video, options)
       .then((bitmap) => {
+        const meta = this.meta.get(id);
+        if (meta) meta.bitmapMs = performance.now() - submitAt;
         this.worker.postMessage(
-          { type: 'frame', id: ++this.seq, bitmap, t, frame, frameMirrored: this.frameMirrored, swapNames: this.swapNames },
+          { type: 'frame', id, bitmap, t, frame, frameMirrored: this.frameMirrored, swapNames: this.swapNames },
           [bitmap],
         );
       })
       .catch(() => {
         this.inflight = Math.max(0, this.inflight - 1);
+        this.meta.delete(id);
       });
+  }
+
+  /** Libera el worker (y con él el modelo). */
+  dispose() {
+    this.worker?.terminate();
+    this.worker = null;
+    this.ready = false;
+    this.meta.clear();
+    this.inflight = 0;
   }
 }

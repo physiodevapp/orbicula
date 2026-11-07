@@ -110,6 +110,38 @@
       </div>
     </section>
 
+    <section class="assistant" id="bench" data-state="idle" aria-label="Prueba de rendimiento" hidden>
+      <div class="assistant-head">
+        <span class="card-title">Prueba de rendimiento</span>
+        <span class="control-label" id="bStatus"></span>
+      </div>
+
+      <div class="as-view" data-view="idle">
+        <p class="hint">Compara el análisis en el worker y en el hilo principal, con y sin blendshapes: 8 pasadas de 12 s (unos 2 minutos y medio), en orden cruzado para que el calentamiento del móvil no falsee la comparación. Mantén la cara quieta y de frente a la cámara todo el rato. Elige antes la cámara y la prioridad.</p>
+        <button class="btn btn-primary" id="bStart" type="button">Empezar</button>
+      </div>
+
+      <div class="as-view" data-view="active">
+        <div class="step-title" id="bTitle"></div>
+        <p class="step-text" id="bText"></p>
+        <div class="coach-bar"><i id="bBar"></i></div>
+        <button class="btn" id="bCancel" type="button">Cancelar</button>
+      </div>
+
+      <div class="as-view" data-view="done">
+        <div class="step-title">Resultados</div>
+        <table class="bench-table" id="bTable"></table>
+        <p class="hint" id="bNote"></p>
+        <div class="control-row wrap">
+          <button class="btn btn-primary" id="bDownload" type="button">Descargar JSON</button>
+          <button class="btn" id="bShare" type="button" hidden>Compartir</button>
+          <button class="btn" id="bCopy" type="button">Copiar resumen</button>
+        </div>
+        <p class="hint" id="bMsg"></p>
+        <button class="btn" id="bAgain" type="button">Repetir</button>
+      </div>
+    </section>
+
     <div class="banner warn" id="qualityBanner" role="status" hidden></div>
 
     <div class="banner warn" id="fpsWarning" hidden>
@@ -193,6 +225,7 @@
           <dt>Modo</dt><dd id="kvDelegate">—</dd>
           <dt>Análisis</dt><dd id="kvTime">—</dd>
           <dt>Imagen de análisis</dt><dd id="kvSize">—</dd>
+          <dt>Llamadas externas bloqueadas</dt><dd id="kvBlocked">ninguna</dd>
           <dt>Cara en el encuadre</dt><dd id="kvFace">—</dd>
           <dt>Distancia intercantal</dt><dd id="kvIcd">—</dd>
           <dt>Ancho del ojo I / D</dt><dd id="kvEye">—</dd>

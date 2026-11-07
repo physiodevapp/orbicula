@@ -1,3 +1,5 @@
+// Barrera de red: lo primero que se evalúa, antes de que cargue MediaPipe.
+import { guard } from './privacy/install.js';
 // Fuentes servidas desde el propio sitio (sin Google Fonts: ninguna llamada de red externa).
 import '@fontsource/outfit/300.css';
 import '@fontsource/outfit/400.css';
@@ -14,6 +16,7 @@ import { Analysis } from './landmarks/analysis.js';
 import { sampleOf } from './landmarks/process.js';
 import { BlinkDetector } from './metrics/blinks.js';
 import { createAssistant } from './ui/assistant.js';
+import { createBenchmark } from './ui/benchmark.js';
 import { Series } from './metrics/series.js';
 import { asymmetry } from './metrics/asymmetry.js';
 import { Overlay } from './ui/overlay.js';
@@ -58,7 +61,6 @@ const camera = new Camera(els.video);
 const overlay = new Overlay(els.overlay, els.stage);
 /** Análisis de la cara: WorkerAnalysis (lo normal) o Analysis en el hilo principal (respaldo). */
 let analysis = null;
-let loadingModel = false;
 const state = { facing: 'rear', priority: 'resolution', deviceId: null, running: false, displayMirrored: false, showRoi: true };
 
 // Medidas: series por lado y un detector de parpadeos por lado (sobre el EAR).
@@ -105,6 +107,8 @@ function captureContext() {
       imageSize: analysis?.analysisSize ?? null,
       blendshapes: els.blendToggle.checked,
       swapNames: els.swapToggle.checked,
+      // Dominios a los que MediaPipe intentó llamar y la barrera de privacidad bloqueó.
+      blockedHosts: [...new Set([...guard.blockedHosts, ...(analysis?.blockedHosts ?? [])])],
     },
     detector: { ...detectors.left.opt },
   };
@@ -114,6 +118,21 @@ const assistant = createAssistant({
   getContext: captureContext,
   getPerf: () => ({ cameraFps: round1(camera.meter.fps), analysisFps: round1(analysis?.fps), analysisMs: round1(analysis?.ms) }),
   onStart: () => resetMeasures(), // el reposo y las series empiezan de cero con cada paso
+});
+
+const bench = createBenchmark({
+  camera,
+  video: els.video,
+  ensureAnalysis: async () => {
+    await loadModel();
+    return analysis;
+  },
+  getBlendshapes: () => els.blendToggle.checked,
+  getContext: captureContext,
+  onStart: () => {
+    overlay.clear();
+    els.quality.hidden = true;
+  },
 });
 
 // Preferencias del clínico (solo comodidad: si el almacenamiento falla, no pasa nada).
@@ -291,6 +310,8 @@ function updateAnalysisUi(r, now) {
   $('kvTime').textContent = `${analysis.ms.toFixed(1)} ms por análisis · ${analysis.fps.toFixed(1)} análisis/s`;
   const sz = analysis.analysisSize;
   $('kvSize').textContent = sz ? `${sz.width} × ${sz.height}` : '—';
+  const blocked = [...new Set([...guard.blockedHosts, ...(analysis.blockedHosts ?? [])])];
+  $('kvBlocked').textContent = blocked.length ? blocked.join(', ') : 'ninguna';
 
   if (!r.face) {
     els.roiPill.hidden = true;
@@ -358,22 +379,24 @@ async function createAnalysis() {
   }
 }
 
-async function loadModel() {
-  if (analysis || loadingModel) return;
-  loadingModel = true;
-  els.anaPill.textContent = 'Cargando modelo…';
-  try {
-    analysis = await createAnalysis();
-    analysis.onResult = onResult;
-    analysis.frameMirrored = false;
-    analysis.swapNames = els.swapToggle.checked;
-    els.anaPill.textContent = 'Modelo listo';
-  } catch (err) {
-    els.anaPill.textContent = 'Sin análisis';
-    showError(`No se pudo cargar el modelo de la cara (${err?.message ?? err}). La cámara sigue funcionando.`);
-  } finally {
-    loadingModel = false;
-  }
+let modelPromise = null;
+/** Carga el modelo una sola vez; quien llame después espera a la misma carga. */
+function loadModel() {
+  modelPromise ??= (async () => {
+    els.anaPill.textContent = 'Cargando modelo…';
+    try {
+      analysis = await createAnalysis();
+      analysis.onResult = onResult;
+      analysis.frameMirrored = false;
+      analysis.swapNames = els.swapToggle.checked;
+      els.anaPill.textContent = 'Modelo listo';
+    } catch (err) {
+      els.anaPill.textContent = 'Sin análisis';
+      showError(`No se pudo cargar el modelo de la cara (${err?.message ?? err}). La cámara sigue funcionando.`);
+      modelPromise = null; // se podrá reintentar
+    }
+  })();
+  return modelPromise;
 }
 
 async function refreshDevices() {
@@ -396,6 +419,7 @@ async function start() {
   els.startBtn.disabled = true;
   lowSince = null;
   assistant.interrupt('la cámara se reinició (cambio de cámara, de prioridad o de pestaña)');
+  bench.interrupt('la cámara se reinició');
   resetMeasures(); // otra cámara u otra resolución: el reposo y las series ya no valen
   try {
     const info = await camera.start(state);
@@ -411,6 +435,7 @@ async function start() {
     els.live.hidden = false;
     els.curvesView.hidden = false;
     assistant.show();
+    bench.show();
     els.controls.hidden = false;
     // La resolución real se conoce cuando llega el primer frame.
     const onMeta = () => renderDetails(info, camera.frameSize);

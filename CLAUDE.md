@@ -69,6 +69,7 @@ Secuencia con instrucciones en pantalla y duración configurable:
 - **Ningún dato del paciente sale del dispositivo**: sin llamadas de red salvo para cargar la propia app.
 - El vídeo no se guarda por defecto. Solo se exportan métricas y series temporales numéricas.
 - Sin analítica ni cookies de terceros.
+- **MediaPipe intenta enviar un registro de uso a `https://odml.pa.googleapis.com/v1/log`.** Lo bloquean la CSP (`connect-src 'self'` en `public/_headers`) y la barrera de `src/privacy/` (que cubre también el worker y los hostings sin cabeceras). No relajar ninguna de las dos ni añadir orígenes externos. El hub, al copiar orbicula a GitHub Pages, depende de la barrera del código.
 
 ## Exportación
 

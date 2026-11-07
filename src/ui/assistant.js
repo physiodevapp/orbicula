@@ -4,6 +4,7 @@
 import { GuidedSession } from '../assistant/session.js';
 import { PHASE3_STEPS } from '../assistant/steps.js';
 import { buildReport, describeSummary } from '../assistant/report.js';
+import { downloadJson, shareJson, copyJson, stamp } from './share.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -100,6 +101,9 @@ export function createAssistant({ getContext, getPerf, onStart }) {
 
   function render(s) {
     root.dataset.state = viewFor(s);
+    const busy = s.state === 'prep' || s.state === 'running' || s.state === 'review';
+    if (busy) document.body.dataset.busy = 'assistant';
+    else if (document.body.dataset.busy === 'assistant') document.body.dataset.busy = '';
     const running = s.state === 'prep' || s.state === 'running';
     el.coach.hidden = !running;
     el.status.textContent = s.state === 'aborted' && s.step
@@ -151,28 +155,18 @@ export function createAssistant({ getContext, getPerf, onStart }) {
     buildReport({ results: session.results, startedAt: session.startedAt, code: el.code.value.trim() || null, includeSeries, ...getContext() });
 
   function fileName() {
-    const d = new Date();
     const code = el.code.value.trim().replace(/[^\w-]/g, '');
-    return `orbicula-pruebas-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${code ? `-${code}` : ''}.json`;
+    return `orbicula-pruebas-${stamp()}${code ? `-${code}` : ''}.json`;
   }
 
   function download() {
-    const blob = new Blob([JSON.stringify(report(true))], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = fileName();
-    document.body.append(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-    el.msg.textContent = `Descargado: ${a.download} (${Math.round(blob.size / 1024)} KB). Está en la carpeta de descargas del móvil.`;
+    const { name, size } = downloadJson(report(true), fileName());
+    el.msg.textContent = `Descargado: ${name} (${Math.round(size / 1024)} KB). Está en la carpeta de descargas del móvil.`;
   }
 
   async function share() {
-    const file = new File([JSON.stringify(report(true))], fileName(), { type: 'application/json' });
     try {
-      if (!navigator.canShare?.({ files: [file] })) throw new Error('no se puede compartir archivos');
-      await navigator.share({ files: [file], title: 'Pruebas de orbicula' });
+      await shareJson(report(true), fileName(), 'Pruebas de orbicula');
       el.msg.textContent = 'Compartido.';
     } catch (err) {
       if (err?.name !== 'AbortError') el.msg.textContent = `No se pudo compartir (${err?.message ?? err}). Usa «Descargar JSON».`;
@@ -181,7 +175,7 @@ export function createAssistant({ getContext, getPerf, onStart }) {
 
   async function copySummary() {
     try {
-      await navigator.clipboard.writeText(JSON.stringify(report(false), null, 1));
+      await copyJson(report(false));
       el.msg.textContent = 'Resumen copiado (sin las series). Pégalo en la conversación.';
     } catch (err) {
       el.msg.textContent = `No se pudo copiar (${err?.message ?? err}). Usa «Descargar JSON».`;
@@ -190,6 +184,7 @@ export function createAssistant({ getContext, getPerf, onStart }) {
 
   // ── Botones ──────────────────────────────────────────────────────────────────
   $('asStart').addEventListener('click', () => {
+    if (document.body.dataset.busy === 'bench') { el.status.textContent = 'Hay una prueba de rendimiento en marcha'; return; }
     audio ??= (() => { try { return new AudioContext(); } catch { return null; } })(); // se crea con un gesto del usuario
     onStart();
     lockScreen();
