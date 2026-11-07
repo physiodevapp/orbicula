@@ -13,6 +13,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - Panel «Verificación de lado (guiño)»: blendshapes de parpadeo y apertura por landmarks, I y D, con opción de invertir los blendshapes.
 - CSP con `'wasm-unsafe-eval'` para el WASM; sin orígenes externos.
 
+### Verificado en el móvil del autor
+- Lateralidad con guiños de cada ojo, con la cámara frontal y con la trasera: la apertura por landmarks y el blendshape de parpadeo suben en el lado correcto (I = izquierda del paciente). La asignación por defecto de los blendshapes es la correcta (no hace falta invertirla).
+- Análisis con la frontal en prioridad «Resolución»: 25–28 análisis/s, 33–37 ms, GPU; ojo de ≈ 250 px de ancho.
+
 ### Cambiado
 - Los fps de la cámara se miden con `presentedFrames`, para que el análisis no los infravalore.
 
