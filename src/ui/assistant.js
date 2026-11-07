@@ -1,41 +1,54 @@
 // Asistente de pruebas: guía paso a paso (GuidedSession), avisa sobre el vídeo con la cuenta
 // atrás y guarda el registro como un JSON que se descarga o se comparte. Todo en el
 // dispositivo: no hay ninguna llamada de red.
-import { GuidedSession } from '../assistant/session.js';
-import { PHASE3_STEPS } from '../assistant/steps.js';
+import { GuidedSession, AUTO_PAUSE_MS, randomPattern } from '../assistant/session.js';
+import { PLANS, DEFAULT_PLAN, spokenPrepMs } from '../assistant/steps.js';
 import { buildReport, describeSummary } from '../assistant/report.js';
 import { downloadJson, shareJson, copyJson, stamp } from './share.js';
 
 const $ = (id) => document.getElementById(id);
 
 /** `?escala=0.2` acorta las duraciones (para comprobar el flujo rápido); por defecto 1. */
-function stepsForRun() {
+function scale() {
   const k = Number(new URLSearchParams(location.search).get('escala'));
-  if (!(k > 0 && k < 1)) return { steps: PHASE3_STEPS, prepMs: undefined };
-  return {
-    steps: PHASE3_STEPS.map((s) => ({ ...s, durationMs: Math.max(1500, Math.round(s.durationMs * k)) })),
-    prepMs: 600,
-  };
+  return k > 0 && k < 1 ? k : 1;
+}
+
+/** Pasos de un plan, acortados con `?escala` y marcados con si necesitan el flujo. */
+function stepsOf(planId) {
+  const plan = PLANS[planId] ?? PLANS[DEFAULT_PLAN];
+  const k = scale();
+  const shorten = (ms, min) => (k < 1 ? Math.max(min, Math.round(ms * k)) : ms);
+  return plan.steps.map((s) => ({
+    ...s,
+    flow: plan.flow,
+    durationMs: shorten(s.durationMs, 1500),
+    ...(s.reps ? { reps: {
+      ...s.reps, everyMs: shorten(s.reps.everyMs, 800), holdMs: shorten(s.reps.holdMs, 300), offsetMs: shorten(s.reps.offsetMs, 300),
+      // Orden al azar de contracciones y controles: se sortea en cada sesión.
+      ...(s.reps.randomize ? { pattern: randomPattern(s.reps.count) } : {}),
+    } } : {}),
+  })).map((s) => (s.reps && k < 1 ? { ...s, durationMs: s.reps.offsetMs + s.reps.count * s.reps.everyMs } : s));
 }
 
 const pad = (n) => String(n).padStart(2, '0');
 const mmss = (ms) => `${Math.floor(ms / 60000)}:${pad(Math.ceil((ms % 60000) / 1000) % 60)}`;
 
 /**
- * @param {{getContext: () => object, getPerf: () => object|null, onStart: () => void}} deps
- *   getContext: build, device, capture, analysis y detector para el informe
- *   onStart: se llama al empezar una sesión (la app reinicia sus medidas)
+ * @param {{getContext: () => object, getPerf: () => object|null, onStart: (plan: object) => Promise<void>|void}} deps
+ *   getContext: build, device, capture, analysis, flujo y detector para el informe
+ *   onStart: se llama al empezar una sesión (la app reinicia sus medidas y, si el plan lo pide, enciende el flujo)
  */
 export function createAssistant({ getContext, getPerf, onStart }) {
   const root = $('assistant');
   const el = {
-    status: $('asStatus'), code: $('asCode'), sound: $('asSound'),
+    status: $('asStatus'), code: $('asCode'), sound: $('asSound'), auto: $('asAuto'), voice: $('asVoice'),
     title: $('asTitle'), text: $('asText'),
     revTitle: $('asRevTitle'), summary: $('asSummary'), expect: $('asExpect'),
     countedRow: $('asCountedRow'), counted: $('asCounted'), notes: $('asNotes'),
     msg: $('asMsg'), share: $('asShare'),
     prev: $('asPrev'), prevReview: $('asPrevReview'), resume: $('asResume'), redoLast: $('asRedoLast'),
-    doneTitle: $('asDoneTitle'), doneText: $('asDoneText'),
+    doneTitle: $('asDoneTitle'), doneText: $('asDoneText'), plan: $('asPlan'),
     coach: $('coach'), coachStep: $('coachStep'), coachTime: $('coachTime'), coachText: $('coachText'), coachBar: $('coachBar'),
   };
 
@@ -56,11 +69,47 @@ export function createAssistant({ getContext, getPerf, onStart }) {
     } catch { /* sin audio */ }
   }
   const buzz = (pattern) => el.sound.checked && navigator.vibrate?.(pattern);
+
+  // ── Voz: el nombre de cada paso, para saber en cuál estás sin mirar la pantalla ───────────────
+  // Solo con voces instaladas en el móvil (localService): una voz «en la nube» mandaría el texto
+  // fuera del dispositivo. El texto es siempre el de la app (nunca datos del paciente).
+  const localVoice = () => {
+    try {
+      const voices = speechSynthesis.getVoices().filter((v) => v.localService);
+      return voices.find((v) => /^es(-|_|$)/i.test(v.lang)) ?? null;
+    } catch {
+      return null;
+    }
+  };
+  try { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = () => {}; } catch { /* sin voz */ }
+  function say(text) {
+    if (!el.voice.checked) return;
+    const voice = localVoice();
+    if (!voice) return;
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.voice = voice;
+      u.lang = voice.lang;
+      u.rate = 1.05;
+      speechSynthesis.speak(u);
+    } catch { /* sin voz */ }
+  }
+
   function onCue(cue) {
-    if (cue === 'prep') { beep(440); buzz(40); }
+    if (cue === 'prep') {
+      beep(440); buzz(40);
+      const s = session.snapshot();
+      if (s.step) say(`Paso ${s.index + 1}: ${s.step.title}. ${s.step.say ?? ''}`);
+    }
     else if (cue === 'go') { beep(880, 200); buzz(150); }
     else if (cue === 'end') { beep(660); beep(660, 130, 0.22); buzz([80, 60, 80]); }
-    else if (cue === 'done') { beep(660); beep(880, 130, 0.18); beep(1100, 200, 0.36); buzz([100, 60, 100, 60, 200]); }
+    else if (cue === 'done') { beep(660); beep(880, 130, 0.18); beep(1100, 200, 0.36); buzz([100, 60, 100, 60, 200]); say('Prueba terminada.'); }
+    // Repeticiones: agudo y largo = «ahora»; grave = «suelta».
+    else if (cue === 'hold') { beep(1175, 260); buzz(120); }
+    else if (cue === 'release') { beep(392, 220); buzz(40); }
+    // Control: dos pitidos cortos medios = «no hagas nada».
+    else if (cue === 'control') { beep(660, 90); beep(660, 90, 0.16); buzz([30, 60, 30]); }
   }
 
   // ── Pantalla encendida mientras dura la sesión ──────────────────────────────
@@ -68,11 +117,13 @@ export function createAssistant({ getContext, getPerf, onStart }) {
   const lockScreen = async () => { try { wake = await navigator.wakeLock?.request('screen'); } catch { wake = null; } };
   const unlockScreen = () => { wake?.release?.().catch(() => {}); wake = null; };
 
-  const { steps, prepMs } = stepsForRun();
   let timer = null;
+  let planId = DEFAULT_PLAN;
+  el.plan.replaceChildren(...Object.values(PLANS).map((p) => Object.assign(document.createElement('option'), { value: p.id, textContent: p.label })));
+  el.plan.value = planId;
 
-  const session = new GuidedSession(steps, {
-    prepMs,
+  const session = new GuidedSession(stepsOf(planId), {
+    prepMs: scale() < 1 ? 600 : undefined,
     getPerf,
     onCue,
     onChange: (s) => render(s),
@@ -92,6 +143,13 @@ export function createAssistant({ getContext, getPerf, onStart }) {
       el.coachText.className = 'coach-text big';
       el.coachText.textContent = String(Math.max(1, Math.ceil(s.remainingMs / 1000)));
       el.coachTime.textContent = 'Prepárate';
+    } else if (s.rep) {
+      // Repeticiones: lo que toca ahora, en grande; el resto de la instrucción, en el paso.
+      el.coachText.className = 'coach-text big';
+      el.coachText.textContent = !s.rep.k ? 'Preparado…'
+        : s.rep.holding ? `${s.rep.control ? 'Nada, quieto' : '¡Ahora!'} (${s.rep.k}/${s.rep.of})`
+        : `Suelta (${s.rep.k}/${s.rep.of})`;
+      el.coachTime.textContent = mmss(s.remainingMs);
     } else {
       el.coachText.className = 'coach-text';
       el.coachText.textContent = s.step.instruction;
@@ -115,8 +173,11 @@ export function createAssistant({ getContext, getPerf, onStart }) {
     if (running) {
       el.title.textContent = s.step.title;
       el.text.textContent = s.step.instruction;
-      el.coachStep.textContent = `${s.index + 1}/${s.total} · ${s.step.title}`;
+      el.coachStep.textContent = `${s.index + 1}/${s.total} · ${s.step.title}${s.step.reps ? ` — ${s.step.instruction}` : ''}`;
       renderTick();
+      timer ??= setInterval(() => { session.tick(); renderTick(); }, 100);
+    } else if (s.autoAdvancing) {
+      // Modo seguido: la revisión dura solo la pausa y se pasa sola al siguiente paso.
       timer ??= setInterval(() => { session.tick(); renderTick(); }, 100);
     } else if (timer) {
       clearInterval(timer);
@@ -132,7 +193,7 @@ export function createAssistant({ getContext, getPerf, onStart }) {
       const exp = !x ? '' : x.closures != null
         ? `Esperado: ${x.closures} cierres en cada ojo.`
         : `Esperado: I ${x.left}, D ${x.right} (parpadeos o cierres).`;
-      el.expect.textContent = [exp, s.step.hint].filter(Boolean).join(' ');
+      el.expect.textContent = [s.autoAdvancing ? 'Modo seguido: el siguiente paso empieza solo.' : '', exp, s.step.hint].filter(Boolean).join(' ');
       el.countedRow.hidden = !s.step.countable;
       el.counted.value = c.user.counted ?? '';
       el.notes.value = c.user.notes ?? '';
@@ -152,7 +213,7 @@ export function createAssistant({ getContext, getPerf, onStart }) {
 
   // ── Informe ──────────────────────────────────────────────────────────────────
   const report = (includeSeries) =>
-    buildReport({ results: session.results, startedAt: session.startedAt, code: el.code.value.trim() || null, includeSeries, ...getContext() });
+    buildReport({ results: session.results, startedAt: session.startedAt, code: el.code.value.trim() || null, plan: planId, includeSeries, ...getContext() });
 
   function fileName() {
     const code = el.code.value.trim().replace(/[^\w-]/g, '');
@@ -183,11 +244,27 @@ export function createAssistant({ getContext, getPerf, onStart }) {
   }
 
   // ── Botones ──────────────────────────────────────────────────────────────────
-  $('asStart').addEventListener('click', () => {
+  $('asStart').addEventListener('click', async () => {
     if (document.body.dataset.busy === 'bench') { el.status.textContent = 'Hay una prueba de rendimiento en marcha'; return; }
     audio ??= (() => { try { return new AudioContext(); } catch { return null; } })(); // se crea con un gesto del usuario
-    onStart();
+    planId = el.plan.value in PLANS ? el.plan.value : DEFAULT_PLAN;
+    session.steps = stepsOf(planId);
+    // Con voz, la cuenta atrás de cada paso dura lo que tarda en leer su explicación (salvo con ?escala).
+    if (el.voice.checked && localVoice() && scale() === 1) {
+      session.steps = session.steps.map((st, i) => ({ ...st, prepMs: spokenPrepMs(`Paso ${i + 1}: ${st.title}. ${st.say ?? ''}`) }));
+    }
+    session.autoAdvanceMs = el.auto.checked ? AUTO_PAUSE_MS : null;
+    say(''); // la voz, como el audio, se activa con un gesto del usuario
     lockScreen();
+    el.status.textContent = PLANS[planId].flow ? 'Preparando el flujo óptico…' : '';
+    try {
+      await onStart(PLANS[planId]);
+    } catch (err) {
+      el.status.textContent = `No se pudo preparar: ${err?.message ?? err}`;
+      unlockScreen();
+      return;
+    }
+    el.status.textContent = '';
     session.start();
   });
   $('asFinish').addEventListener('click', () => session.finishStep());
@@ -208,12 +285,25 @@ export function createAssistant({ getContext, getPerf, onStart }) {
   el.counted.addEventListener('input', () => session.setUser({ counted: el.counted.value === '' ? null : Number(el.counted.value) }));
   el.notes.addEventListener('input', () => session.setUser({ notes: el.notes.value }));
 
+  // Preferencias de comodidad (si el almacenamiento falla, no pasa nada).
+  for (const [box, key] of [[el.auto, 'asAuto'], [el.voice, 'asVoice']]) {
+    try {
+      const v = localStorage.getItem(`orbicula.${key}`);
+      if (v != null) box.checked = v === '1';
+    } catch { /* sin almacenamiento */ }
+    box.addEventListener('change', () => { try { localStorage.setItem(`orbicula.${key}`, box.checked ? '1' : '0'); } catch { /* nada */ } });
+  }
+  // Durante la sesión se puede cambiar el modo seguido (p. ej. para revisar un paso concreto).
+  el.auto.addEventListener('change', () => { session.autoAdvanceMs = el.auto.checked ? AUTO_PAUSE_MS : null; });
+
   render(session.snapshot());
 
   return {
     show: () => { root.hidden = false; },
     /** Una muestra del análisis; solo se guarda mientras se graba un paso. */
     record: (t, sample, events) => session.record(t, sample, events),
+    /** Un par de flujo procesado; solo se guarda mientras se graba un paso. */
+    recordFlow: (sample) => session.recordFlow(sample),
     /** La cámara se reinició, etc.: el paso en curso queda interrumpido. */
     interrupt: (reason) => session.interrupt(reason),
   };

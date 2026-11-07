@@ -21,6 +21,11 @@ import { Series } from './metrics/series.js';
 import { asymmetry } from './metrics/asymmetry.js';
 import { Overlay } from './ui/overlay.js';
 import { Curves } from './ui/curves.js';
+import { FlowClient } from './flow/flow-client.js';
+import { FLOW_CONFIGS, DEFAULT_FLOW, OPENCV_VERSION, FARNEBACK_PARAMS } from './flow/config.js';
+import { FlowProcessor } from './flow/processor.js';
+import { RateGovernor } from './flow/governor.js';
+import { FLOW_ROIS, VARIANTS } from './flow/metrics.js';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -50,6 +55,12 @@ const els = {
   deviceSelect: $('deviceSelect'),
   details: $('captureDetails'),
   build: $('buildInfo'),
+  flowToggle: $('flowToggle'),
+  flowConfig: $('flowConfig'),
+  fieldToggle: $('fieldToggle'),
+  flowSelect: $('flowSelect'),
+  flowRoi: $('flowRoi'),
+  flowComp: $('flowComp'),
 };
 
 els.build.textContent = `v${__APP_VERSION__} · ${__BRANCH__}@${__COMMIT__}`;
@@ -61,13 +72,22 @@ const camera = new Camera(els.video);
 const overlay = new Overlay(els.overlay, els.stage);
 /** Análisis de la cara: WorkerAnalysis (lo normal) o Analysis en el hilo principal (respaldo). */
 let analysis = null;
-const state = { facing: 'rear', priority: 'fps', deviceId: null, running: false, displayMirrored: false, showRoi: true };
+/** Flujo óptico (worker con OpenCV.js): se carga solo al activarlo o en la prueba de rendimiento. */
+let flow = null;
+const state = { facing: 'rear', priority: 'fps', deviceId: null, running: false, displayMirrored: false, showRoi: true, showFlow: false, showField: false };
 
 // Medidas: series por lado y un detector de parpadeos por lado (sobre el EAR).
 const series = new Series({ maxAgeMs: 120000 });
 const detectors = { left: new BlinkDetector(), right: new BlinkDetector() };
 let lastT = 0; // marca de tiempo del último resultado
 let t0 = null; // inicio de las medidas (para el registro de parpadeos)
+
+// Flujo por ROI: velocidad residual (raíz de la energía, DI/s) por ROI y compensación ('upperLid:pose'…).
+const FLOW_SERIES_KEYS = FLOW_ROIS.flatMap((roi) => VARIANTS.map((v) => `${roi}:${v}`));
+// …y el cierre por flujo de cada ojo (DI, + = se cierra).
+const flowSeries = new Series({ maxAgeMs: 120000, keys: [...FLOW_SERIES_KEYS, 'closure'] });
+const flowProcessor = new FlowProcessor(onFlowSample);
+let lastField = null; // última muestra del campo de flujo (para dibujarla)
 
 const curves = new Curves(
   { left: $('curveL'), right: $('curveR') },
@@ -76,6 +96,7 @@ const curves = new Curves(
     left: { events: detectors.left.events, baseline: detectors.left.baseline },
     right: { events: detectors.right.events, baseline: detectors.right.baseline },
   }),
+  { flowSeries },
 );
 
 /** Datos del informe del asistente de pruebas: solo medidas y configuración, sin imágenes. */
@@ -108,16 +129,31 @@ function captureContext() {
       blendshapes: els.blendToggle.checked,
       swapNames: els.swapToggle.checked,
       // Dominios a los que MediaPipe intentó llamar y la barrera de privacidad bloqueó.
-      blockedHosts: [...new Set([...guard.blockedHosts, ...(analysis?.blockedHosts ?? [])])],
+      blockedHosts: [...new Set([...guard.blockedHosts, ...(analysis?.blockedHosts ?? []), ...(flow?.blockedHosts ?? [])])],
     },
+    flow: flow
+      ? { on: state.showFlow, config: flow.config.key, library: 'OpenCV.js', version: OPENCV_VERSION, params: FARNEBACK_PARAMS[flow.config.params], loadMs: round1(flow.loadMs) }
+      : null,
     detector: { ...detectors.left.opt },
   };
 }
 
 const assistant = createAssistant({
   getContext: captureContext,
-  getPerf: () => ({ cameraFps: round1(camera.meter.fps), analysisFps: round1(analysis?.fps), analysisMs: round1(analysis?.ms) }),
-  onStart: () => resetMeasures(), // el reposo y las series empiezan de cero con cada paso
+  getPerf: () => ({
+    cameraFps: round1(camera.meter.fps), analysisFps: round1(analysis?.fps), analysisMs: round1(analysis?.ms),
+    flowFps: state.showFlow ? round1(flow?.fps) : null, flowMs: state.showFlow ? round1(flow?.ms) : null,
+    flowRateCap: state.showFlow ? (flow?.rateCap ?? 0) : null, // pares/s de la rebaja automática (0 = sin rebaja)
+  }),
+  // El reposo y las series empiezan de cero; el plan de la fase 4 enciende el flujo (y espera a OpenCV.js).
+  onStart: async (plan) => {
+    resetMeasures();
+    if (plan.flow && !state.showFlow) {
+      els.flowToggle.checked = true;
+      await setFlow(true);
+      if (!state.showFlow) throw new Error('no se pudo cargar el flujo óptico');
+    }
+  },
 });
 
 const bench = createBenchmark({
@@ -127,6 +163,7 @@ const bench = createBenchmark({
     await loadModel();
     return analysis;
   },
+  ensureFlow: () => loadFlow(),
   getBlendshapes: () => els.blendToggle.checked,
   getContext: captureContext,
   onStart: () => {
@@ -230,6 +267,8 @@ const METRIC_HINTS = {
   ear: 'EAR: apertura vertical media del ojo / ancho del ojo. Ronda 0,25–0,35 con el ojo abierto y baja al cerrar. Es la señal que usa el detector (la línea discontinua es el reposo estimado).',
   aperture: 'Apertura palpebral central normalizada a la distancia entre las comisuras internas de los dos ojos.',
   blink: 'Blendshape de parpadeo de MediaPipe (0 abierto, 1 cerrado). Es una señal más lenta y de menor rango que el EAR; sirve de apoyo.',
+  closure: 'Cierre del ojo medido con el flujo: cuánto ha bajado el párpado superior menos lo que ha subido el inferior, en distancias intercantales (DI), compensado con el dorso nasal. Sube al entrecerrar y vuelve a 0 en unos segundos (para que no derive). Es la señal que detecta contracciones más finas que el EAR.',
+  flow: 'Flujo óptico de la ROI elegida: velocidad del movimiento que queda tras restar el de la cabeza, en distancias intercantales por segundo (DI/s). Escala logarítmica, con líneas en 0,01, 0,17 y 3 DI/s. Por defecto, compensado con el dorso nasal (en los vídeos de prueba, la postura añadía el temblor de la malla).',
 };
 els.metricHint.textContent = METRIC_HINTS.ear;
 
@@ -247,8 +286,12 @@ function updateCurveStats(now) {
     const b = detectors[side].baseline;
     r.base.textContent = b == null ? '—' : b.toFixed(2);
   }
-  const key = curves.metric;
-  const a = asymmetry(series.mean('left', key, lastT, 10000) ?? NaN, series.mean('right', key, lastT, 10000) ?? NaN);
+  // Con la curva del flujo, la asimetría es la de la ROI y la compensación elegidas.
+  const flowCurve = curves.metric === 'flow' || curves.metric === 'closure';
+  const src = flowCurve ? flowSeries : series;
+  const key = curves.metric === 'flow' ? curves.flowKey : curves.metric;
+  const tEnd = flowCurve ? (flowSeries.t.at(-1) ?? lastT) : lastT;
+  const a = asymmetry(src.mean('left', key, tEnd, 10000) ?? NaN, src.mean('right', key, tEnd, 10000) ?? NaN);
   els.asymVal.textContent = a == null ? '—' : `${a > 0 ? '+' : ''}${a.toFixed(2)}`;
 }
 
@@ -270,6 +313,8 @@ function logBlink(side, e) {
 
 function resetMeasures() {
   series.clear();
+  flowSeries.clear();
+  flowProcessor.reset();
   for (const side of SIDES) detectors[side].reset();
   t0 = null;
   els.blinkLog.replaceChildren(Object.assign(document.createElement('li'), { className: 'log-empty', textContent: 'Aún no hay ninguno.' }));
@@ -310,7 +355,7 @@ function updateAnalysisUi(r, now) {
   $('kvTime').textContent = `${analysis.ms.toFixed(1)} ms por análisis · ${analysis.fps.toFixed(1)} análisis/s`;
   const sz = analysis.analysisSize;
   $('kvSize').textContent = sz ? `${sz.width} × ${sz.height}` : '—';
-  const blocked = [...new Set([...guard.blockedHosts, ...(analysis.blockedHosts ?? [])])];
+  const blocked = [...new Set([...guard.blockedHosts, ...(analysis.blockedHosts ?? []), ...(flow?.blockedHosts ?? [])])];
   $('kvBlocked').textContent = blocked.length ? blocked.join(', ') : 'ninguna';
 
   if (!r.face) {
@@ -353,8 +398,12 @@ function onResult(r) {
   }
   assistant.record(r.t, sample, newEvents);
 
+  flow?.setFace(r);
+  flowProcessor.pushFace(r.t, r);
   if (r.face && state.showRoi) overlay.draw(r, { displayMirrored: state.displayMirrored });
   else overlay.clear();
+  if (r.face && state.showFlow && flow?.strip) overlay.drawStrip(flow.strip, r.frame, { displayMirrored: state.displayMirrored });
+  if (r.face && state.showFlow && state.showField && lastField) overlay.drawField(lastField, r.frame, { displayMirrored: state.displayMirrored });
   updateQuality(r, now);
   updateAnalysisUi(r, now);
   updateCurveStats(now);
@@ -376,6 +425,87 @@ async function createAnalysis() {
     const main = new Analysis();
     await main.load(blendshapes);
     return main;
+  }
+}
+
+// ── Ritmo del flujo: se rebaja solo si el análisis de la cara no llega a 24/s ─────────────
+const governor = new RateGovernor();
+setInterval(() => {
+  // La prueba de rendimiento mide configuraciones fijas: ahí no se toca.
+  if (!flow || !state.showFlow || !analysis || document.body.dataset.busy === 'bench') return;
+  const cap = governor.update(performance.now(), analysis.fps);
+  if (cap !== flow.rateCap) {
+    flow.setRateCap(cap);
+    console.info(`orbicula: flujo ${cap ? `rebajado a ${cap} pares/s (análisis de la cara a ${analysis.fps.toFixed(1)}/s)` : 'de vuelta a su ritmo normal'}`);
+  }
+}, 500);
+
+// ── Flujo óptico (paso 4a: solo rendimiento) ──────────────────────────────────
+let flowPromise = null;
+let lastFlowUi = 0;
+/** Carga el worker de flujo y OpenCV.js una sola vez. */
+function loadFlow() {
+  flowPromise ??= (async () => {
+    const f = new FlowClient();
+    f.setConfig(els.flowConfig.value);
+    try {
+      await f.load();
+    } catch (err) {
+      f.dispose();
+      flowPromise = null;
+      throw err;
+    }
+    f.onResult = onFlowResult;
+    flow = f;
+    return f;
+  })();
+  return flowPromise;
+}
+
+/** Un par de flujo procesado (con sus tres compensaciones): series, asistente y curvas. */
+function onFlowSample(s) {
+  const side = (x) => Object.fromEntries(FLOW_SERIES_KEYS.map((k) => {
+    const [roi, v] = k.split(':');
+    const e = x?.[roi]?.[v]?.energy;
+    return [k, Number.isFinite(e) ? Math.sqrt(e) : NaN];
+  }));
+  flowSeries.push(s.t, {
+    left: { ...side(s.left), closure: s.closure?.left ?? NaN },
+    right: { ...side(s.right), closure: s.closure?.right ?? NaN },
+  });
+  assistant.recordFlow(s);
+  if (curves.metric === 'flow' || curves.metric === 'closure') curves.requestDraw();
+}
+
+function onFlowResult(m) {
+  if (m.paired && m.moments) flowProcessor.pushFlow({ t: m.t, dt: m.dt, moments: m.moments, strip: m.strip, scale: m.scale });
+  if (m.field) lastField = { field: m.field, strip: m.strip, scale: m.scale };
+  const now = performance.now();
+  if (now - lastFlowUi < 250) return;
+  lastFlowUi = now;
+  const f = flow;
+  $('kvFlow').textContent = `${f.ms.toFixed(1)} ms · ${f.fps.toFixed(1)} pares/s${f.rateCap ? ` (rebajado a ${f.rateCap})` : ''} · worker ${m.totalMs.toFixed(1)} ms (copia ${m.readMs.toFixed(1)})`;
+  $('kvStrip').textContent = f.strip ? `${f.strip.w} × ${f.strip.h} → ${m.size.width} × ${m.size.height}` : '—';
+  $('kvFlowLoad').textContent = f.loadMs != null ? `${(f.loadMs / 1000).toFixed(1)} s` : '—';
+}
+
+async function setFlow(on) {
+  state.showFlow = on;
+  if (!on) {
+    $('kvFlow').textContent = 'apagado';
+    lastField = null;
+    return;
+  }
+  $('kvFlow').textContent = 'cargando OpenCV.js…';
+  try {
+    await loadFlow();
+    flow.wantField = state.showField;
+    $('kvFlowLoad').textContent = `${(flow.loadMs / 1000).toFixed(1)} s`;
+    if (state.showFlow) $('kvFlow').textContent = 'esperando a la cara…';
+  } catch (err) {
+    state.showFlow = false;
+    els.flowToggle.checked = false;
+    $('kvFlow').textContent = `no se pudo cargar (${err?.message ?? err})`;
   }
 }
 
@@ -421,6 +551,7 @@ async function start() {
   assistant.interrupt('la cámara se reinició (cambio de cámara, de prioridad o de pestaña)');
   bench.interrupt('la cámara se reinició');
   resetMeasures(); // otra cámara u otra resolución: el reposo y las series ya no valen
+  flow?.resetStrip();
   try {
     const info = await camera.start(state);
     state.running = true;
@@ -455,7 +586,11 @@ async function start() {
 camera.onFrame = updateStats;
 // La marca de tiempo del frame es la de captura de la cámara (si el navegador la da), no la
 // de cuando acaba el análisis: así las duraciones de los parpadeos no dependen de la latencia.
-camera.onVideoFrame = (now, meta) => analysis?.submit(els.video, meta?.captureTime ?? now);
+camera.onVideoFrame = (now, meta) => {
+  const t = meta?.captureTime ?? now;
+  analysis?.submit(els.video, t);
+  if (state.showFlow) flow?.submit(els.video, t);
+};
 
 els.roiToggle.checked = pref.get('showRoi') !== '0';
 state.showRoi = els.roiToggle.checked;
@@ -473,10 +608,52 @@ els.swapToggle.addEventListener('change', () => {
 
 els.blendToggle.addEventListener('change', () => analysis?.setBlendshapes(els.blendToggle.checked));
 
+els.flowConfig.replaceChildren(
+  ...Object.values(FLOW_CONFIGS)
+    .filter((c) => c.method !== 'none')
+    .map((c) => Object.assign(document.createElement('option'), { value: c.key, textContent: c.label })),
+);
+els.flowConfig.value = FLOW_CONFIGS[pref.get('flowConfig')] && pref.get('flowConfig') !== 'none' ? pref.get('flowConfig') : DEFAULT_FLOW;
+els.flowConfig.addEventListener('change', () => {
+  pref.set('flowConfig', els.flowConfig.value);
+  flow?.setConfig(els.flowConfig.value);
+});
+els.flowToggle.addEventListener('change', () => setFlow(els.flowToggle.checked));
+
+els.fieldToggle.checked = pref.get('showField') === '1';
+state.showField = els.fieldToggle.checked;
+els.fieldToggle.addEventListener('change', () => {
+  state.showField = els.fieldToggle.checked;
+  pref.set('showField', state.showField ? '1' : '0');
+  if (flow) flow.wantField = state.showField;
+  if (state.showField && !state.showFlow) {
+    els.flowToggle.checked = true;
+    setFlow(true);
+  }
+});
+
+// Curva del flujo: qué ROI y con qué compensación.
+const setFlowKey = () => {
+  curves.flowKey = `${els.flowRoi.value}:${els.flowComp.value}`;
+  pref.set('flowRoi', els.flowRoi.value);
+  pref.set('flowComp', els.flowComp.value);
+  curves.requestDraw();
+};
+if (FLOW_ROIS.includes(pref.get('flowRoi'))) els.flowRoi.value = pref.get('flowRoi');
+if (VARIANTS.includes(pref.get('flowComp'))) els.flowComp.value = pref.get('flowComp');
+setFlowKey();
+els.flowRoi.addEventListener('change', setFlowKey);
+els.flowComp.addEventListener('change', setFlowKey);
+
 document.querySelectorAll('[data-metric]').forEach((b) =>
   b.addEventListener('click', () => {
     curves.setMetric(b.dataset.metric);
     setPressed('metric', b.dataset.metric);
+    els.flowSelect.hidden = b.dataset.metric !== 'flow';
+    if ((b.dataset.metric === 'flow' || b.dataset.metric === 'closure') && !state.showFlow) {
+      els.flowToggle.checked = true;
+      setFlow(true); // la curva del flujo necesita el flujo encendido
+    }
     els.metricHint.textContent = METRIC_HINTS[b.dataset.metric];
     lastStatsUi = 0;
   }),
@@ -523,3 +700,9 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) camera.stop();
   else start();
 });
+
+// `?debug`: expone las series para las pruebas de punta a punta (scripts/dev/, docs/desarrollo.md).
+// Solo lectura en la propia página; no envía nada.
+if (new URLSearchParams(location.search).has('debug')) {
+  window.__orbicula = { series, flowSeries, get flow() { return flow; }, get analysis() { return analysis; } };
+}

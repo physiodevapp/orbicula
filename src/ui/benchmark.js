@@ -1,15 +1,14 @@
-// Prueba de rendimiento: ejecuta sola las pasadas (worker / hilo principal × con / sin
-// blendshapes), registra cada análisis y exporta un JSON. Ver src/assistant/benchmark.js.
-import { WorkerAnalysis } from '../landmarks/worker-client.js';
-import { Analysis } from '../landmarks/analysis.js';
-import { buildPlan, summarizeRun, buildBenchmarkReport, groupSummary } from '../assistant/benchmark.js';
+// Prueba de rendimiento del flujo óptico: ejecuta sola las pasadas (una por configuración del
+// flujo, más una sin flujo), con el análisis de la cara a la vez, registra cada resultado y exporta
+// un JSON. Ver src/assistant/benchmark.js.
+import { buildPlan, summarizeRun, buildBenchmarkReport, groupSummary, flowRaw } from '../assistant/benchmark.js';
+import { FLOW_CONFIGS, OPENCV_VERSION, FARNEBACK, FARNEBACK_LITE, LUCAS_KANADE } from '../flow/config.js';
 import { downloadJson, shareJson, copyJson, stamp } from './share.js';
 import { createCues } from './cues.js';
 
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const r1 = (v) => (Number.isFinite(v) ? Math.round(v * 10) / 10 : null);
-const MODE_LABEL = { worker: 'Worker', main: 'Hilo principal' };
 
 /** `?escala=0.25` acorta las pasadas (para comprobar el flujo rápido); por defecto 12 s con 3 s de calentamiento. */
 function params() {
@@ -22,9 +21,10 @@ function params() {
 
 /**
  * @param {{camera: object, video: HTMLVideoElement, ensureAnalysis: () => Promise<object|null>,
- *          getBlendshapes: () => boolean, getContext: () => object, onStart: () => void}} deps
+ *          ensureFlow: () => Promise<object>, getBlendshapes: () => boolean, getContext: () => object,
+ *          onStart: () => void, onEnd: () => void}} deps
  */
-export function createBenchmark({ camera, video, ensureAnalysis, getBlendshapes, getContext, onStart }) {
+export function createBenchmark({ camera, video, ensureAnalysis, ensureFlow, getBlendshapes, getContext, onStart, onEnd }) {
   const root = $('bench');
   const el = {
     status: $('bStatus'), title: $('bTitle'), text: $('bText'), bar: $('bBar'), table: $('bTable'), note: $('bNote'), msg: $('bMsg'),
@@ -37,6 +37,7 @@ export function createBenchmark({ camera, video, ensureAnalysis, getBlendshapes,
   let warmupMs = 3000;
   let leadMs = 10000;
   let cancelled = null; // motivo, si se cancela
+  let flowInfo = null; // datos del flujo para el informe (versión, parámetros, carga)
   const cues = createCues(() => $('bSound').checked);
   let wake = null;
 
@@ -54,14 +55,19 @@ export function createBenchmark({ camera, video, ensureAnalysis, getBlendshapes,
     el.coachBar.style.width = `${Math.round(frac * 100)}%`;
   }
 
-  /** Una pasada: recoge cada resultado, los repintados y las tareas largas del hilo principal. */
-  async function runOne(plan, inst, label) {
+  /** Una pasada: recoge cada resultado (cara y flujo), los repintados y las tareas largas del hilo principal. */
+  async function runOne(plan, inst, flow, label) {
     const raw = { tRel: [], inferMs: [], latencyMs: [], bitmapMs: [], roundTripMs: [], faces: [], camT: [], camPresented: [], rafMs: [], longTasks: [] };
+    const withFlow = plan.method !== 'none';
+    if (withFlow) raw.flow = flowRaw();
     const t0 = performance.now();
     let lastFaceAt = t0;
     let lastWarnAt = 0;
+    let countsAtWarmup = null;
+    flow.resetCounts();
     inst.onResult = (r) => {
       const now = performance.now();
+      flow.setFace(r); // la franja sigue a la cara también en la pasada sin flujo
       if (r.face) lastFaceAt = now;
       raw.tRel.push(now - t0);
       raw.inferMs.push(r.ms);
@@ -70,10 +76,30 @@ export function createBenchmark({ camera, video, ensureAnalysis, getBlendshapes,
       raw.roundTripMs.push(r.roundTripMs ?? null);
       raw.faces.push(!!r.face);
     };
+    flow.onResult = (m) => {
+      if (!withFlow) return;
+      const now = performance.now();
+      const f = raw.flow;
+      f.t.push(now - t0);
+      f.paired.push(m.paired);
+      f.flowMs.push(m.flowMs);
+      f.readMs.push(m.readMs);
+      f.prepMs.push(m.prepMs);
+      f.totalMs.push(m.totalMs);
+      f.cropMs.push(m.cropMs ?? null);
+      f.latencyMs.push(now - m.t);
+      f.roundTripMs.push(m.roundTripMs ?? null);
+      f.dt.push(m.dt);
+      const src = m.sourceNote ? `${m.source}: ${m.sourceNote}` : m.source;
+      f.sources[src] = (f.sources[src] ?? 0) + 1;
+      f.size = m.size;
+    };
     camera.onVideoFrame = (now, meta) => {
       raw.camT.push(performance.now() - t0);
       raw.camPresented.push(meta?.presentedFrames ?? null);
-      inst.submit(video, meta?.captureTime ?? now);
+      const t = meta?.captureTime ?? now;
+      inst.submit(video, t);
+      if (withFlow) flow.submit(video, t);
     };
 
     let running = true;
@@ -96,6 +122,7 @@ export function createBenchmark({ camera, video, ensureAnalysis, getBlendshapes,
     while (performance.now() - t0 < runMs && !cancelled) {
       const done = performance.now() - t0;
       const warm = done < warmupMs;
+      if (!warm && !countsAtWarmup) countsAtWarmup = { ...flow.counts };
       const faceLost = performance.now() - lastFaceAt > 2000;
       // Sin mirar la pantalla, un tono grave cada 3 s avisa de que la cara no se ve.
       if (faceLost && performance.now() - lastWarnAt > 3000) {
@@ -115,8 +142,15 @@ export function createBenchmark({ camera, video, ensureAnalysis, getBlendshapes,
     camera.onVideoFrame = null;
     inst.onResult = null;
     const durationMs = performance.now() - t0;
-    // Se espera a que vuelvan los frames que quedaban en el worker, para que no ensucien la siguiente pasada.
-    for (let i = 0; i < 10 && inst.inflight > 0; i++) await sleep(100);
+    if (withFlow) {
+      const end = flow.counts;
+      const start = countsAtWarmup ?? {};
+      raw.flow.counts = Object.fromEntries(Object.keys(end).map((k) => [k, end[k] - (start[k] ?? 0)]));
+      raw.flow.strip = flow.strip ? { ...flow.strip } : null;
+    }
+    // Se espera a que vuelvan los frames que quedaban en los workers, para que no ensucien la siguiente pasada.
+    for (let i = 0; i < 10 && (inst.inflight > 0 || flow.inflight > 0); i++) await sleep(100);
+    flow.onResult = null;
     return { raw, durationMs };
   }
 
@@ -141,14 +175,20 @@ export function createBenchmark({ camera, video, ensureAnalysis, getBlendshapes,
     const prevHandler = camera.onVideoFrame;
     let base = null;
     let baseOnResult = null;
-    let other = null;
+    let flow = null;
+    let flowOnResult = null;
+    let flowConfig = null;
     try {
       base = await ensureAnalysis();
       if (!base) throw new Error('el modelo de la cara no está cargado');
       baseOnResult = base.onResult;
-      other = base.mode === 'worker' ? new Analysis() : new WorkerAnalysis();
-      await other.load(true);
-      const inst = { [base.mode]: base, [other.mode]: other };
+      showProgress('Cargando OpenCV.js (13 MB la primera vez)…', 'Preparando', 0, null);
+      flow = await ensureFlow();
+      flowOnResult = flow.onResult;
+      flowConfig = flow.config.key;
+      flowInfo = { library: 'OpenCV.js', version: OPENCV_VERSION, loadMs: r1(flow.loadMs), farneback: FARNEBACK, farnebackLite: FARNEBACK_LITE, lucasKanade: LUCAS_KANADE, videoFrame: typeof VideoFrame === 'function' };
+      // Punto de trabajo de la fase 3: análisis de la cara con blendshapes.
+      await base.setBlendshapes(true);
 
       // Cuenta atrás para colocar el móvil: no cuenta en la medida.
       const leadStart = performance.now();
@@ -168,17 +208,22 @@ export function createBenchmark({ camera, video, ensureAnalysis, getBlendshapes,
       const tStart = performance.now();
       for (const p of plan) {
         if (cancelled) break;
-        const label = `${MODE_LABEL[p.mode]} · ${p.blendshapes ? 'con' : 'sin'} blendshapes`;
+        const label = FLOW_CONFIGS[p.flow].label;
         showProgress('Cambiando de configuración…', `Pasada ${p.index} de ${p.total} · ${label}`, (p.index - 1) / p.total, null);
-        await inst[p.mode].setBlendshapes(p.blendshapes);
+        if (p.method !== 'none') flow.setConfig(p.flow);
+        await sleep(300);
         const runStart = performance.now();
-        const { raw, durationMs } = await runOne(p, inst[p.mode], label);
+        const { raw, durationMs } = await runOne(p, base, flow, label);
         if (cancelled) break;
+        const paired = raw.flow ? raw.flow.t.map((t, i) => i).filter((i) => raw.flow.paired[i]) : [];
         runs.push({
-          index: p.index, round: p.round, mode: p.mode, blendshapes: p.blendshapes, status: 'completed',
+          index: p.index, round: p.round, flow: p.flow, status: 'completed',
           startedAtMs: Math.round(runStart - tStart), durationMs: Math.round(durationMs),
           summary: summarizeRun(raw, { warmupMs }),
-          series: { tRel: raw.tRel.map(Math.round), inferMs: raw.inferMs.map(r1) },
+          series: {
+            tRel: raw.tRel.map(Math.round), inferMs: raw.inferMs.map(r1),
+            ...(raw.flow ? { flowT: paired.map((i) => Math.round(raw.flow.t[i])), flowMs: paired.map((i) => r1(raw.flow.flowMs[i])), workerMs: paired.map((i) => r1(raw.flow.totalMs[i])) } : {}),
+          },
         });
       }
       if (cancelled && !runs.length) throw new Error(cancelled);
@@ -196,7 +241,11 @@ export function createBenchmark({ camera, video, ensureAnalysis, getBlendshapes,
         base.onResult = baseOnResult;
         try { await base.setBlendshapes(getBlendshapes()); } catch { /* ya está liberado */ }
       }
-      other?.dispose();
+      if (flow) {
+        flow.onResult = flowOnResult;
+        flow.setConfig(flowConfig);
+      }
+      onEnd?.();
       wake?.release?.().catch(() => {});
       wake = null;
       el.coach.hidden = true;
@@ -204,39 +253,48 @@ export function createBenchmark({ camera, video, ensureAnalysis, getBlendshapes,
     }
   }
 
+  /** Si el plano Y no se pudo leer (el móvil da los frames en la GPU), se dice qué se usó en su lugar. */
+  function sourcesNote(rows) {
+    const used = new Set(rows.filter((x) => x.source === 'videoframe').flatMap((x) => Object.keys(x.sources)));
+    if (!used.size) return '';
+    return [...used].every((k) => k.startsWith('y-plane')) ? 'Plano Y leído directamente del frame. ' : `Origen de la imagen en las pasadas «Y»: ${[...used].join(', ')}. `;
+  }
+
   function finish(partial) {
     setState('done');
     const g = groupSummary(runs);
     const rows = g.groups.filter((x) => x.runs);
+    const f1 = (v) => (v == null ? '—' : v.toFixed(1));
     el.table.replaceChildren(
-      Object.assign(document.createElement('caption'), { textContent: partial ? 'Resultados parciales (media de las pasadas hechas)' : 'Resultados (media de 2 pasadas por combinación)' }),
-      ...[['Modo', 'Blend.', 'ms', 'análisis/s', 'cámara', 'tirones']].map((cells) => {
+      Object.assign(document.createElement('caption'), { textContent: partial ? 'Resultados parciales (media de las pasadas hechas)' : 'Resultados (media de 2 pasadas por configuración)' }),
+      ...[['Flujo', 'pares/s', 'ms flujo', 'ms copia', 'ms total', 'análisis/s', 'cámara']].map((cells) => {
         const tr = document.createElement('tr');
         for (const c of cells) tr.append(Object.assign(document.createElement('th'), { textContent: c }));
         return tr;
       }),
       ...rows.map((x) => {
         const tr = document.createElement('tr');
-        const cells = [x.mode === 'worker' ? 'Worker' : 'Princ.', x.blendshapes ? 'sí' : 'no', x.inferMsMean?.toFixed(1), x.analysisFps?.toFixed(1), x.cameraFps?.toFixed(1), x.over50ms?.toFixed(0)];
-        for (const c of cells) tr.append(Object.assign(document.createElement('td'), { textContent: c ?? '—' }));
+        const name = FLOW_CONFIGS[x.flow].short;
+        const cells = [name, f1(x.flowFps), f1(x.flowMsMean), f1(x.readMsMean), f1(x.totalMsMean), f1(x.analysisFps), f1(x.cameraFps)];
+        for (const c of cells) tr.append(Object.assign(document.createElement('td'), { textContent: c }));
         return tr;
       }),
     );
     const faces = runs.map((r) => r.summary.faceFraction).filter((v) => v != null);
     const minFace = faces.length ? Math.min(...faces) : null;
-    const e = g.effects;
-    const sign = (v) => (v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)} ms`);
+    const loss = Object.entries(g.analysisFpsLoss).filter(([, v]) => v != null);
     el.note.textContent =
-      'ms = lo que tarda cada análisis; cámara = fps; tirones = repintados de pantalla de más de 50 ms (menos es más fluido). ' +
-      `Worker frente a hilo principal: ${sign(e.workerMinusMain_withBlendshapes)} con blendshapes y ${sign(e.workerMinusMain_withoutBlendshapes)} sin ellos. ` +
-      `Blendshapes encendidos frente a apagados: ${sign(e.blendshapesOnMinusOff_worker)} en worker y ${sign(e.blendshapesOnMinusOff_main)} en hilo principal. ` +
+      'pares/s = veces por segundo que se calcula el flujo entre dos frames; ms flujo = lo que tarda el algoritmo; ms copia = sacar la franja en grises del frame; ms total = todo el trabajo del worker por frame; análisis/s = análisis de la cara (MediaPipe) a la vez; cámara = fps. «Y» = solo el plano de brillo del frame; «ligero» = Farnebäck con menos niveles e iteraciones. ' +
+      sourcesNote(rows) +
+      (rows[0]?.size || rows[1]?.size ? `Franja de trabajo: ${(rows.find((x) => x.size) ?? {}).size.width}×${(rows.find((x) => x.size) ?? {}).size.height} px. ` : '') +
+      (loss.length ? `El flujo resta al análisis de la cara: ${loss.map(([k, v]) => `${FLOW_CONFIGS[k].label} ${v > 0 ? '−' : '+'}${Math.abs(v).toFixed(1)}/s`).join('; ')}. ` : '') +
       (minFace != null && minFace < 0.9 ? `Ojo: en alguna pasada la cara solo se detectó en el ${Math.round(minFace * 100)} % de los análisis.` : 'Cara detectada durante casi toda la prueba.');
     el.share.hidden = !navigator.canShare;
   }
 
   const report = (includeSeries) => {
     const ctx = getContext();
-    return buildBenchmarkReport({ runs, startedAt, runMs, warmupMs, includeSeries, build: ctx.build, device: ctx.device, capture: ctx.capture, analysis: ctx.analysis });
+    return buildBenchmarkReport({ runs, startedAt, runMs, warmupMs, includeSeries, build: ctx.build, device: ctx.device, capture: ctx.capture, analysis: ctx.analysis, flow: flowInfo });
   };
   const fileName = () => `orbicula-rendimiento-${stamp()}.json`;
 

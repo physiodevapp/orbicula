@@ -6,12 +6,70 @@
 //          → siguiente paso … → done.   Se puede interrumpir, saltar o repetir un paso.
 
 export const PREP_MS = 3000;
+/** Modo seguido: pausa entre el final de un paso (dos pitidos) y la cuenta atrás del siguiente. */
+export const AUTO_PAUSE_MS = 2000;
 
 const r3 = (v) => (Number.isFinite(v) ? Math.round(v * 1000) / 1000 : null);
 
 /** Señales que se guardan por lado en cada paso. */
-export const SERIES_KEYS = ['ear', 'aperture', 'blink', 'lookDown', 'lookUp'];
+export const SERIES_KEYS = ['ear', 'aperture', 'blink', 'lookDown', 'lookUp', 'irisH', 'irisV'];
 const emptySide = () => Object.fromEntries(SERIES_KEYS.map((k) => [k, []]));
+
+/**
+ * Flujo óptico por ROI que se guarda en cada paso (fase 4). Por ROI y lado:
+ *   eN, eR, eP, eH: energía residual sin compensar, con la referencia, con la postura y con «dorso nasal
+ *   + giro» ((DI/s)²); dR, tR, dP, tP, dH, tH: componente hacia abajo y hacia la sien (DI/s) con cada una.
+ * `head`: movimiento de la cabeza que se resta (DI/s), con la referencia (rU, rV) y con la postura (pU, pV).
+ */
+export const FLOW_ROIS = ['upperLid', 'lowerLid', 'brow', 'canthus'];
+export const FLOW_KEYS = {
+  eN: ['none', 'energy'], eR: ['reference', 'energy'], eP: ['pose', 'energy'], eH: ['hybrid', 'energy'],
+  dR: ['reference', 'down'], tR: ['reference', 'temple'], dP: ['pose', 'down'], tP: ['pose', 'temple'], dH: ['hybrid', 'down'], tH: ['hybrid', 'temple'],
+};
+const emptyFlow = () => ({
+  rel: [],
+  dt: [],
+  left: Object.fromEntries(FLOW_ROIS.map((r) => [r, Object.fromEntries(Object.keys(FLOW_KEYS).map((k) => [k, []]))])),
+  right: Object.fromEntries(FLOW_ROIS.map((r) => [r, Object.fromEntries(Object.keys(FLOW_KEYS).map((k) => [k, []]))])),
+  head: { rU: [], rV: [], pU: [], pV: [] },
+  closure: { left: [], right: [] }, // cierre por flujo (DI, + = se cierra; ver processor.js)
+});
+/** 4 cifras significativas (las energías van de 1e-4 a 10). */
+// 4 cifras significativas; por debajo de 1e-6 (DI/s o su cuadrado) es ruido numérico: 0.
+const sig = (v) => (Number.isFinite(v) ? (Math.abs(v) < 1e-6 ? 0 : Number(v.toPrecision(4))) : null);
+
+/**
+ * Calendario de repeticiones de un paso: cada una empieza en offsetMs + k·everyMs (pitido «ahora»)
+ * y se suelta holdMs después (pitido «suelta»). Con `pattern`, cada repetición tiene su condición:
+ * 'act' (hacer el gesto) o 'control' (pitido distinto: no hacer nada), para medir falsos positivos.
+ * @returns {{k:number, kind:'hold'|'release', at:number, cond:'act'|'control'}[]} en orden de tiempo
+ */
+export function repSchedule(reps) {
+  if (!reps) return [];
+  const out = [];
+  for (let k = 0; k < reps.count; k++) {
+    const at = reps.offsetMs + k * reps.everyMs;
+    const cond = reps.pattern?.[k] ?? 'act';
+    out.push({ k, kind: 'hold', at, cond }, { k, kind: 'release', at: at + reps.holdMs, cond });
+  }
+  return out;
+}
+
+/**
+ * Orden al azar de `n` repeticiones con la mitad de controles, sin más de 3 iguales seguidas (para
+ * que no se puedan adivinar). `rand` se inyecta en los tests.
+ */
+export function randomPattern(n, rand = Math.random) {
+  for (let tries = 0; tries < 200; tries++) {
+    const p = [...Array(Math.ceil(n / 2)).fill('act'), ...Array(Math.floor(n / 2)).fill('control')];
+    for (let i = p.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [p[i], p[j]] = [p[j], p[i]];
+    }
+    if (!p.some((x, i) => i >= 3 && p[i - 1] === x && p[i - 2] === x && p[i - 3] === x)) return p;
+  }
+  return Array.from({ length: n }, (_, i) => (i % 2 ? 'control' : 'act'));
+}
 
 const newResult = (step, attempt) => ({
   id: step.id,
@@ -30,6 +88,10 @@ const newResult = (step, attempt) => ({
   rel: [], // ms desde t0
   series: { left: emptySide(), right: emptySide() },
   events: { left: [], right: [] },
+  flow: emptyFlow(),
+  marks: [], // repeticiones: { rep, kind: 'hold'|'release', t } (t en ms desde t0, el reloj de las series)
+  reps: step.reps ?? null,
+  wantsFlow: !!step.flow, // el plan necesita el flujo óptico (para avisar si no llega)
 });
 
 export class GuidedSession {
@@ -45,6 +107,9 @@ export class GuidedSession {
     this.getPerf = getPerf;
     this.onChange = onChange;
     this.onCue = onCue;
+    // Modo seguido: sin revisión; al terminar un paso se pasa solo al siguiente tras esta pausa
+    // (null = desactivado). Pensado para hacerse la prueba uno mismo con la cámara trasera.
+    this.autoAdvanceMs = null;
     this.reset();
   }
 
@@ -70,13 +135,21 @@ export class GuidedSession {
     let remainingMs = 0;
     let progress = 0;
     if (this.state === 'prep') {
-      remainingMs = Math.max(0, this.prepMs - elapsed);
-      progress = 1 - remainingMs / this.prepMs;
+      const prep = this.#prepOf(step);
+      remainingMs = Math.max(0, prep - elapsed);
+      progress = 1 - remainingMs / prep;
     } else if (this.state === 'running') {
       remainingMs = Math.max(0, step.durationMs - elapsed);
       progress = 1 - remainingMs / step.durationMs;
     }
-    return { state: this.state, index: this.index, total: this.steps.length, completed: this.results.length, step, remainingMs, progress, current: this.cur };
+    // Repetición en curso (pasos con repeticiones): para el aviso sobre el vídeo.
+    let rep = null;
+    if (this.state === 'running' && step?.reps) {
+      const due = repSchedule(step.reps).filter((e) => e.at <= elapsed);
+      const last = due.at(-1);
+      rep = { of: step.reps.count, k: last ? last.k + 1 : 0, holding: last?.kind === 'hold', control: last?.cond === 'control' };
+    }
+    return { state: this.state, index: this.index, total: this.steps.length, completed: this.results.length, step, remainingMs, progress, current: this.cur, rep, autoAdvancing: this.autoAdvancing };
   }
 
   #emit() {
@@ -103,10 +176,24 @@ export class GuidedSession {
     this.#enter(0);
   }
 
+  /** Cuenta atrás de un paso: la suya (p. ej. más larga si la voz lee la explicación) o la general. */
+  #prepOf(step) {
+    return step?.prepMs ?? this.prepMs;
+  }
+
+  /** ¿Pasará solo al siguiente paso? (para que la interfaz siga llamando a tick en la revisión) */
+  get autoAdvancing() {
+    return this.state === 'review' && this.autoAdvanceMs != null && this.cur?.status === 'completed';
+  }
+
   /** Avanza las fases por tiempo; la interfaz lo llama unas 10 veces por segundo. */
   tick() {
     const t = this.now();
-    if (this.state === 'prep' && t - this.phaseStart >= this.prepMs) {
+    if (this.autoAdvancing && t - this.phaseStart >= this.autoAdvanceMs) {
+      this.next();
+      return;
+    }
+    if (this.state === 'prep' && t - this.phaseStart >= this.#prepOf(this.step)) {
       this.state = 'running';
       this.phaseStart = t;
       this.cur.startedAt = new Date().toISOString();
@@ -114,6 +201,16 @@ export class GuidedSession {
       this.#emit();
     } else if (this.state === 'running' && t - this.phaseStart >= this.step.durationMs) {
       this.finishStep();
+    } else if (this.state === 'running' && this.step.reps) {
+      // Pitidos de cada repetición, y su marca de tiempo en el reloj de las series.
+      const elapsed = t - this.phaseStart;
+      const c = this.cur;
+      const step = this.step;
+      for (const e of repSchedule(this.step.reps).slice(c.marks.length)) {
+        if (e.at > elapsed) break;
+        c.marks.push({ rep: e.k + 1, kind: e.kind, t: Math.round(t - (c.t0 ?? t)), ...(step.reps.pattern ? { cond: e.cond } : {}) });
+        this.onCue(e.kind === 'hold' && e.cond === 'control' ? 'control' : e.kind);
+      }
     }
   }
 
@@ -143,6 +240,29 @@ export class GuidedSession {
     }
   }
 
+  /**
+   * Registra un par de flujo óptico ya procesado (FlowProcessor), solo mientras se graba el paso.
+   * @param {{t:number, dt:number, left:object, right:object, head:object}} s
+   */
+  recordFlow(s) {
+    if (this.state !== 'running' || !s) return;
+    const c = this.cur;
+    c.t0 ??= s.t;
+    const f = c.flow;
+    f.rel.push(Math.round(s.t - c.t0));
+    f.dt.push(Math.round(s.dt));
+    for (const side of ['left', 'right']) {
+      for (const roi of FLOW_ROIS) {
+        for (const [k, [variant, field]] of Object.entries(FLOW_KEYS)) f[side][roi][k].push(sig(s[side]?.[roi]?.[variant]?.[field]));
+      }
+    }
+    f.head.rU.push(sig(s.head?.reference?.u));
+    f.head.rV.push(sig(s.head?.reference?.v));
+    f.head.pU.push(sig(s.head?.pose?.u));
+    f.head.pV.push(sig(s.head?.pose?.v));
+    for (const side of ['left', 'right']) f.closure[side].push(sig(s.closure?.[side]));
+  }
+
   /** Termina el paso en curso (por tiempo o antes de tiempo) y pasa a la revisión. */
   finishStep() {
     if (this.state !== 'running') return;
@@ -150,6 +270,7 @@ export class GuidedSession {
     this.cur.durationMs = Math.round(this.now() - this.phaseStart);
     this.cur.perf = this.getPerf();
     this.state = 'review';
+    this.phaseStart = this.now(); // para la pausa del modo seguido
     this.onCue('end');
     this.#emit();
   }

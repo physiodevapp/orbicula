@@ -90,4 +90,43 @@ export class Overlay {
     ctx.setLineDash([]);
     ctx.globalAlpha = 1;
   }
+
+  /** Franja periocular que se recorta para el flujo óptico (rectángulo en píxeles del frame completo). */
+  drawStrip(strip, frame, { displayMirrored }) {
+    const { ctx } = this;
+    const rect = contentRect(this.w, this.h, frame.width, frame.height);
+    const a = toDisplay({ x: strip.x, y: strip.y }, rect, displayMirrored);
+    const b = toDisplay({ x: strip.x + strip.w, y: strip.y + strip.h }, rect, displayMirrored);
+    ctx.strokeStyle = this.colors.reference;
+    ctx.globalAlpha = 0.8;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([2, 3]);
+    ctx.strokeRect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y));
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+  }
+
+  /**
+   * Campo de flujo: una flecha cada 10 px de trabajo, ampliada `gain` veces (los movimientos finos
+   * son de 1–2 px). Coordenadas de trabajo de la franja → frame completo → pantalla.
+   */
+  drawField({ field, strip, scale }, frame, { displayMirrored, gain = 6 }) {
+    const { ctx } = this;
+    const rect = contentRect(this.w, this.h, frame.width, frame.height);
+    ctx.strokeStyle = this.colors.reference;
+    ctx.globalAlpha = 0.9;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for (let i = 0; i < field.length; i += 4) {
+      const x = strip.x + field[i] / scale;
+      const y = strip.y + field[i + 1] / scale;
+      const a = toDisplay({ x, y }, rect, displayMirrored);
+      const b = toDisplay({ x: x + (field[i + 2] / scale) * gain, y: y + (field[i + 3] / scale) * gain }, rect, displayMirrored);
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.rect(a.x - 0.5, a.y - 0.5, 1, 1);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
 }

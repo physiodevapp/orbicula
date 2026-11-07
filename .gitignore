@@ -4,3 +4,4 @@ dist
 *.local
 .wrangler
 public/mediapipe
+public/opencv

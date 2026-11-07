@@ -4,6 +4,65 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (fase 4b: medida del flujo por ROI)
+- **Flujo por ROI y por lado del paciente** (párpado superior e inferior, ceja y canto externo). El worker devuelve, por ROI, 14 sumas de su campo de flujo («momentos», `src/flow/metrics.js`); con ellas el hilo principal calcula el flujo medio y la energía residual frente a cualquier movimiento afín de la cabeza, sin volver a recorrer los píxeles.
+- **Tres compensaciones de la cabeza a la vez** (`src/flow/processor.js`): ninguna, **dorso nasal** (restar su traslación) y **postura** (movimiento afín de puntos estables de la cara —dorso nasal, extremos del óvalo y frente—, interpolados entre los análisis que rodean a cada frame; cada par espera hasta 300 ms al análisis siguiente).
+- Métricas normalizadas: velocidad en **distancias intercantales por segundo (DI/s)**, independiente de la distancia y de los fps; energía en su cuadrado; componentes con signo **hacia abajo** y **hacia la sien**, con los ejes sacados de la propia cara (valen igual con espejo; con test).
+- **Posición del iris** (landmarks 468 y 473, asignados al ojo más cercano) normalizada a las comisuras, en las series del asistente, para estudiar los falsos cierres al mirar hacia abajo.
+- Curva **«Flujo»** (escala logarítmica, DI/s) con selector de ROI y de compensación; casilla **«Campo de flujo»** que dibuja el flujo sobre el vídeo (ampliado ×6).
+- **Asistente de la fase 4** (plan por defecto; el de la fase 3 sigue disponible): reposo, contracción mínima («Entrecierra los ojos lo mínimo, como si sonrieras con los ojos») ×5, contracción algo mayor ×3, cabeceo, giro, cejas ×3, guiños de cada ojo ×3 y parpadeo espontáneo. Las repeticiones van con **pitidos** (agudo = ahora, grave = suelta) y el aviso «¡Ahora!/Suelta» sobre el vídeo; sus marcas de tiempo se guardan. Enciende el flujo solo.
+- JSON del asistente **`orbicula-test-session/2`**: plan, iris, series del flujo por ROI (energía con las tres compensaciones y componentes con referencia y postura), movimiento de la cabeza restado, marcas de las repeticiones y resumen del flujo por paso (p50, p95 y p99 de la energía).
+- Vídeos sintéticos con la respuesta conocida (`scripts/dev/make-face-videos.py`): **cabeceo** de 6 px sin contracción y **párpado** que baja 1,5 px. Scripts `scripts/dev/check-flow.cjs` y `scripts/dev/run-assistant.cjs`; `?debug` expone las series para ellos.
+- En los vídeos sintéticos (Chromium): el párpado de 1,5 px se ve en su lado y no en el otro, y el EAR no cambia; el cabeceo se anula con el dorso nasal (de 0,04–0,13 a 0,006–0,017 DI/s). La postura compensa peor y añade 0,01–0,03 DI/s de temblor de la malla con la cara quieta (en Chromium MediaPipe solo analiza ~9/s; se decidirá con los datos del móvil en el 4c).
+- 22 tests nuevos.
+
+- **Modo seguido** en el asistente (casilla): sin pantalla de revisión entre pasos; al terminar uno (dos pitidos) el siguiente empieza solo 2 s después. Pensado para hacerse la prueba uno mismo con la cámara trasera sin tocar el móvil. Un paso interrumpido sí se detiene en la revisión.
+- **Voz** (casilla, activada por defecto): dice «Paso N: nombre» al empezar cada cuenta atrás y «Prueba terminada» al final. Solo con voces instaladas en el móvil (`localService`), para que ningún texto salga del dispositivo; si no hay ninguna en español, no se oye nada.
+
+- **La voz explica cada paso** durante la cuenta atrás: en los pasos con repeticiones, que hay que esperar al pitido agudo y mantener el gesto hasta el grave; en el cabeceo y el giro, que se hace sin parar desde el pitido de inicio. Con voz, la cuenta atrás dura lo que tarda en leerse la explicación.
+- `scripts/dev/analyze-flow.mjs`: análisis del JSON del asistente de la fase 4 (criterios 3 y 4, alineado con el gesto real).
+- Primer análisis (4c) en `docs/plan-fase-4.md`: criterio 1 cumple; criterio 4 cumple en párpados y canto con el dorso nasal, no en la ceja; criterio 3 sin concluir (la contracción «mínima» también la veía el EAR). Compensación por defecto: dorso nasal.
+
+- `analyze-flow.mjs`: detección calibrada frente al reposo (percentil de cada repetición entre ventanas de reposo sin parpadeos) para el EAR y la apertura por flujo integrada. Segundo análisis en `docs/plan-fase-4.md`: con contracciones más pequeñas, el flujo integrado detecta 3 de 5 que el EAR no ve.
+
+- **Cierre por flujo** (curva «Cierre F» y serie `flow.closure` del JSON): desplazamiento acumulado del párpado superior hacia abajo menos el del inferior, compensado con el dorso nasal, en DI (+ = se cierra), con un integrador con fuga de 5 s para que no derive. Es la medida que detectó contracciones que el EAR no distinguía del reposo.
+- **Prueba «contracción mínima con controles»** (nuevo plan del asistente, unos 3 min): reposo, 2 × 10 repeticiones en orden al azar (mitad contracciones mínimas con el pitido agudo, mitad controles con **dos pitidos cortos: no hacer nada**) y reposo final. Las marcas guardan la condición de cada repetición. `analyze-flow.mjs` da, para el EAR y el flujo, aciertos, falsas alarmas y AUC (criterio 3).
+
+- Prueba con controles en el móvil: el cierre por flujo detectó 6/7 contracciones mínimas en cada ojo frente a 2/7 y 4/7 del EAR, con las mismas falsas alarmas (1/8). Criterio 3 cumplido de forma provisional (`docs/plan-fase-4.md`).
+
+- **Compensación «dorso nasal + giro»** (cuarta variante, `hybrid`, serie `eH`/`dH`/`tH`): la traslación del dorso nasal más, para cada ROI, la diferencia de movimiento que produce el giro 3D de la cabeza entre esa ROI y el dorso nasal. El giro se estima por mínimos cuadrados con los puntos estables en 3D (la z del modelo); cada ROI tiene su punto 3D. Pensada para el canto externo y la ceja, que fallaban al girar la cabeza. En un giro sintético deja en el canto menos de 1/20 del error del dorso nasal solo; con la cabeza solo trasladándose añade algo de ruido (la z de los landmarks también tiembla).
+- **Ajuste automático del ritmo del flujo** (`src/flow/governor.js`): si el análisis de la cara pasa 3 s por debajo de 24/s, el flujo baja a 20 pares/s; vuelve a su ritmo cuando el análisis pasa de 27/s durante 10 s. Se ve en «Verificación de lado» y queda en el JSON (`perf.flowRateCap`). No actúa durante la prueba de rendimiento.
+
+- Análisis de la prueba completa con buena luz: la compensación «dorso nasal + giro» no mejora con datos reales (se quita de la curva); el criterio 4 se cumple con el cierre por flujo (lo que generará los eventos) en la prueba con un reposo válido; la referencia de reposo ahora excluye los tramos con la cabeza en movimiento.
+
+- **Fase 4 cerrada** (`docs/plan-fase-4.md`): en dos pruebas con controles, el cierre por flujo detectó 12/13 contracciones mínimas en cada ojo frente a 6/13 y 10/13 del EAR, con las mismas falsas alarmas, y con mucho más margen de separación (×8 frente a ×1–3 en la prueba con la cabeza apoyada).
+
+### Corregido (fase 4b)
+- `analyze-flow.mjs`: en la detección calibrada solo se apartan los parpadeos de verdad (cierre ≥ 50 %); antes apartaba también los eventos poco profundos que provoca la propia contracción mínima.
+- La asimetría de las curvas fallaba al elegir una métrica que no está en la serie de la cara.
+
+### Añadido (fase 4a bis: aligerar el flujo)
+- El worker de flujo puede leer **solo el plano de brillo (Y)** de la franja directamente del frame de la cámara (`VideoFrame`), sin pasar por RGBA. Si el móvil entrega el frame en un formato que no se puede leer así, recorta con `createImageBitmap` dentro del worker y lo anota en el JSON (`sources`).
+- **Farnebäck ligero** (2 niveles, ventana 9, 2 iteraciones) y **límite de pares por segundo** (30), para dejar procesador al análisis de la cara.
+- La prueba de rendimiento compara ahora: sin flujo, Farnebäck 320 px como en la 4a, con plano Y, ligero con plano Y, y ligero con plano Y a 30/s. Añade la columna «ms copia».
+- Resultados del 4a en el móvil del autor en `docs/plan-fase-4.md`: 4K descartado para el flujo en directo; punto de trabajo trasera «fps» con Farnebäck a 320 px; a 60 fps el flujo bajaba el análisis de la cara de 28 a 22 por segundo.
+
+- **Punto de trabajo del flujo** (tras la prueba en el móvil): trasera «fps», Farnebäck a 320 px leyendo el plano Y, con un máximo de 30 pares por segundo (`farneback-320-vf-30`, por defecto). El plano Y bajó la copia de 15 a 1,2 ms; el Farnebäck ligero apenas ahorraba y se descarta.
+
+### Corregido (fase 4a bis)
+- El límite de pares por segundo dejaba pasar solo 20 con la cámara a 40 fps (saltaba un frame de cada dos): ahora reparte el ritmo por crédito y da 30.
+- Con la cara en el borde del frame, la franja del flujo se recolocaba en cada análisis (y el flujo casi no se medía): ahora solo cuenta la parte de las ROI que cae dentro del frame.
+- El origen de la franja va en coordenadas pares (necesario para leer frames YUV).
+
+### Añadido (fase 4a: rendimiento del flujo óptico)
+- **Worker de flujo óptico** (`src/flow/flow.worker.js`) con **OpenCV.js 5.0.0-release.1** (`@techstark/opencv-js`), separado del de MediaPipe para que trabajen en paralelo, con la barrera de privacidad importada lo primero. OpenCV.js (13 MB, WASM embebido) se sirve desde `opencv/<versión>/` con caché `immutable` y se carga solo al activar el flujo o al empezar la prueba de rendimiento.
+- **Parche de OpenCV.js sin `eval`** (`scripts/opencv-patch.mjs`, aplicado al copiarlo): su capa embind genera funciones con `new Function`, que la CSP bloquea; se sustituyen por cierres equivalentes. Comprobado que da los mismos resultados que el original. La CSP no cambia (sin `'unsafe-eval'`).
+- **Franja periocular** (`src/flow/strip.js`): rectángulo con los dos ojos, cejas, cantos y dorso nasal, con margen, recortado del frame **completo** con `createImageBitmap` en cada frame de la cámara (no solo en los que analiza MediaPipe), reducido al tamaño de trabajo y con la marca de tiempo de captura. Solo se recoloca cuando la cara se sale de ella o se aleja; el par de ese cambio no se mide.
+- Farnebäck (flujo denso) y Lucas-Kanade piramidal sobre una rejilla, con el brillo de cada recorte normalizado (media y desviación). DIS no está disponible en OpenCV.js 5.0.0 (solo exporta sus constantes).
+- **Prueba de rendimiento del flujo** (`orbicula-benchmark/2`): 10 pasadas (Farnebäck a 320 px, 640 px y sin reducir, Lucas-Kanade a 640 px, y sin flujo), con el análisis de la cara a la vez; mide ms de flujo, pares por segundo, copia, latencia y cuánto frena al análisis de la cara.
+- Casilla «Calcular flujo óptico (en pruebas)» en «Verificación de lado», con selector de configuración, ms y pares por segundo, y la franja dibujada sobre el vídeo.
+- 21 tests nuevos (franja, tamaño de trabajo, resumen del flujo, parche y prueba de rendimiento).
+
 ### Añadido (fase 3: EAR y parpadeos)
 - El análisis de la cara corre en un Web Worker (`src/landmarks/analysis.worker.js`): el hilo principal queda libre para las curvas. Los frames se mandan como `ImageBitmap` reducido (lado corto ≤ 720 px, que no empeora los landmarks), con dos frames en vuelo para que el worker no espere, y las ROI se calculan sobre el frame completo. Si el worker no arranca se usa el hilo principal; `?analysis=main` lo fuerza para comparar tiempos.
 - EAR de 6 puntos por lado (posiciones 3 y 5 de las cadenas de los párpados) y apertura palpebral central normalizada a la distancia intercantal; sustituyen a la «apertura rápida» de la fase 2.

@@ -19,7 +19,8 @@
     "@fontsource/dm-mono": "5.3.0",
     "@fontsource/dm-serif-display": "5.3.0",
     "@fontsource/outfit": "5.3.0",
-    "@mediapipe/tasks-vision": "1.1.0"
+    "@mediapipe/tasks-vision": "1.1.0",
+    "@techstark/opencv-js": "5.0.0-release.1"
   },
   "devDependencies": {
     "vite": "8.3.4",

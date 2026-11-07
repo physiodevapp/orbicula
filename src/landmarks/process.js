@@ -30,6 +30,9 @@ export function sampleOf(result) {
     // Mirada arriba/abajo del modelo: para estudiar los falsos cierres al mirar hacia abajo.
     lookDown: result.blend[s].eyeLookDown ?? NaN,
     lookUp: result.blend[s].eyeLookUp ?? NaN,
+    // Posición del iris en el ojo (ver geometry.js): para estudiar la mirada sin blendshapes.
+    irisH: result.rois[s].iris?.h ?? NaN,
+    irisV: result.rois[s].iris?.v ?? NaN,
   });
   return { left: side('left'), right: side('right') };
 }
