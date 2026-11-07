@@ -19,6 +19,14 @@ v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolu
 - **Distancia:** unos 30–50 cm entre el objetivo y la cara. Más cerca, la cara se sale del encuadre al moverse; más lejos, la región periocular tiene pocos píxeles.
 - **Iluminación:** luz frontal, difusa y uniforme (por ejemplo, frente a una ventana sin sol directo). Evita contraluces, sombras sobre un solo lado de la cara y fluorescentes que parpadeen.
 - **fps:** la app muestra los fps reales. Por debajo de 24 fps lo avisa: prueba la prioridad «fps» (menos resolución, más fotogramas).
+- **fps medidos** (Chrome para Android, móvil del autor, buena luz; prioridad «fps» sin exigir mínimo):
+
+  | Cámara | Prioridad «Resolución» | Prioridad «fps» |
+  |---|---|---|
+  | Trasera | 29.9 fps · 2160×4032 | 30.0 fps · 720×1280 |
+  | Frontal | 29.9 fps · 2160×3440 | 30.0 fps · 720×1280 (24 fps con poca luz) |
+
+  Ambas anuncian 60 fps en sus ajustes pero entregan 30: los fps se miden siempre frame a frame. Con poca luz la cámara alarga la exposición y baja los fps.
 - **Privacidad:** la imagen se procesa en el propio móvil. No se envía nada a ningún servidor y el vídeo no se guarda.
 
 ## Desarrollo
