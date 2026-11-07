@@ -8,6 +8,10 @@
 import '../privacy/install.js'; // la barrera de red va la primera, antes que OpenCV.js
 import { LUCAS_KANADE } from './config.js';
 import { denseStats, sparseStats, gridPoints, normalizeCoeffs } from './stats.js';
+import { rasterize, moments, MOMENTS } from './metrics.js';
+
+/** Separación (px de trabajo) de la muestra del campo de flujo que se manda para dibujarlo. */
+const FIELD_STEP = 10;
 
 /** Formatos de VideoFrame cuyo primer plano es el brillo (Y) a resolución completa. */
 const YUV_FORMATS = new Set(['I420', 'I420A', 'I422', 'I422A', 'I444', 'I444A', 'NV12']);
@@ -24,6 +28,7 @@ let prevKey = null; // franja + configuración del frame anterior: solo se compa
 let prevT = null;
 let grid = null; // Lucas-Kanade: puntos de la rejilla { p0: cv.Mat, pts: Float32Array }
 let queue = Promise.resolve(); // los frames se procesan en orden (la copia del VideoFrame es asíncrona)
+let masks = null; // { key, idx: Int32Array[] } píxeles de cada ROI (orden de ROI_KEYS)
 
 /** Carga OpenCV.js: importScripts en un worker clásico (la build); import() en uno de módulo (dev). */
 async function loadOpenCv(url) {
@@ -70,6 +75,25 @@ function ensureFull(width, height) {
   full?.mat.delete();
   full = { mat: new cv.Mat(height, width, cv.CV_8UC1), width, height };
   return full.mat;
+}
+
+/** Píxeles de cada ROI; se recalculan solo si cambian los polígonos o el tamaño. */
+function roiMasks(polys, polyId, width, height) {
+  const key = `${polyId}|${width}x${height}`;
+  if (masks?.key !== key) masks = { key, idx: polys.map((p) => rasterize(p, width, height)) };
+  return masks.idx;
+}
+
+/** Muestra del campo de flujo cada FIELD_STEP px (para dibujarlo): [x, y, u, v, …]. */
+function sampleField(flow, width, height) {
+  const out = [];
+  for (let y = FIELD_STEP / 2; y < height; y += FIELD_STEP) {
+    for (let x = FIELD_STEP / 2; x < width; x += FIELD_STEP) {
+      const p = 2 * (Math.floor(y) * width + Math.floor(x));
+      out.push(x, y, flow[p], flow[p + 1]);
+    }
+  }
+  return Float32Array.from(out);
 }
 
 function lkGrid(width, height) {
@@ -168,11 +192,21 @@ async function processFrame(m) {
   // 3. Flujo, solo si el frame anterior tiene el mismo recorte y la misma configuración.
   const key = `${m.stripId}|${m.method}|${JSON.stringify(m.params)}|${width}x${height}`;
   let stats = null;
+  let roiMoments = null;
+  let field = null;
   if (prevKey === key && m.method !== 'none') {
     if (m.method === 'farneback') {
       const F = m.params;
       cv.calcOpticalFlowFarneback(mats.prev, mats.cur, mats.flow, F.pyrScale, F.levels, F.winsize, F.iterations, F.polyN, F.polySigma, 0);
-      stats = denseStats(mats.flow.data32F);
+      const flow = mats.flow.data32F;
+      stats = denseStats(flow);
+      // Momentos por ROI (ver metrics.js): el hilo principal calcula con ellos las métricas y las compensaciones.
+      if (m.polys) {
+        const idx = roiMasks(m.polys, m.polyId, width, height);
+        roiMoments = new Float64Array(idx.length * MOMENTS);
+        idx.forEach((ix, k) => roiMoments.set(moments(flow, width, ix), k * MOMENTS));
+      }
+      if (m.wantField) field = sampleField(flow, width, height);
     } else if (m.method === 'lk') {
       const L = LUCAS_KANADE;
       const g = lkGrid(width, height);
@@ -199,6 +233,8 @@ async function processFrame(m) {
     totalMs: t3 - t0,
     size: { width, height },
     stats,
+    moments: roiMoments,
+    field,
   };
 }
 
@@ -233,7 +269,8 @@ self.onmessage = async ({ data: m }) => {
     queue = queue.then(async () => {
       try {
         const out = await processFrame(m);
-        self.postMessage({ type: 'result', id: m.id, t: m.t, stripId: m.stripId, method: m.method, ...out });
+        const transfer = [out.moments?.buffer, out.field?.buffer].filter(Boolean);
+        self.postMessage({ type: 'result', id: m.id, t: m.t, stripId: m.stripId, method: m.method, ...out }, transfer);
       } catch (err) {
         prevKey = null;
         self.postMessage({ type: 'frameError', id: m.id, message: String(err?.message ?? err) });

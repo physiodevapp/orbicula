@@ -94,6 +94,12 @@ La cámara dio ~40 fps en esta sesión (60 en la anterior; probablemente menos l
 - El flujo sigue restando ~4 análisis de la cara por segundo (28 → 24); con el límite, ~2,5.
 - **Punto de trabajo elegido: trasera «fps», Farnebäck 320 px, plano Y, 30 pares/s** (`farneback-320-vf-30`, la configuración por defecto). Se comprobará de paso con los datos de rendimiento del asistente del 4b.
 
+## Paso 4b (hecho, pendiente de la prueba en el móvil)
+- Implementado según la arquitectura de arriba (puntos 4–6) y el asistente propuesto, con guiños de cada ojo añadidos (problema del ojo que no guiña) y pitidos en cada repetición. Ver `CHANGELOG.md`.
+- Decisión de diseño: el worker devuelve 14 sumas por ROI en vez del campo; así la compensación por postura puede esperar al análisis siguiente y las tres variantes se calculan exactas a partir de las mismas sumas.
+- Vídeos sintéticos en Chromium (`scripts/dev/check-flow.cjs`): párpado de 1,5 px visto en su lado (máx. ~0,03 DI/s frente a 0 en reposo) sin cambio del EAR; cabeceo de 6 px: sin compensar 0,04–0,13 DI/s, dorso nasal 0,006–0,017, postura 0,014–0,107. **La postura añade el temblor de la malla** (0,01–0,03 DI/s con la cara quieta), comparable al movimiento fino del párpado. En el móvil MediaPipe va a ~28/s (no 9) y puede salir mejor: decidir en el 4c.
+- Para el 4c: con el JSON del asistente, comparar por paso y compensación el p95/p99 de la energía frente al reposo (criterios 3 y 4), las marcas de las repeticiones frente a la energía, el EAR frente a su ruido y, en los guiños, el flujo del ojo que no guiña.
+
 ## Pruebas
 - **Vídeos sintéticos con la respuesta conocida** (ampliar `scripts/dev/make-face-videos.py`): mover solo el párpado 1–2 px (el flujo lo tiene que ver) y, por separado, toda la cara simulando un cabeceo (la compensación lo tiene que anular).
 - **Tests unitarios:** energía, máscaras de ROI en coordenadas de la franja, recolocación de la franja, signos con espejo y el ajuste del movimiento rígido.

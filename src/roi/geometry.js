@@ -7,7 +7,7 @@
 // derivada, anclada a la comisura externa. Las proporciones de abajo son provisionales y se
 // ajustan al ver las ROI en el móvil.
 
-import { EYES, NASAL_DORSUM, FACE_WIDTH, EAR_PAIR_POSITIONS, CENTER_PAIR_POSITION } from './indices.js';
+import { EYES, NASAL_DORSUM, FACE_WIDTH, EAR_PAIR_POSITIONS, CENTER_PAIR_POSITION, IRIS_CENTERS, POSE_POINTS } from './indices.js';
 import { SIDES, patientSide } from './laterality.js';
 
 /** Proporciones respecto al ancho del ojo (distancia entre comisuras). */
@@ -64,6 +64,25 @@ const roi = (polygon) => ({ polygon, box: bbox(polygon) });
 /** Región = contorno + el mismo contorno desplazado `pad` en la dirección `n`. */
 const lidRoi = (chain, n, pad) => roi(hull([...chain, ...chain.map((p) => add(p, n, pad))]));
 
+/**
+ * Posición del iris dentro del ojo, normalizada al ancho del ojo:
+ *   h: a lo largo del eje de las comisuras, 0 = comisura interna, 1 = externa (≈ 0,5 mirando al frente);
+ *   v: perpendicular, positivo hacia abajo (mirada hacia abajo).
+ * El centro del iris se toma de entre los dos que da el modelo, el más cercano a este ojo.
+ */
+function irisPosition(lm, f, inner, outer, down) {
+  if (lm.length <= Math.max(...IRIS_CENTERS)) return null;
+  const mid = { x: (inner.x + outer.x) / 2, y: (inner.y + outer.y) / 2 };
+  const [c] = IRIS_CENTERS.map((i) => pt(lm, i, f)).sort((a, b) => dist(a, mid) - dist(b, mid));
+  const axis = sub(outer, inner);
+  const w2 = axis.x * axis.x + axis.y * axis.y || 1;
+  const rel = sub(c, inner);
+  return {
+    h: (rel.x * axis.x + rel.y * axis.y) / w2,
+    v: ((c.x - mid.x) * down.x + (c.y - mid.y) * down.y) / Math.sqrt(w2),
+  };
+}
+
 function eyeRois(lm, f, eye, intercanthal) {
   const outer = pt(lm, eye.outer, f);
   const inner = pt(lm, eye.inner, f);
@@ -98,6 +117,13 @@ function eyeRois(lm, f, eye, intercanthal) {
     ear,
     /** Apertura palpebral central / distancia intercantal (comisuras internas de los dos ojos). */
     aperture: gap(CENTER_PAIR_POSITION) / intercanthal,
+    /**
+     * Ejes del ojo en la imagen (vectores unitarios), para dar signo al flujo: `temple` va de la
+     * comisura interna a la externa (hacia la sien) y `down` del párpado superior al inferior.
+     * Salen de la propia cara, así que valen igual con espejo o sin él y con la cabeza inclinada.
+     */
+    axes: { temple: { x: -along.x, y: -along.y }, down: { x: -up.x, y: -up.y } },
+    iris: irisPosition(lm, f, inner, outer, { x: -up.x, y: -up.y }),
   };
 }
 
@@ -127,6 +153,9 @@ export function buildRois(lm, frame, { frameMirrored = false } = {}) {
   ]);
 
   const faceWidth = dist(pt(lm, FACE_WIDTH.right, frame), pt(lm, FACE_WIDTH.left, frame));
+  // Puntos estables (píxeles del frame) para estimar el movimiento rígido de la cabeza.
+  out.pose = POSE_POINTS.map((i) => pt(lm, i, frame));
+
   out.meta = {
     intercanthal,
     faceWidth,

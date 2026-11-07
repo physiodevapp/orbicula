@@ -50,7 +50,11 @@
       </div>
 
       <div class="as-view" data-view="idle">
-        <p class="hint">Te guía por cada prueba (reposo, parpadeo natural, guiños, cierres, mirada y cabeceo) y guarda las medidas en un archivo JSON que puedes compartir. Dura unos 7 minutos. No se guarda ninguna imagen.</p>
+        <p class="hint">Te guía por cada prueba y guarda las medidas en un archivo JSON que puedes compartir. No se guarda ninguna imagen. <b>Fase 4</b>: reposo, contracción mínima y algo mayor, cabeceo, giro, cejas, guiños y parpadeo; con pitidos en cada repetición (agudo = ahora, grave = suelta), para hacerla con la cámara trasera sin mirar. <b>Fase 3</b>: parpadeos, guiños, cierres, mirada y cabeceo.</p>
+        <label class="field">
+          <span class="control-label">Prueba</span>
+          <select class="select" id="asPlan" aria-label="Prueba del asistente"></select>
+        </label>
         <label class="field">
           <span class="control-label">Código (opcional)</span>
           <input class="input" id="asCode" maxlength="24" autocomplete="off" placeholder="p. ej. P01">
@@ -117,7 +121,7 @@
       </div>
 
       <div class="as-view" data-view="idle">
-        <p class="hint">Mide el flujo óptico (fase 4) con el análisis de la cara funcionando a la vez: Farnebäck a tres tamaños, Lucas-Kanade y una pasada sin flujo. Son 10 pasadas de 12 s (unos 2 minutos y medio), en orden cruzado para que el calentamiento del móvil no falsee la comparación. Mantén la cara quieta y de frente a la cámara todo el rato. Elige antes la cámara y la prioridad. La primera vez descarga OpenCV.js (13 MB).</p>
+        <p class="hint">Mide el flujo óptico (fase 4) con el análisis de la cara funcionando a la vez: Farnebäck como en la 4a, leyendo solo el plano de brillo (Y), con y sin límite de 30 pares/s, el Farnebäck ligero, y una pasada sin flujo. Son 10 pasadas de 12 s (unos 2 minutos y medio), en orden cruzado para que el calentamiento del móvil no falsee la comparación. Mantén la cara quieta y de frente a la cámara todo el rato. Elige antes la cámara y la prioridad. La primera vez descarga OpenCV.js (13 MB).</p>
         <p class="hint">Con la cámara trasera no verás la pantalla: pulsa «Empezar», apoya el móvil a unos 40 cm de tu cara y espera. Tienes 10 s para colocarte (los últimos 3 s suenan). Un pitido largo marca el inicio; si pierde la cara suena un tono grave cada 3 s; tres pitidos ascendentes y una vibración larga avisan de que ha terminado.</p>
         <label class="check"><input type="checkbox" id="bSound" checked> Cuenta atrás, pitidos y vibración</label>
         <button class="btn btn-primary" id="bStart" type="button">Empezar</button>
@@ -157,7 +161,21 @@
           <button type="button" data-metric="ear" aria-pressed="true">EAR</button>
           <button type="button" data-metric="aperture" aria-pressed="false">Apertura</button>
           <button type="button" data-metric="blink" aria-pressed="false">Blendshape</button>
+          <button type="button" data-metric="flow" aria-pressed="false">Flujo</button>
         </div>
+      </div>
+      <div class="control-row wrap" id="flowSelect" hidden>
+        <select class="select" id="flowRoi" aria-label="ROI del flujo">
+          <option value="upperLid">Párpado superior</option>
+          <option value="lowerLid">Párpado inferior</option>
+          <option value="brow">Ceja</option>
+          <option value="canthus">Canto externo</option>
+        </select>
+        <select class="select" id="flowComp" aria-label="Compensación de la cabeza">
+          <option value="reference">Compensado: dorso nasal</option>
+          <option value="pose">Compensado: postura</option>
+          <option value="none">Sin compensar</option>
+        </select>
       </div>
       <p class="hint" id="metricHint"></p>
       <div class="pane" data-side="left">
@@ -199,6 +217,7 @@
       <div class="control-row">
         <span class="control-label">Superposición</span>
         <label class="check"><input type="checkbox" id="roiToggle" checked> Mostrar ROI</label>
+        <label class="check"><input type="checkbox" id="fieldToggle"> Campo de flujo</label>
       </div>
       <div class="control-row" id="deviceRow" hidden>
         <span class="control-label">Dispositivo</span>

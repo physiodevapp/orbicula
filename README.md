@@ -7,7 +7,7 @@ Cuantificación de movimientos finos de la musculatura periocular (orbicular de 
 
 ## Estado
 
-v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolución reales) **fase 2** (Face Landmarker, ROI por lado y lateralidad) y **fase 3** (EAR, parpadeos y curvas en tiempo real). Ver [`CHANGELOG.md`](CHANGELOG.md).
+v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolución reales) **fase 2** (Face Landmarker, ROI por lado y lateralidad) y **fase 3** (EAR, parpadeos y curvas en tiempo real). En curso: **fase 4** (flujo óptico; hechos los pasos 4a y 4b). Ver [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Uso clínico
 
@@ -39,7 +39,13 @@ v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolu
 
 ## Asistente de pruebas
 
-Debajo del vídeo hay un asistente que guía por cada prueba y guarda las medidas en un JSON que se puede descargar y compartir. Ver [`docs/pruebas.md`](docs/pruebas.md). Más abajo, una **prueba de rendimiento** compara el análisis en worker y en el hilo principal, con y sin blendshapes ([`docs/rendimiento.md`](docs/rendimiento.md)).
+Debajo del vídeo hay un asistente que guía por cada prueba y guarda las medidas en un JSON que se puede descargar y compartir. Ver [`docs/pruebas.md`](docs/pruebas.md). El plan por defecto es el de la **fase 4 (flujo óptico)**: las repeticiones van con pitidos (agudo = ahora, grave = suelta), así que se puede hacer con la cámara trasera sin mirar la pantalla. Más abajo, una **prueba de rendimiento** mide el coste del flujo óptico ([`docs/rendimiento.md`](docs/rendimiento.md)).
+
+## Flujo óptico (en pruebas)
+Mide el movimiento de la piel en cada región (párpado superior e inferior, ceja y canto externo) después de restar el de la cabeza, en distancias intercantales por segundo (DI/s): no depende de lo cerca que esté la cámara. Se ve en la curva **«Flujo»** (con selector de región y de compensación) y, con la casilla **«Campo de flujo»**, como flechas sobre el vídeo. Es lo que debería detectar contracciones más finas de las que mueven el EAR.
+- Usa la **cámara trasera con prioridad «fps»**, con el móvil apoyado y a 30–40 cm, y la cara centrada.
+- Luz estable y sin parpadeo: luz natural o una lámpara que no parpadee (los fluorescentes y algunos LED a 50 Hz dan flujo falso).
+- La cabeza, lo más quieta posible: la compensación resta los movimientos suaves, no los bruscos.
 
 ## Desarrollo en la nube
 

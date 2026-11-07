@@ -327,3 +327,99 @@ describe('informe', () => {
     expect(Object.keys(full).some((k) => /name|patient|nombre/i.test(k))).toBe(false);
   });
 });
+
+// ── Fase 4: repeticiones guiadas, flujo e informe v2 ────────────────────────────────────────
+import { repSchedule } from '../src/assistant/session.js';
+import { PHASE4_STEPS, PLANS, DEFAULT_PLAN } from '../src/assistant/steps.js';
+
+describe('asistente de la fase 4', () => {
+  const REPS = { count: 2, everyMs: 1000, holdMs: 400, offsetMs: 200 };
+  const STEP = [{ id: 'm', title: 'M', instruction: 'entrecierra', durationMs: 2500, reps: REPS, flow: true }];
+  const flowSample = (t, e) => {
+    const roi = { none: { energy: e, down: 0.1, temple: 0 }, reference: { energy: e / 2, down: 0.05, temple: 0.01 }, pose: { energy: e / 4, down: 0.04, temple: 0.02 } };
+    const side = { upperLid: roi, lowerLid: roi, brow: roi, canthus: roi };
+    return { t, dt: 33, left: side, right: side, head: { reference: { u: 0.1, v: 0.2 }, pose: { u: 0.1, v: 0.19 } } };
+  };
+
+  it('calendario: «ahora» y «suelta» de cada repetición', () => {
+    expect(repSchedule(REPS)).toEqual([
+      { k: 0, kind: 'hold', at: 200 }, { k: 0, kind: 'release', at: 600 },
+      { k: 1, kind: 'hold', at: 1200 }, { k: 1, kind: 'release', at: 1600 },
+    ]);
+    expect(repSchedule(null)).toEqual([]);
+  });
+
+  it('los pasos con repeticiones duran lo que sus repeticiones y el plan por defecto es el de la fase 4', () => {
+    for (const s of PHASE4_STEPS.filter((x) => x.reps)) expect(s.durationMs).toBe(s.reps.offsetMs + s.reps.count * s.reps.everyMs);
+    expect(DEFAULT_PLAN).toBe('phase4');
+    expect(PLANS.phase4.flow).toBe(true);
+    expect(PHASE4_STEPS.map((s) => s.id)).toEqual(expect.arrayContaining(['rest', 'minimal', 'more', 'nod', 'turn', 'brows', 'wink-left', 'wink-right']));
+    expect(PHASE4_STEPS.find((s) => s.id === 'minimal').instruction).toMatch(/como si sonrieras con los ojos/);
+  });
+
+  it('emite los pitidos de cada repetición y guarda sus marcas en el reloj de las series', () => {
+    let t = 0;
+    const cues = [];
+    const s = new GuidedSession(STEP, { now: () => t, prepMs: 100, onCue: (c) => cues.push(c) });
+    const at = (v) => { t = v; s.tick(); };
+    s.start();
+    at(100); // empieza a grabar
+    s.record(150, sample(0.3, 0.3)); // t0 de las series = 150
+    at(300); // 200 ms desde el inicio: «ahora» 1
+    expect(s.snapshot().rep).toEqual({ of: 2, k: 1, holding: true });
+    at(700); // «suelta» 1
+    expect(s.snapshot().rep.holding).toBe(false);
+    at(1350);
+    at(1800);
+    expect(cues.filter((c) => c === 'hold' || c === 'release')).toEqual(['hold', 'release', 'hold', 'release']);
+    expect(s.cur.marks).toEqual([
+      { rep: 1, kind: 'hold', t: 150 }, { rep: 1, kind: 'release', t: 550 },
+      { rep: 2, kind: 'hold', t: 1200 }, { rep: 2, kind: 'release', t: 1650 },
+    ]);
+  });
+
+  it('registra el flujo por ROI (solo grabando) y el informe v2 lo resume y lo guarda', () => {
+    let t = 0;
+    const s = new GuidedSession(STEP, { now: () => t, prepMs: 100 });
+    s.start();
+    s.recordFlow(flowSample(10, 1)); // en la cuenta atrás: no se guarda
+    t = 100; s.tick();
+    for (let k = 0; k < 20; k++) {
+      s.record(200 + 33 * k, sample(0.3, 0.3));
+      s.recordFlow(flowSample(230 + 33 * k, k === 19 ? 10 : 0.01));
+    }
+    t = 2600; s.tick();
+    expect(s.state).toBe('review');
+    const c = s.cur;
+    expect(c.flow.rel).toHaveLength(20);
+    expect(c.flow.rel[0]).toBe(30); // mismo reloj que las series (t0 = 200)
+    expect(c.flow.left.upperLid.eP[0]).toBe(0.0025);
+    expect(c.flow.head.pV[0]).toBe(0.19);
+    const sum = summarizeStep(c);
+    expect(sum.flow.pairs).toBe(20);
+    expect(sum.flow.left.upperLid.none.p50).toBeCloseTo(0.01, 6);
+    expect(sum.flow.left.upperLid.pose.p99).toBeGreaterThan(sum.flow.left.upperLid.pose.p50);
+    expect(describeSummary(c)).toMatch(/Flujo p95/);
+    s.next();
+    const r = buildReport({ results: s.results, startedAt: 'x', plan: 'phase4', build: {}, device: {}, capture: {}, analysis: {}, flow: { config: 'farneback-320-vf-30' }, detector: {} });
+    expect(r.schema).toBe('orbicula-test-session/2');
+    expect(r.plan).toBe('phase4');
+    expect(r.steps[0].flow.left.upperLid.eN).toHaveLength(20);
+    expect(r.steps[0].series.left.irisH).toBeDefined();
+    expect(r.steps[0].reps).toEqual(REPS);
+    expect(JSON.parse(JSON.stringify(r))).toEqual(r);
+    const lite = buildReport({ results: s.results, startedAt: 'x', build: {}, device: {}, capture: {}, analysis: {}, detector: {}, includeSeries: false });
+    expect(lite.steps[0].flow).toBeUndefined();
+    expect(lite.steps[0].summary.flow.pairs).toBe(20);
+  });
+
+  it('un paso del plan de flujo sin datos de flujo lo avisa en la revisión', () => {
+    let t = 0;
+    const s = new GuidedSession(STEP, { now: () => t, prepMs: 100 });
+    s.start();
+    t = 100; s.tick();
+    s.record(200, sample(0.3, 0.3));
+    t = 2600; s.tick();
+    expect(describeSummary(s.cur)).toMatch(/Sin datos de flujo/);
+  });
+});

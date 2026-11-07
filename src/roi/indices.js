@@ -53,6 +53,21 @@ export const NASAL_DORSUM = [168, 6, 197, 195];
 /** Extremos laterales del óvalo facial (FACEMESH_FACE_OVAL): anchura de la cara. */
 export const FACE_WIDTH = { right: 234, left: 454 };
 
+/**
+ * Centros del iris: 468 y 473 (el modelo del iris añade 10 puntos al mallado, 468–477; las
+ * conexiones oficiales FACEMESH_RIGHT_IRIS = 469–472 y FACEMESH_LEFT_IRIS = 474–477 rodean a
+ * 468 y 473). Cada centro se asigna al ojo más cercano, sin depender del nombre del lado.
+ */
+export const IRIS_CENTERS = [468, 473];
+
+/**
+ * Puntos estables para estimar el movimiento rígido de la cabeza (compensación «postura»):
+ * el dorso nasal, los extremos laterales del óvalo facial y el punto superior del óvalo (10,
+ * línea media de la frente junto al nacimiento del pelo; primer índice de FACEMESH_FACE_OVAL).
+ * Ninguno está en los párpados ni en las cejas.
+ */
+export const POSE_POINTS = [...NASAL_DORSUM, 234, 454, 10];
+
 /** Número de landmarks que devuelve el modelo (468 del mallado + 10 del iris). */
 export const LANDMARK_COUNT = 478;
 
@@ -63,5 +78,7 @@ export const ALL_USED = [
     ...NASAL_DORSUM,
     FACE_WIDTH.right,
     FACE_WIDTH.left,
+    ...IRIS_CENTERS,
+    ...POSE_POINTS,
   ]),
 ];

@@ -9,6 +9,7 @@ import { FLOW_CONFIGS, DEFAULT_FLOW, OPENCV_VERSION, FARNEBACK_PARAMS } from './
 import { stripFromRois, needsNewStrip, workingSize } from './strip.js';
 import { FpsMeter } from '../capture/camera-logic.js';
 import { RateLimiter } from './rate.js';
+import { ROI_KEYS, toWork } from './metrics.js';
 
 /** Frames en vuelo: uno calculándose y otro preparándose. Si están los dos, el frame se descarta. */
 const MAX_IN_FLIGHT = 2;
@@ -35,6 +36,9 @@ export class FlowClient {
     this.blockedHosts = new Set();
     this.meta = new Map(); // id → {submitAt, cropMs}
     this.onResult = null;
+    this.polys = null; // polígonos de las ROI en píxeles de trabajo (orden de ROI_KEYS)
+    this.polyId = 0;
+    this.wantField = false; // pedir al worker una muestra del campo de flujo (para dibujarlo)
     this._loading = null;
   }
 
@@ -67,6 +71,7 @@ export class FlowClient {
               m.cropMs = meta.cropMs; // recorte y reducción del frame en el hilo principal
               m.roundTripMs = now - meta.submitAt;
               m.scale = meta.scale;
+              m.strip = meta.strip; // franja de este par (las métricas pasan de px de trabajo al frame)
             }
             if (m.paired) {
               this.ms = this.ms ? this.ms * 0.9 + m.flowMs * 0.1 : m.flowMs;
@@ -98,6 +103,7 @@ export class FlowClient {
     this.config = c;
     if (this.strip) this.work = workingSize(this.strip, c.maxWidth);
     this.stripId++;
+    this.polys = null; // con otra escala, los polígonos se recalculan con el siguiente análisis
     this.limiter = new RateLimiter(c.maxRate);
   }
 
@@ -105,18 +111,32 @@ export class FlowClient {
   setFace(result) {
     if (!result?.face) return;
     const frameChanged = !this.frame || this.frame.width !== result.frame.width || this.frame.height !== result.frame.height;
-    if (!frameChanged && !needsNewStrip(this.strip, result.rois, result.frame)) return;
-    const strip = stripFromRois(result.rois, result.frame);
-    if (!strip) return;
-    if (this.strip) this.counts.replaced++;
-    this.strip = strip;
-    this.frame = { ...result.frame };
-    this.work = workingSize(strip, this.config.maxWidth);
-    this.stripId++;
+    if (frameChanged || needsNewStrip(this.strip, result.rois, result.frame)) {
+      const strip = stripFromRois(result.rois, result.frame);
+      if (!strip) return;
+      if (this.strip) this.counts.replaced++;
+      this.strip = strip;
+      this.frame = { ...result.frame };
+      this.work = workingSize(strip, this.config.maxWidth);
+      this.stripId++;
+    }
+    this.#setPolys(result.rois);
+  }
+
+  /** Polígonos de las ROI pasados a píxeles de trabajo de la franja actual. */
+  #setPolys(rois) {
+    if (!this.strip || !this.work) return;
+    this.polys = ROI_KEYS.map((key) => {
+      const [side, name] = key.split('.');
+      const poly = key === 'reference' ? rois.reference.polygon : rois[side][name].polygon;
+      return toWork(poly, this.strip, this.work.scale);
+    });
+    this.polyId++;
   }
 
   /** Olvida la franja (otra cámara u otra resolución). */
   resetStrip() {
+    this.polys = null;
     this.strip = null;
     this.work = null;
     this.frame = null;
@@ -148,6 +168,7 @@ export class FlowClient {
     const base = {
       type: 'frame', id, t, stripId: this.stripId, method: this.config.method,
       params: FARNEBACK_PARAMS[this.config.params],
+      polys: this.polys, polyId: this.polyId, wantField: this.wantField,
     };
     const submitAt = performance.now();
     this.counts.submitted++;
@@ -162,7 +183,7 @@ export class FlowClient {
         this.videoFrameOk = false; // este navegador no lo admite: en adelante, el recorte de siempre
       }
       if (frame) {
-        this.meta.set(id, { submitAt, cropMs: performance.now() - submitAt, scale: work.scale });
+        this.meta.set(id, { submitAt, cropMs: performance.now() - submitAt, scale: work.scale, strip: this.strip });
         this.worker.postMessage(
           { ...base, videoFrame: frame, rect: { x, y, w, h }, work: { width: work.width, height: work.height }, frameSize: { ...this.frame } },
           [frame],
@@ -171,7 +192,7 @@ export class FlowClient {
       }
     }
 
-    this.meta.set(id, { submitAt, cropMs: null, scale: work.scale });
+    this.meta.set(id, { submitAt, cropMs: null, scale: work.scale, strip: this.strip });
     createImageBitmap(video, x, y, w, h, { resizeWidth: work.width, resizeHeight: work.height, resizeQuality: 'medium' })
       .then((bitmap) => {
         const meta = this.meta.get(id);

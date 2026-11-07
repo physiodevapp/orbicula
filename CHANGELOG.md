@@ -4,6 +4,21 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (fase 4b: medida del flujo por ROI)
+- **Flujo por ROI y por lado del paciente** (párpado superior e inferior, ceja y canto externo). El worker devuelve, por ROI, 14 sumas de su campo de flujo («momentos», `src/flow/metrics.js`); con ellas el hilo principal calcula el flujo medio y la energía residual frente a cualquier movimiento afín de la cabeza, sin volver a recorrer los píxeles.
+- **Tres compensaciones de la cabeza a la vez** (`src/flow/processor.js`): ninguna, **dorso nasal** (restar su traslación) y **postura** (movimiento afín de puntos estables de la cara —dorso nasal, extremos del óvalo y frente—, interpolados entre los análisis que rodean a cada frame; cada par espera hasta 300 ms al análisis siguiente).
+- Métricas normalizadas: velocidad en **distancias intercantales por segundo (DI/s)**, independiente de la distancia y de los fps; energía en su cuadrado; componentes con signo **hacia abajo** y **hacia la sien**, con los ejes sacados de la propia cara (valen igual con espejo; con test).
+- **Posición del iris** (landmarks 468 y 473, asignados al ojo más cercano) normalizada a las comisuras, en las series del asistente, para estudiar los falsos cierres al mirar hacia abajo.
+- Curva **«Flujo»** (escala logarítmica, DI/s) con selector de ROI y de compensación; casilla **«Campo de flujo»** que dibuja el flujo sobre el vídeo (ampliado ×6).
+- **Asistente de la fase 4** (plan por defecto; el de la fase 3 sigue disponible): reposo, contracción mínima («Entrecierra los ojos lo mínimo, como si sonrieras con los ojos») ×5, contracción algo mayor ×3, cabeceo, giro, cejas ×3, guiños de cada ojo ×3 y parpadeo espontáneo. Las repeticiones van con **pitidos** (agudo = ahora, grave = suelta) y el aviso «¡Ahora!/Suelta» sobre el vídeo; sus marcas de tiempo se guardan. Enciende el flujo solo.
+- JSON del asistente **`orbicula-test-session/2`**: plan, iris, series del flujo por ROI (energía con las tres compensaciones y componentes con referencia y postura), movimiento de la cabeza restado, marcas de las repeticiones y resumen del flujo por paso (p50, p95 y p99 de la energía).
+- Vídeos sintéticos con la respuesta conocida (`scripts/dev/make-face-videos.py`): **cabeceo** de 6 px sin contracción y **párpado** que baja 1,5 px. Scripts `scripts/dev/check-flow.cjs` y `scripts/dev/run-assistant.cjs`; `?debug` expone las series para ellos.
+- En los vídeos sintéticos (Chromium): el párpado de 1,5 px se ve en su lado y no en el otro, y el EAR no cambia; el cabeceo se anula con el dorso nasal (de 0,04–0,13 a 0,006–0,017 DI/s). La postura compensa peor y añade 0,01–0,03 DI/s de temblor de la malla con la cara quieta (en Chromium MediaPipe solo analiza ~9/s; se decidirá con los datos del móvil en el 4c).
+- 22 tests nuevos.
+
+### Corregido (fase 4b)
+- La asimetría de las curvas fallaba al elegir una métrica que no está en la serie de la cara.
+
 ### Añadido (fase 4a bis: aligerar el flujo)
 - El worker de flujo puede leer **solo el plano de brillo (Y)** de la franja directamente del frame de la cámara (`VideoFrame`), sin pasar por RGBA. Si el móvil entrega el frame en un formato que no se puede leer así, recorta con `createImageBitmap` dentro del worker y lo anota en el JSON (`sources`).
 - **Farnebäck ligero** (2 niveles, ventana 9, 2 iteraciones) y **límite de pares por segundo** (30), para dejar procesador al análisis de la cara.

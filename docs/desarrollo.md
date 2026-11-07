@@ -29,6 +29,14 @@ Vuelca las pastillas y el panel «Verificación de lado», las peticiones extern
 
 Parámetros útiles en la dirección: `?escala=0.25` (acorta el asistente y la prueba de rendimiento) y `?analysis=main` (análisis en el hilo principal).
 
+## Comprobar el flujo con vídeos de respuesta conocida (fase 4)
+```bash
+node scripts/dev/check-flow.cjs --video /tmp/caras/lid.y4m   # párpado de 1,5 px: picos en su lado, EAR igual
+node scripts/dev/check-flow.cjs --video /tmp/caras/nod.y4m   # cabeceo: la compensación lo anula
+node scripts/dev/run-assistant.cjs --video /tmp/caras/lid.y4m --out /tmp/informe.json   # asistente entero (?escala=0.25)
+```
+`check-flow.cjs` abre la app con `?debug` (que expone las series en `window.__orbicula`), enciende la curva «Flujo» y resume un ciclo del vídeo por tramos de 0,5 s: el máximo de la velocidad residual del párpado superior por lado y compensación, y el EAR. El vídeo empieza en un punto cualquiera del bucle de 16 s: hay que buscar el patrón (en `lid.y4m`, un pico al bajar y otro al subir, 1,5 s después). `run-assistant.cjs` recorre el asistente pulsando «Siguiente» en cada revisión e imprime los resúmenes.
+
 ## Repetir el detector con datos reales
 ```bash
 node scripts/dev/replay-blinks.mjs informe.json '{"startRatio":0.8}'

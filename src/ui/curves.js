@@ -6,6 +6,9 @@ export const METRICS = {
   ear: { label: 'EAR', min: 0, max: 0.5, digits: 2 },
   aperture: { label: 'Apertura / distancia intercantal', min: 0, max: 0.35, digits: 3 },
   blink: { label: 'Blendshape de parpadeo', min: 0, max: 1, digits: 2 },
+  // Flujo residual de una ROI: velocidad cuadrática media (raíz de la energía), en distancias
+  // intercantales por segundo. Escala logarítmica: el reposo y una contracción difieren en órdenes de magnitud.
+  flow: { label: 'Flujo (DI/s)', min: 0.01, max: 3, digits: 2, log: true, series: 'flow' },
 };
 
 export class Curves {
@@ -15,9 +18,11 @@ export class Curves {
    * @param {() => {left: {events: object[], baseline: number|null}, right: {events: object[], baseline: number|null}}} getState
    * @param {{windowMs?: number}} opts ancho de la ventana temporal
    */
-  constructor(canvases, series, getState, { windowMs = 10000 } = {}) {
+  constructor(canvases, series, getState, { windowMs = 10000, flowSeries = null } = {}) {
     this.canvases = canvases;
     this.series = series;
+    this.flowSeries = flowSeries;
+    this.flowKey = null; // métrica del flujo que se dibuja: '<roi>:<compensación>'
     this.getState = getState;
     this.windowMs = windowMs;
     this.metric = 'ear';
@@ -73,9 +78,15 @@ export class Curves {
 
     const m = METRICS[this.metric];
     const padY = 6;
-    const y = (v) => h - padY - ((Math.min(m.max, Math.max(m.min, v)) - m.min) / (m.max - m.min)) * (h - 2 * padY);
-    const { t, [side]: data } = this.series;
-    const tNow = t.length ? t[t.length - 1] : 0;
+    const tr = m.log ? Math.log10 : (v) => v;
+    const lo = tr(m.min);
+    const hi = tr(m.max);
+    const y = (v) => h - padY - ((tr(Math.min(m.max, Math.max(m.min, v))) - lo) / (hi - lo)) * (h - 2 * padY);
+    const src = m.series === 'flow' ? this.flowSeries : this.series;
+    const key = m.series === 'flow' ? this.flowKey : this.metric;
+    const { t, [side]: data } = src;
+    // El tiempo lo marcan las dos series (la del flujo va unos 70 ms por detrás de la de la cara).
+    const tNow = Math.max(this.series.t.at(-1) ?? 0, this.flowSeries?.t.at(-1) ?? 0);
     const x = (tt) => ((tt - (tNow - this.windowMs)) / this.windowMs) * w;
 
     // Cuadrícula: una línea cada 2 s y tres horizontales.
@@ -88,7 +99,7 @@ export class Curves {
       ctx.lineTo(gx, h);
     }
     for (const f of [0, 0.5, 1]) {
-      const gy = Math.round(y(m.min + f * (m.max - m.min))) + 0.5;
+      const gy = Math.round(h - padY - f * (h - 2 * padY)) + 0.5;
       ctx.moveTo(0, gy);
       ctx.lineTo(w, gy);
     }
@@ -124,7 +135,7 @@ export class Curves {
     let last = null;
     for (let i = 0; i < t.length; i++) {
       if (t[i] < tNow - this.windowMs - 500) continue;
-      const v = data[this.metric][i];
+      const v = data[key]?.[i];
       if (!Number.isFinite(v)) {
         pen = false;
         continue;
