@@ -19,14 +19,14 @@ v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolu
 - **Distancia:** unos 30–50 cm entre el objetivo y la cara. Más cerca, la cara se sale del encuadre al moverse; más lejos, la región periocular tiene pocos píxeles.
 - **Iluminación:** luz frontal, difusa y uniforme (por ejemplo, frente a una ventana sin sol directo). Evita contraluces, sombras sobre un solo lado de la cara y fluorescentes que parpadeen.
 - **fps:** la app muestra los fps reales. Por debajo de 24 fps lo avisa: prueba la prioridad «fps» (menos resolución, más fotogramas).
-- **fps medidos** (Chrome para Android, móvil del autor, buena luz; prioridad «fps» sin exigir mínimo):
+- **fps medidos** (Chrome para Android, móvil del autor, luz de interior):
 
-  | Cámara | Prioridad «Resolución» | Prioridad «fps» |
+  | Cámara | Prioridad «Resolución» | Prioridad «fps» (exige ≥ 55 fps) |
   |---|---|---|
-  | Trasera | 29.9 fps · 2160×4032 | 30.0 fps · 720×1280 |
-  | Frontal | 29.9 fps · 2160×3440 | 30.0 fps · 720×1280 (24 fps con poca luz) |
+  | Trasera | 29.9 fps · 2160×4032 | **49.2 fps** · 720×1280 |
+  | Frontal | 29.9 fps · 2160×3440 | 29.0 fps · 720×1280 |
 
-  Ambas anuncian 60 fps en sus ajustes pero entregan 30: los fps se miden siempre frame a frame. Con poca luz la cámara alarga la exposición y baja los fps.
+  Ambas anuncian 60 fps, pero si solo se piden como «ideal» Chrome se queda en 30: por eso la prioridad «fps» exige un mínimo. La frontal acepta el mínimo pero sigue dando unos 30. Con poca luz la cámara alarga la exposición y baja los fps (la frontal llegó a 24). **Para medir en directo, usa la trasera con prioridad «fps» y buena luz.**
 - **Privacidad:** la imagen se procesa en el propio móvil. No se envía nada a ningún servidor y el vídeo no se guarda.
 
 ## Desarrollo
