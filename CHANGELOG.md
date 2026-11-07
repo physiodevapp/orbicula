@@ -19,6 +19,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - **Modo seguido** en el asistente (casilla): sin pantalla de revisión entre pasos; al terminar uno (dos pitidos) el siguiente empieza solo 2 s después. Pensado para hacerse la prueba uno mismo con la cámara trasera sin tocar el móvil. Un paso interrumpido sí se detiene en la revisión.
 - **Voz** (casilla, activada por defecto): dice «Paso N: nombre» al empezar cada cuenta atrás y «Prueba terminada» al final. Solo con voces instaladas en el móvil (`localService`), para que ningún texto salga del dispositivo; si no hay ninguna en español, no se oye nada.
 
+- **La voz explica cada paso** durante la cuenta atrás: en los pasos con repeticiones, que hay que esperar al pitido agudo y mantener el gesto hasta el grave; en el cabeceo y el giro, que se hace sin parar desde el pitido de inicio. Con voz, la cuenta atrás dura lo que tarda en leerse la explicación.
+- `scripts/dev/analyze-flow.mjs`: análisis del JSON del asistente de la fase 4 (criterios 3 y 4, alineado con el gesto real).
+- Primer análisis (4c) en `docs/plan-fase-4.md`: criterio 1 cumple; criterio 4 cumple en párpados y canto con el dorso nasal, no en la ceja; criterio 3 sin concluir (la contracción «mínima» también la veía el EAR). Compensación por defecto: dorso nasal.
+
 ### Corregido (fase 4b)
 - La asimetría de las curvas fallaba al elegir una métrica que no está en la serie de la cara.
 

@@ -2,7 +2,7 @@
 // atrás y guarda el registro como un JSON que se descarga o se comparte. Todo en el
 // dispositivo: no hay ninguna llamada de red.
 import { GuidedSession, AUTO_PAUSE_MS } from '../assistant/session.js';
-import { PLANS, DEFAULT_PLAN } from '../assistant/steps.js';
+import { PLANS, DEFAULT_PLAN, spokenPrepMs } from '../assistant/steps.js';
 import { buildReport, describeSummary } from '../assistant/report.js';
 import { downloadJson, shareJson, copyJson, stamp } from './share.js';
 
@@ -96,7 +96,7 @@ export function createAssistant({ getContext, getPerf, onStart }) {
     if (cue === 'prep') {
       beep(440); buzz(40);
       const s = session.snapshot();
-      if (s.step) say(`Paso ${s.index + 1}: ${s.step.title}.`);
+      if (s.step) say(`Paso ${s.index + 1}: ${s.step.title}. ${s.step.say ?? ''}`);
     }
     else if (cue === 'go') { beep(880, 200); buzz(150); }
     else if (cue === 'end') { beep(660); beep(660, 130, 0.22); buzz([80, 60, 80]); }
@@ -241,6 +241,10 @@ export function createAssistant({ getContext, getPerf, onStart }) {
     audio ??= (() => { try { return new AudioContext(); } catch { return null; } })(); // se crea con un gesto del usuario
     planId = el.plan.value in PLANS ? el.plan.value : DEFAULT_PLAN;
     session.steps = stepsOf(planId);
+    // Con voz, la cuenta atrás de cada paso dura lo que tarda en leer su explicación (salvo con ?escala).
+    if (el.voice.checked && localVoice() && scale() === 1) {
+      session.steps = session.steps.map((st, i) => ({ ...st, prepMs: spokenPrepMs(`Paso ${i + 1}: ${st.title}. ${st.say ?? ''}`) }));
+    }
     session.autoAdvanceMs = el.auto.checked ? AUTO_PAUSE_MS : null;
     say(''); // la voz, como el audio, se activa con un gesto del usuario
     lockScreen();

@@ -467,3 +467,28 @@ describe('modo seguido (sin revisión)', () => {
     expect(s.state).toBe('review');
   });
 });
+
+describe('voz del asistente', () => {
+  it('cada paso de la fase 4 tiene su explicación hablada; las de repeticiones piden esperar al agudo y mantener hasta el grave', () => {
+    for (const s of PHASE4_STEPS) expect(s.say?.length).toBeGreaterThan(10);
+    for (const s of PHASE4_STEPS.filter((x) => x.reps)) {
+      expect(s.say).toMatch(/Espera al pitido agudo/);
+      expect(s.say).toMatch(/hasta el pitido grave/);
+    }
+  });
+  it('la cuenta atrás se alarga lo que tarda en leerse la explicación', async () => {
+    const { spokenPrepMs } = await import('../src/assistant/steps.js');
+    expect(spokenPrepMs('')).toBe(3000);
+    expect(spokenPrepMs('x'.repeat(100))).toBe(9500);
+  });
+  it('un paso con su propia cuenta atrás espera ese tiempo antes de grabar', () => {
+    let t = 0;
+    const s = new GuidedSession([{ id: 'a', title: 'A', instruction: '', durationMs: 1000, prepMs: 5000 }], { now: () => t, prepMs: 300 });
+    s.start();
+    t = 4999; s.tick();
+    expect(s.state).toBe('prep');
+    expect(s.snapshot().remainingMs).toBe(1);
+    t = 5000; s.tick();
+    expect(s.state).toBe('running');
+  });
+});

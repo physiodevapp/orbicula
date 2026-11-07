@@ -100,6 +100,19 @@ La cámara dio ~40 fps en esta sesión (60 en la anterior; probablemente menos l
 - Vídeos sintéticos en Chromium (`scripts/dev/check-flow.cjs`): párpado de 1,5 px visto en su lado (máx. ~0,03 DI/s frente a 0 en reposo) sin cambio del EAR; cabeceo de 6 px: sin compensar 0,04–0,13 DI/s, dorso nasal 0,006–0,017, postura 0,014–0,107. **La postura añade el temblor de la malla** (0,01–0,03 DI/s con la cara quieta), comparable al movimiento fino del párpado. En el móvil MediaPipe va a ~28/s (no 9) y puede salir mejor: decidir en el 4c.
 - Para el 4c: con el JSON del asistente, comparar por paso y compensación el p95/p99 de la energía frente al reposo (criterios 3 y 4), las marcas de las repeticiones frente a la energía, el EAR frente a su ruido y, en los guiños, el flujo del ojo que no guiña.
 
+## Paso 4c: primer análisis (JSON del autor, 2026-11-07, commit bff7b1d)
+Trasera «fps» (la cámara dio ~30 fps; poca luz), modo seguido. Análisis: `node scripts/dev/analyze-flow.mjs informe.json`.
+
+- **Criterio 1 (rendimiento): cumple.** Con el flujo encendido, análisis de la cara 25–30/s y flujo ~29 pares/s.
+- **Retraso del gesto:** llega 0,5–1 s (mediana ~0,8 s) después del pitido «ahora» (latencia del audio + reacción). El análisis se alinea con el movimiento real (bajada más rápida del EAR), no con el pitido.
+- **Reposo** (sin parpadeos), p95 de la velocidad residual con el dorso nasal: párpado superior ~0,22 DI/s (los ojos nunca están del todo quietos), inferior 0,14–0,16, canto 0,11, ceja 0,09. Ruido del EAR: DT ≈ 0,010.
+- **Detección:** el flujo marca cada contracción en las ROI que tocan (picos de energía ×10–160 el p95 del reposo) y la elevación de cejas sobre todo en la ceja (×50–240).
+- **Criterio 3: sin concluir.** La «contracción mínima» cerró el ojo un 14–38 % según el EAR (5–12 DT de su ruido): **el EAR también la ve**, así que no era menor de lo que mueve el EAR. La apertura por flujo integrada (∫ componente vertical párpado inferior − superior) tiene una relación señal/ruido parecida (6–8 DT). Hace falta una contracción mucho más pequeña (EAR < 1 DT) para contrastarlo: se añade «tan poco que casi no lo notes» a la explicación hablada.
+- **Criterio 4: cumple en los párpados, no en la ceja.** Con el dorso nasal, % de pares sobre el p99 del reposo: cabeceo, párpados 0 % y canto 0–3 %; giro, párpados 0–1 %, canto 5–27 %. La ceja falla (27–60 %): está lejos del dorso nasal y en los giros se mueve distinto (perspectiva); una traslación no basta. Pendiente: compensación afín local (más puntos de referencia a la altura de la ceja) o referencia por lado.
+- **Compensación elegida: dorso nasal.** Menor ruido en reposo en todas las ROI y mejor en el criterio 4 para párpados y canto. La postura solo mejora la ceja en el cabeceo (11–19 % frente a 27–30 %) y añade el temblor de la malla. Se sigue calculando y guardando, como experimental.
+- **Normalización (DI/s) adecuada:** valores coherentes entre lados y pasos.
+- **Guiños (ojo que no guiña):** en el guiño izquierdo, el EAR dice que el ojo derecho se cierra un 66–86 % (el izquierdo, 79–91 %: la diferencia de ~10 % que vio el autor), mientras que el flujo integrado dice que se mueve la mitad que el que guiña. Apoya en parte que la malla exagera el cierre del otro ojo. En el guiño derecho no es concluyente: integrar el flujo no es fiable con cierres completos (el párpado tapa el ojo y el flujo pierde el seguimiento).
+
 ## Pruebas
 - **Vídeos sintéticos con la respuesta conocida** (ampliar `scripts/dev/make-face-videos.py`): mover solo el párpado 1–2 px (el flujo lo tiene que ver) y, por separado, toda la cara simulando un cabeceo (la compensación lo tiene que anular).
 - **Tests unitarios:** energía, máscaras de ROI en coordenadas de la franja, recolocación de la franja, signos con espejo y el ajuste del movimiento rígido.

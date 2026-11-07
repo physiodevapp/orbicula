@@ -113,8 +113,9 @@ export class GuidedSession {
     let remainingMs = 0;
     let progress = 0;
     if (this.state === 'prep') {
-      remainingMs = Math.max(0, this.prepMs - elapsed);
-      progress = 1 - remainingMs / this.prepMs;
+      const prep = this.#prepOf(step);
+      remainingMs = Math.max(0, prep - elapsed);
+      progress = 1 - remainingMs / prep;
     } else if (this.state === 'running') {
       remainingMs = Math.max(0, step.durationMs - elapsed);
       progress = 1 - remainingMs / step.durationMs;
@@ -153,6 +154,11 @@ export class GuidedSession {
     this.#enter(0);
   }
 
+  /** Cuenta atrás de un paso: la suya (p. ej. más larga si la voz lee la explicación) o la general. */
+  #prepOf(step) {
+    return step?.prepMs ?? this.prepMs;
+  }
+
   /** ¿Pasará solo al siguiente paso? (para que la interfaz siga llamando a tick en la revisión) */
   get autoAdvancing() {
     return this.state === 'review' && this.autoAdvanceMs != null && this.cur?.status === 'completed';
@@ -165,7 +171,7 @@ export class GuidedSession {
       this.next();
       return;
     }
-    if (this.state === 'prep' && t - this.phaseStart >= this.prepMs) {
+    if (this.state === 'prep' && t - this.phaseStart >= this.#prepOf(this.step)) {
       this.state = 'running';
       this.phaseStart = t;
       this.cur.startedAt = new Date().toISOString();

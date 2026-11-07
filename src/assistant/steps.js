@@ -87,6 +87,9 @@ export const PHASE3_STEPS = [
 //
 // `reps`: repeticiones guiadas con pitidos (agudo = «ahora», grave = «suelta»), para poder hacerlas
 // con la cámara trasera sin ver la pantalla. Sus marcas de tiempo se guardan en el JSON.
+// `say`: lo que dice la voz (si está activada) durante la cuenta atrás, después del nombre del paso.
+// En el móvil del autor el gesto llega ~0,5–1 s después del pitido (latencia del audio + reacción):
+// el análisis lo alinea con el movimiento real, no con el pitido.
 
 const rep = (count, everyMs, holdMs, offsetMs = 2500) => ({ count, everyMs, holdMs, offsetMs });
 const repDuration = (r) => r.offsetMs + r.count * r.everyMs;
@@ -102,12 +105,14 @@ export const PHASE4_STEPS = [
     title: 'Comprobación inicial',
     instruction: 'Cara de frente, centrada y quieta. Mira a la cámara. No hace falta hacer nada.',
     durationMs: 8000,
+    say: 'Quieto y de frente. No hagas nada.',
   },
   {
     id: 'rest',
     title: 'Reposo',
     instruction: 'Mira al frente, quieto, sin hacer nada. Parpadea con naturalidad.',
     durationMs: 20000,
+    say: 'Mira al frente sin hacer nada y parpadea con naturalidad.',
     hint: 'Este reposo es la referencia de los demás pasos: cuanto más quieto, mejor.',
   },
   {
@@ -116,6 +121,7 @@ export const PHASE4_STEPS = [
     instruction: 'Con el pitido agudo, entrecierra los ojos lo mínimo, como si sonrieras con los ojos. Suelta con el pitido grave. 5 veces.',
     durationMs: repDuration(MINIMAL),
     reps: MINIMAL,
+    say: 'Espera al pitido agudo. Entonces entrecierra los ojos lo mínimo, como si sonrieras con los ojos, tan poco que casi no lo notes. Mantenlo hasta el pitido grave y suelta. Cinco veces.',
     hint: 'Lo más pequeño que puedas notar tú. Si el EAR no lo ve pero el flujo sí, es justo lo que se quiere demostrar.',
   },
   {
@@ -124,12 +130,14 @@ export const PHASE4_STEPS = [
     instruction: 'Con el pitido agudo, entrecierra los ojos algo más, que se note, sin cerrarlos. Suelta con el pitido grave. 3 veces.',
     durationMs: repDuration(MORE),
     reps: MORE,
+    say: 'Espera al pitido agudo. Entonces entrecierra los ojos algo más, que se note, sin cerrarlos. Mantenlo hasta el pitido grave y suelta. Tres veces.',
   },
   {
     id: 'nod',
     title: 'Cabeceo suave',
     instruction: 'Asiente despacio con la cabeza, poco. Sin entrecerrar los ojos ni parpadear a propósito.',
     durationMs: 15000,
+    say: 'Cuando suene el pitido de inicio, asiente con la cabeza, despacio y poco, sin parar hasta el final del paso. Los ojos, abiertos y sin gestos.',
     hint: 'Con la compensación, el flujo de los párpados debería quedarse como en reposo.',
   },
   {
@@ -137,6 +145,7 @@ export const PHASE4_STEPS = [
     title: 'Giro suave',
     instruction: 'Gira la cabeza despacio a un lado y al otro, poco. Sin mover los párpados a propósito.',
     durationMs: 12000,
+    say: 'Cuando suene el pitido de inicio, gira la cabeza a un lado y al otro, despacio y poco, sin parar hasta el final del paso. Los ojos, abiertos y sin gestos.',
   },
   {
     id: 'brows',
@@ -144,6 +153,7 @@ export const PHASE4_STEPS = [
     instruction: 'Con el pitido agudo, sube las cejas. Bájalas con el pitido grave. 3 veces.',
     durationMs: repDuration(BROWS),
     reps: BROWS,
+    say: 'Espera al pitido agudo. Entonces sube las cejas y mantenlas arriba hasta el pitido grave. Después bájalas y relaja. Tres veces.',
   },
   {
     id: 'wink-left',
@@ -151,6 +161,7 @@ export const PHASE4_STEPS = [
     instruction: 'Con el pitido agudo, cierra SOLO el ojo izquierdo. Ábrelo con el pitido grave. 3 veces.',
     durationMs: repDuration(WINK),
     reps: WINK,
+    say: 'Espera al pitido agudo. Entonces cierra solo el ojo izquierdo y mantenlo cerrado hasta el pitido grave. Tres veces.',
     expect: { left: 3, right: 0 },
     hint: 'Sirve para ver si el otro ojo se mueve de verdad (flujo) o solo en la malla de puntos (EAR).',
   },
@@ -160,6 +171,7 @@ export const PHASE4_STEPS = [
     instruction: 'Con el pitido agudo, cierra SOLO el ojo derecho. Ábrelo con el pitido grave. 3 veces.',
     durationMs: repDuration(WINK),
     reps: WINK,
+    say: 'Espera al pitido agudo. Entonces cierra solo el ojo derecho y mantenlo cerrado hasta el pitido grave. Tres veces.',
     expect: { left: 0, right: 3 },
   },
   {
@@ -168,8 +180,17 @@ export const PHASE4_STEPS = [
     instruction: 'Mira al frente y parpadea con naturalidad.',
     durationMs: 20000,
     countable: true,
+    say: 'Mira al frente y parpadea con naturalidad.',
   },
 ];
+
+/**
+ * Cuenta atrás de un paso cuando la voz lee su explicación: lo que tarda en leerla (≈ 70 ms por
+ * carácter, sin prisa) más 2,5 s para los pitidos de la cuenta atrás. Nunca menos de `minMs`.
+ */
+export function spokenPrepMs(text, minMs = 3000) {
+  return Math.max(minMs, Math.round((text?.length ?? 0) * 70 + 2500));
+}
 
 /** Planes del asistente. `flow`: necesita el flujo óptico encendido. */
 export const PLANS = {
