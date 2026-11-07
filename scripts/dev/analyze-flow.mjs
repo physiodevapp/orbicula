@@ -54,8 +54,20 @@ const inAny = (t, wins) => wins.some(([a, b]) => t >= a && t <= b);
 
 // ── Reposo ─────────────────────────────────────────────────────────────────────────────────────
 const rest = step('rest');
+// Los JSON anteriores a «dorso nasal + giro» no tienen eH: se usan solo las compensaciones presentes.
+for (const k of Object.keys(VAR)) if (!rest.flow.left.upperLid[k]) delete VAR[k];
 const restWins = blinkWindows(rest);
-const restKeep = rest.flow.t.map((t, i) => i).filter((i) => !inAny(rest.flow.t[i], restWins));
+/**
+ * Reposo de verdad: también con la cabeza quieta. Se apartan los tramos (±500 ms) en que el dorso
+ * nasal se mueve más de HEAD_STILL DI/s: si quien hace la prueba se recoloca durante el reposo, la
+ * referencia se infla y el criterio 4 pasa sin significar nada (JSON del 2026-11-07 18:55).
+ */
+// Umbral relativo al propio reposo (3 × su mediana, mínimo 0,1 DI/s): con poca luz el ruido del
+// flujo del dorso nasal ya ronda 0,1 DI/s y un umbral fijo apartaría casi todo el reposo.
+const headSpeed = (s, i) => Math.hypot(s.flow.head.rU[i] ?? 0, s.flow.head.rV[i] ?? 0);
+const HEAD_STILL = Math.max(0.1, 3 * pct(rest.flow.t.map((t, i) => headSpeed(rest, i)), 0.5));
+const restMoving = rest.flow.t.filter((t, i) => headSpeed(rest, i) > HEAD_STILL).map((t) => [t - 500, t + 500]);
+const restKeep = rest.flow.t.map((t, i) => i).filter((i) => !inAny(rest.flow.t[i], restWins) && !inAny(rest.flow.t[i], restMoving));
 const base = {};
 for (const side of SIDES) {
   base[side] = {};
@@ -70,7 +82,7 @@ for (const side of SIDES) {
 const earKeep = (s, side) => s.series.t.map((t, i) => i).filter((i) => !inAny(s.series.t[i], blinkWindows(s))).map((i) => s.series[side].ear[i]);
 const earNoise = Object.fromEntries(SIDES.map((side) => [side, sd(earKeep(rest, side))]));
 
-console.log(`Reposo: ${rest.flow.t.length} pares, ${restKeep.length} sin parpadeos (${rest.events.left.length}+${rest.events.right.length} eventos quitados)`);
+console.log(`Reposo: ${rest.flow.t.length} pares, ${restKeep.length} sin parpadeos ni movimiento de la cabeza (${rest.events.left.length}+${rest.events.right.length} eventos; ${rest.flow.t.filter((t) => inAny(t, restMoving)).length} pares con la cabeza moviéndose a más de ${f(HEAD_STILL)} DI/s)`);
 console.log(`Ruido del EAR en reposo (DT): I ${f(earNoise.left, 4)} · D ${f(earNoise.right, 4)}`);
 console.log('\nVelocidad residual en reposo, p95 (DI/s), por compensación:');
 console.log('ROI         lado  ' + Object.values(VAR).map((v) => v.padStart(12)).join(''));
@@ -251,5 +263,41 @@ for (const id of ['nod', 'turn']) {
       const det = (k) => (rank(k, x[k]) >= 95 ? '✔' : ' ');
       console.log(`  ${id.padEnd(8)} rep ${r.rep}: ${keys.map((k) => `${k} ${f(x[k], 3)} (${rank(k, x[k])})${det(k)}`).join(' · ')}`);
     }
+  }
+}
+
+// ── Criterio 4 con la medida que genera los eventos ────────────────────────────────────────────
+// Los eventos saldrán del cierre (EAR o cierre por flujo), no de la energía de cada ROI. Estadístico
+// de una ventana de 1,5 s: lo máximo que se cierra respecto a los 0,6 s previos (el mayor de los dos
+// ojos). Umbral: el MÁXIMO del reposo estricto (comprobación, reposo y reposo final, sin ningún evento
+// del detector y con la cabeza quieta). Criterio 4: en el cabeceo y el giro, ninguna ventana lo supera.
+{
+  const mWin = 1500;
+  const strictWindows = (s, measure, strict) => {
+    const ev = SIDES.flatMap((x) => s.events[x].filter((e) => !strict ? e.completeness >= REAL_BLINK : true).map((e) => [e.t - e.duration - 200, e.t + e.duration + 400]));
+    const moving = strict ? s.flow.t.filter((t, i) => headSpeed(s, i) > HEAD_STILL).map((t) => [t - 500, t + 500]) : [];
+    const out = [];
+    for (let h = 600; h + mWin < s.flow.t.at(-1); h += 250) {
+      if ([...ev, ...moving].some(([a, b]) => b >= h - 600 && a <= h + mWin)) continue;
+      out.push(measure(s, h));
+    }
+    return out;
+  };
+  const closeFlow = (k) => (s, h) => Math.max(...SIDES.map((side) => {
+    const a = flowAperture(s, side, k).map((v) => -v); // + = se cierra
+    return Math.max(...within(s.flow.t, a, h, h + mWin)) - med(within(s.flow.t, a, h - 600, h));
+  }));
+  const closeEar = (s, h) => Math.max(...SIDES.map((side) => med(within(s.series.t, s.series[side].ear, h - 600, h)) - Math.min(...within(s.series.t, s.series[side].ear, h, h + mWin))));
+  const measures = [['EAR', closeEar], ['cierre por flujo (dorso nasal)', closeFlow('R')], ['cierre por flujo (postura)', closeFlow('P')]];
+  if (rest.flow.left.upperLid.dH) measures.push(['cierre por flujo (dorso+giro)', closeFlow('H')]);
+  console.log('\nCRITERIO 4 CON EL CIERRE (lo que generará los eventos): % de ventanas de 1,5 s del cabeceo y del giro por encima del MÁXIMO del reposo estricto.');
+  for (const [name, m] of measures) {
+    const nul = ['check', 'rest', 'rest-end'].map(step).filter(Boolean).flatMap((s) => strictWindows(s, m, true));
+    const thr = Math.max(...nul);
+    const cells = ['nod', 'turn'].map(step).filter(Boolean).map((s) => {
+      const w = strictWindows(s, m, false);
+      return `${s.id} ${Math.round((100 * w.filter((v) => v > thr).length) / w.length)} %`;
+    });
+    console.log(`  ${name.padEnd(32)} ${cells.join(' · ')}   (umbral ${f(thr, 3)}, ${nul.length} ventanas de reposo${nul.length < 20 ? ': POCAS, no concluyente' : ''})`);
   }
 }

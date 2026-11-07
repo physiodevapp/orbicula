@@ -142,6 +142,20 @@ Plan «contracción mínima con controles»: 20 repeticiones al azar (10 contrac
 - **Criterio 3: cumplido de forma provisional.** El cierre por flujo detecta contracciones mínimas que el EAR no distingue del reposo, sin más falsas alarmas. Muestra pequeña: conviene repetirlo otro día, con buena luz, para confirmarlo.
 - Rendimiento: análisis de la cara 20–25/s (por debajo de 24 en las tandas), probablemente por calor tras tres pruebas seguidas. Pendiente: bajar el flujo (p. ej. a 24 pares/s) cuando el análisis de la cara no llegue.
 
+## Paso 4c: prueba completa con buena luz (JSON del autor, 2026-11-07, commit 7f02658)
+Luz mejor (ruido del EAR en reposo 0,008 frente a 0,010–0,012). El autor movió la cabeza en los segundos 2–7 del reposo.
+
+- **Lección de análisis:** la referencia de reposo tiene que excluir los tramos con la cabeza en movimiento (umbral relativo: 3 × la mediana de la velocidad del dorso nasal en el reposo, mínimo 0,1 DI/s). Sin eso, el reposo de esta prueba daba un p95 del párpado superior de 0,83 DI/s (frente a 0,23–0,33) y el criterio 4 pasaba sin significar nada. Corregido en `analyze-flow.mjs` y aplicado a todos los JSON.
+- **«Dorso nasal + giro» no funciona con datos reales:** en el giro deja más error que el dorso nasal solo, también en los párpados (24–40 % sobre el p99 frente a 5–14 %); la z de los landmarks es demasiado imprecisa. Se quita de la curva; se sigue calculando (`eH`) por si sirve más adelante.
+- **Energía por ROI con el dorso nasal** (reposo limpio): cabeceo, párpados 0 %, canto 3 %, ceja 5–6 %; giro, párpados 5–14 %, canto 49–50 %, ceja 67–68 %. Con un reposo muy quieto y buena luz, el criterio 4 escrito sobre la energía de cada ROI no se cumple en el giro.
+- **Criterio 4 con la medida que generará los eventos** (cierre: EAR o cierre por flujo; ventana de 1,5 s; umbral = máximo del reposo estricto, sin eventos y con la cabeza quieta):
+  - prueba de las 17:47 (44 ventanas de reposo): **0 % en el cabeceo y el giro** para el cierre por flujo (dorso nasal) y para el EAR. **Cumple.**
+  - prueba de las 18:55: no concluyente (solo 17 ventanas de reposo válidas), pero el cierre por flujo supera el umbral mucho menos que el EAR (13 % y 25 % frente a 65 % y 75 %).
+  - prueba de las 18:21 (poca luz): no concluyente (10 ventanas).
+- **Criterio 3 en esta prueba:** las 5 contracciones mínimas, detectadas por el EAR y por el flujo (la contracción fue mayor y, con buena luz, el EAR es menos ruidoso). La prueba que discrimina es la de controles.
+- **Rendimiento:** el ajuste automático actuó desde el cuarto paso (flujo a 20 pares/s) y el análisis de la cara se quedó en 23–24/s: justo en el límite, con el móvil caliente.
+- **Decisiones para la fase 5:** (1) los eventos salen del **cierre por flujo compensado con el dorso nasal**; (2) **puerta de calidad «cabeza en movimiento»**: sin eventos mientras la velocidad del dorso nasal supere el umbral del reposo, con aviso en pantalla; (3) reposo inicial más largo y con la cabeza apoyada (respaldo o pared), porque la referencia depende de él.
+
 ## Propuesta para terminar la fase 4 (1 y 2 hechos; aprobada por el autor)
 1. **Apertura por flujo** como métrica de la app (curva y JSON), con corrección de la deriva (integrador con fuga o restar la línea base de los últimos segundos).
 2. **Prueba de contracción mínima con controles**: ~10 contracciones mínimas y ~10 controles en orden aleatorio, con dos pitidos distintos («contrae» / «no hagas nada»); tasas de acierto y falsos positivos del EAR y del flujo.
