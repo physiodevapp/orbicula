@@ -1,13 +1,12 @@
-// Análisis por frame: Face Landmarker → ROI y blendshapes por lado del paciente.
-import { createLandmarker } from './landmarker.js';
-import { buildRois } from '../roi/geometry.js';
-import { sidedBlendshapes } from '../roi/laterality.js';
+// Análisis en el hilo principal: respaldo si el worker no puede arrancar.
+// Tiene la misma interfaz que WorkerAnalysis (ver worker-client.js).
+import { createLandmarker, assetUrls } from './landmarker.js';
+import { processResult } from './process.js';
 import { FpsMeter } from '../capture/camera-logic.js';
 
 export class Analysis {
-  /** @param {HTMLVideoElement} video */
-  constructor(video) {
-    this.video = video;
+  constructor() {
+    this.mode = 'main';
     this.landmarker = null;
     this.delegate = null;
     this._loading = null;
@@ -21,6 +20,8 @@ export class Analysis {
     this.swapNames = false;
     this.ms = 0; // tiempo medio de análisis por frame (media móvil)
     this.meter = new FpsMeter(1000);
+    this.analysisSize = null;
+    this.onResult = null;
   }
 
   get ready() {
@@ -31,40 +32,32 @@ export class Analysis {
     return this.meter.fps;
   }
 
-  /** Carga el modelo (una sola vez). Rechaza si no se puede. */
-  load() {
-    this._loading ??= createLandmarker().then(({ landmarker, delegate }) => {
+  load(blendshapes = true) {
+    this._loading ??= createLandmarker({ ...assetUrls(), blendshapes }).then(({ landmarker, delegate }) => {
       this.landmarker = landmarker;
       this.delegate = delegate;
     });
     return this._loading;
   }
 
-  /**
-   * Analiza el frame actual del vídeo.
-   * @returns {null | {frame, face: false} | {frame, face: true, lm, rois, blend}}
-   *   null si el modelo aún no está listo o el vídeo no tiene frame.
-   */
-  step() {
-    const v = this.video;
-    if (!this.landmarker || v.readyState < 2 || !v.videoWidth) return null;
-    const frame = { width: v.videoWidth, height: v.videoHeight };
+  setBlendshapes(on) {
+    this.landmarker?.setOptions({ outputFaceBlendshapes: on });
+  }
 
+  /** Analiza el frame actual del vídeo y entrega el resultado por `onResult`. */
+  submit(video, t) {
+    if (!this.landmarker || video.readyState < 2 || !video.videoWidth) return;
+    const frame = { width: video.videoWidth, height: video.videoHeight };
+    this.analysisSize = frame;
     const t0 = performance.now();
-    const res = this.landmarker.detectForVideo(v, t0);
+    const res = this.landmarker.detectForVideo(video, t0);
     const t1 = performance.now();
     this.ms = this.ms ? this.ms * 0.9 + (t1 - t0) * 0.1 : t1 - t0;
     this.meter.push(t1);
-
-    const lm = res.faceLandmarks?.[0];
-    if (!lm) return { frame, face: false };
-    const opts = { frameMirrored: this.frameMirrored };
-    return {
-      frame,
-      face: true,
-      lm,
-      rois: buildRois(lm, frame, opts),
-      blend: sidedBlendshapes(res.faceBlendshapes?.[0]?.categories, { ...opts, swapNames: this.swapNames }),
-    };
+    this.onResult?.({
+      t,
+      ms: t1 - t0,
+      ...processResult(res, frame, { frameMirrored: this.frameMirrored, swapNames: this.swapNames }),
+    });
   }
 }

@@ -44,6 +44,37 @@
       El directo no llega a 24 fps. Prueba la prioridad «fps» o, para máxima sensibilidad, graba con la app de cámara y usa el modo de vídeo grabado (llegará en una fase posterior).
     </div>
 
+    <section class="curves" id="curvesView" aria-label="Curvas y parpadeos" hidden>
+      <div class="control-row">
+        <span class="control-label">Curva</span>
+        <div class="segmented" role="group" aria-label="Métrica de la curva">
+          <button type="button" data-metric="ear" aria-pressed="true">EAR</button>
+          <button type="button" data-metric="aperture" aria-pressed="false">Apertura</button>
+          <button type="button" data-metric="blink" aria-pressed="false">Blendshape</button>
+        </div>
+      </div>
+      <p class="hint" id="metricHint"></p>
+      <div class="pane" data-side="left">
+        <canvas class="curve" id="curveL" aria-label="Curva del lado izquierdo"></canvas>
+        <div class="stats-grid" id="statsL"></div>
+      </div>
+      <div class="pane" data-side="right">
+        <canvas class="curve" id="curveR" aria-label="Curva del lado derecho"></canvas>
+        <div class="stats-grid" id="statsR"></div>
+      </div>
+      <div class="control-row asym">
+        <span class="control-label">Asimetría (I − D) / (I + D), últimos 10 s</span>
+        <span class="asym-value" id="asymVal">—</span>
+      </div>
+      <details class="details">
+        <summary>Últimos parpadeos</summary>
+        <ol class="log" id="blinkLog"><li class="log-empty">Aún no hay ninguno.</li></ol>
+      </details>
+      <div class="control-row">
+        <button class="btn" id="resetBtn" type="button">Reiniciar medidas</button>
+      </div>
+    </section>
+
     <section class="controls" id="controls" hidden>
       <div class="control-row">
         <span class="control-label">Cámara</span>
@@ -70,23 +101,26 @@
 
       <details class="details">
         <summary>Verificación de lado (guiño)</summary>
-        <p class="hint">Cierra solo un ojo. I = izquierda del paciente, D = derecha. Si al cerrar el ojo izquierdo sube la barra D, marca «Invertir blendshapes» y avísame.</p>
+        <p class="hint">Cierra solo un ojo. I = izquierda del paciente, D = derecha. Las dos comprobaciones de lado ya están verificadas; este panel sigue aquí para repetirlas.</p>
         <div class="verify">
           <span class="control-label">Parpadeo (blendshape)</span>
           <div class="bars">
             <div class="bar" data-side="left"><span>I</span><i><b id="blinkL"></b></i><em id="blinkLv">—</em></div>
             <div class="bar" data-side="right"><span>D</span><i><b id="blinkR"></b></i><em id="blinkRv">—</em></div>
           </div>
-          <span class="control-label">Apertura (landmarks)</span>
+          <span class="control-label">EAR (landmarks)</span>
           <div class="bars">
-            <div class="bar" data-side="left"><span>I</span><i><b id="openL"></b></i><em id="openLv">—</em></div>
-            <div class="bar" data-side="right"><span>D</span><i><b id="openR"></b></i><em id="openRv">—</em></div>
+            <div class="bar" data-side="left"><span>I</span><i><b id="earL"></b></i><em id="earLv">—</em></div>
+            <div class="bar" data-side="right"><span>D</span><i><b id="earR"></b></i><em id="earRv">—</em></div>
           </div>
         </div>
         <label class="check"><input type="checkbox" id="swapToggle"> Invertir blendshapes</label>
+        <label class="check"><input type="checkbox" id="blendToggle" checked> Calcular blendshapes</label>
+        <p class="hint">Desactivar los blendshapes sirve para medir cuánto cuestan. Hacen falta para la sonrisa (fase 5); el EAR no los usa.</p>
         <dl class="kv" id="analysisDetails">
-          <dt>Delegado</dt><dd id="kvDelegate">—</dd>
+          <dt>Modo</dt><dd id="kvDelegate">—</dd>
           <dt>Análisis</dt><dd id="kvTime">—</dd>
+          <dt>Imagen de análisis</dt><dd id="kvSize">—</dd>
           <dt>Cara en el encuadre</dt><dd id="kvFace">—</dd>
           <dt>Distancia intercantal</dt><dd id="kvIcd">—</dd>
           <dt>Ancho del ojo I / D</dt><dd id="kvEye">—</dd>

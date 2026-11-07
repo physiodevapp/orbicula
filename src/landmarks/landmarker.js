@@ -1,27 +1,35 @@
 // Face Landmarker de MediaPipe: modelo y WASM servidos desde el propio sitio.
+// Lo usan el worker y el respaldo en el hilo principal, así que no toca `document`
+// (las rutas llegan ya absolutas: dentro de un worker las relativas se resolverían contra
+// el script del worker, no contra la página).
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 
-// Cambiar de modelo = cambiar el nombre del archivo (la caché es «immutable», ver _headers).
-export const MODEL_URL = './modelos/face_landmarker_float16_1.task';
-const WASM_DIR = `./mediapipe/${__MEDIAPIPE_VERSION__}`;
+const MODEL_FILE = 'modelos/face_landmarker_float16_1.task'; // la versión va en el nombre (caché «immutable»)
 
-const OPTIONS = {
-  runningMode: 'VIDEO',
-  numFaces: 1,
-  outputFaceBlendshapes: true,
-  // La matriz de transformación facial se activará en la fase 4 si compensa mejor la cabeza.
-  outputFacialTransformationMatrixes: false,
-};
+/** Rutas absolutas de los archivos de MediaPipe. Solo en el hilo principal. */
+export function assetUrls() {
+  return {
+    wasmDir: new URL(`mediapipe/${__MEDIAPIPE_VERSION__}`, document.baseURI).href,
+    modelUrl: new URL(MODEL_FILE, document.baseURI).href,
+  };
+}
 
-/** Crea el Face Landmarker. Intenta la GPU y, si falla, la CPU. */
-export async function createLandmarker() {
-  const fileset = await FilesetResolver.forVisionTasks(WASM_DIR);
+/**
+ * Crea el Face Landmarker. Intenta la GPU y, si falla, la CPU.
+ * @param {{wasmDir: string, modelUrl: string, blendshapes?: boolean}} opts
+ */
+export async function createLandmarker({ wasmDir, modelUrl, blendshapes = true }) {
+  const fileset = await FilesetResolver.forVisionTasks(wasmDir);
   let lastError;
   for (const delegate of ['GPU', 'CPU']) {
     try {
       const landmarker = await FaceLandmarker.createFromOptions(fileset, {
-        baseOptions: { modelAssetPath: MODEL_URL, delegate },
-        ...OPTIONS,
+        baseOptions: { modelAssetPath: modelUrl, delegate },
+        runningMode: 'VIDEO',
+        numFaces: 1,
+        outputFaceBlendshapes: blendshapes,
+        // La matriz de transformación facial se activará en la fase 4 si compensa mejor la cabeza.
+        outputFacialTransformationMatrixes: false,
       });
       return { landmarker, delegate };
     } catch (err) {

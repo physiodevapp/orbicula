@@ -7,7 +7,7 @@
 // derivada, anclada a la comisura externa. Las proporciones de abajo son provisionales y se
 // ajustan al ver las ROI en el móvil.
 
-import { EYES, NASAL_DORSUM, FACE_WIDTH } from './indices.js';
+import { EYES, NASAL_DORSUM, FACE_WIDTH, EAR_PAIR_POSITIONS, CENTER_PAIR_POSITION } from './indices.js';
 import { SIDES, patientSide } from './laterality.js';
 
 /** Proporciones respecto al ancho del ojo (distancia entre comisuras). */
@@ -64,7 +64,7 @@ const roi = (polygon) => ({ polygon, box: bbox(polygon) });
 /** Región = contorno + el mismo contorno desplazado `pad` en la dirección `n`. */
 const lidRoi = (chain, n, pad) => roi(hull([...chain, ...chain.map((p) => add(p, n, pad))]));
 
-function eyeRois(lm, f, eye) {
+function eyeRois(lm, f, eye, intercanthal) {
   const outer = pt(lm, eye.outer, f);
   const inner = pt(lm, eye.inner, f);
   const upper = eye.upper.map((i) => pt(lm, i, f));
@@ -83,7 +83,9 @@ function eyeRois(lm, f, eye) {
     add(add(center, along, -a), up, -a),
   ]);
 
-  const mid = (chain) => chain[Math.floor(chain.length / 2)];
+  // EAR de 6 puntos y apertura central normalizada a la distancia intercantal.
+  const gap = (k) => dist(upper[k], lower[k]);
+  const ear = EAR_PAIR_POSITIONS.reduce((sum, k) => sum + gap(k), 0) / (EAR_PAIR_POSITIONS.length * width);
   const brow = hull(eye.brow.map((i) => pt(lm, i, f)));
   const browC = centroid(brow);
   return {
@@ -92,9 +94,10 @@ function eyeRois(lm, f, eye) {
     brow: roi(hull([...brow, ...brow.map((p) => add(p, unit(sub(p, browC)), P.browPad * width))])),
     canthus,
     eyeWidth: width,
-    // Apertura rápida (no es el EAR de la fase 3): distancia entre los puntos medios de los
-    // párpados, normalizada al ancho del ojo. Sirve para comprobar el lado con un guiño.
-    opening: dist(mid(upper), mid(lower)) / width,
+    /** EAR: apertura vertical media / ancho del ojo (comisura a comisura). ≈ 0,25–0,35 con el ojo abierto. */
+    ear,
+    /** Apertura palpebral central / distancia intercantal (comisuras internas de los dos ojos). */
+    aperture: gap(CENTER_PAIR_POSITION) / intercanthal,
   };
 }
 
@@ -107,14 +110,12 @@ function eyeRois(lm, f, eye) {
  */
 export function buildRois(lm, frame, { frameMirrored = false } = {}) {
   const out = {};
+  const intercanthal = dist(pt(lm, EYES.right.inner, frame), pt(lm, EYES.left.inner, frame));
   for (const meshSide of SIDES) {
-    out[patientSide(meshSide, frameMirrored)] = eyeRois(lm, frame, EYES[meshSide]);
+    out[patientSide(meshSide, frameMirrored)] = eyeRois(lm, frame, EYES[meshSide], intercanthal);
   }
 
   const dorsum = NASAL_DORSUM.map((i) => pt(lm, i, frame));
-  const innerR = pt(lm, EYES.right.inner, frame);
-  const innerL = pt(lm, EYES.left.inner, frame);
-  const intercanthal = dist(innerR, innerL);
   const axis = unit(sub(dorsum[dorsum.length - 1], dorsum[0]));
   const side = { x: -axis.y, y: axis.x };
   const half = PROPORTIONS.referenceHalfWidth * intercanthal;

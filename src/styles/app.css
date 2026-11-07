@@ -192,3 +192,31 @@ main {
 .app-footer .build { font-family: var(--font-mono); }
 
 [hidden] { display: none !important; }
+
+/* ── Curvas y parpadeos ─────────────────────────────────────────────────── */
+.curves { display: flex; flex-direction: column; gap: var(--sp-3); }
+.pane {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.curve { display: block; width: 100%; height: 92px; }
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(5.2rem, 1fr));
+  gap: var(--sp-2) var(--sp-3);
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  border-top: 1px solid var(--border);
+}
+.stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stat-label { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-value { font-family: var(--font-mono); font-size: var(--fs-md); color: var(--text); }
+.pane[data-side='left'] .stat-value.main { color: var(--side-left); }
+.pane[data-side='right'] .stat-value.main { color: var(--side-right); }
+.asym-value { font-family: var(--font-mono); font-size: var(--fs-lg); color: var(--text); }
+.log { list-style: none; margin-top: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-1); font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text2); }
+.log li { display: flex; gap: var(--sp-2); }
+.log .side-left { color: var(--side-left); }
+.log .side-right { color: var(--side-right); }
+.log-empty { color: var(--text3); }

@@ -4,6 +4,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (fase 3: EAR y parpadeos)
+- El análisis de la cara corre en un Web Worker (`src/landmarks/analysis.worker.js`): el hilo principal queda libre para las curvas. Los frames se mandan como `ImageBitmap` reducido (lado corto ≤ 720 px, que no empeora los landmarks), con dos frames en vuelo para que el worker no espere, y las ROI se calculan sobre el frame completo. Si el worker no arranca se usa el hilo principal; `?analysis=main` lo fuerza para comparar tiempos.
+- EAR de 6 puntos por lado (posiciones 3 y 5 de las cadenas de los párpados) y apertura palpebral central normalizada a la distancia intercantal; sustituyen a la «apertura rápida» de la fase 2.
+- Detector de parpadeos por lado (`src/metrics/blinks.js`): reposo = percentil 90 de los últimos 5 s (o línea base fija, para la calibración de la fase 5), histéresis, duración a media altura con interpolación, completitud = cierre respecto al reposo, frecuencia por minuto y distinción entre parpadeo y cierre largo (> 800 ms). Umbrales provisionales.
+- Dos curvas en tiempo real (I y D, ventana de 10 s, escala fija) de EAR, apertura o blendshape, con el reposo y los parpadeos marcados; contadores por lado, índice de asimetría (I − D) / (I + D) de los últimos 10 s y registro de los últimos parpadeos.
+- Las marcas de tiempo son las de captura de la cámara (`captureTime`) cuando el navegador las da.
+- Casilla «Calcular blendshapes» para medir su coste.
+- 54 tests (señales sintéticas de parpadeo con ruido, jitter, deriva, pérdida de cara y espejo).
+
 ### Añadido (fase 2: landmarks)
 - MediaPipe Face Landmarker 1.1.0 con el modelo (`public/modelos/`) y el WASM servidos desde el propio sitio; `scripts/copy-wasm.mjs` copia el WASM antes de `dev` y `build`. GPU con respaldo a CPU.
 - ROI por lado del paciente (párpado superior, párpado inferior, ceja y canto externo) y ROI de referencia en el dorso nasal, en píxeles del frame completo (`src/roi/`). Los índices salen del mallado oficial y están documentados en `src/roi/indices.js`; el canto externo es una caja derivada.
