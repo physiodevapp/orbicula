@@ -75,6 +75,7 @@ export function buildReport({ results, startedAt, code = null, build, device, ca
       title: step.title,
       instruction: step.instruction,
       status: step.status,
+      attempt: step.attempt,
       interruptReason: step.interruptReason,
       startedAt: step.startedAt,
       plannedMs: step.plannedMs,

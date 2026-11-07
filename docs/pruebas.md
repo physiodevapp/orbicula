@@ -7,8 +7,17 @@ Guía paso a paso dentro de la app (tarjeta «Asistente de pruebas», debajo del
 ## Cómo se usa
 1. Activa la cámara y encuadra la cara. Elige cámara y prioridad **antes** de empezar: cambiarlas interrumpe el paso.
 2. Pulsa **Empezar** (el código es opcional). Cada paso: cuenta atrás de 3 s, instrucción sobre el vídeo con tiempo restante y pitidos/vibración (se pueden desactivar), y una pantalla de revisión.
-3. En la revisión se ve lo que ha detectado la app. Puedes anotar cuántos parpadeos has contado tú (opcional) y observaciones. **Repetir** descarta el paso y lo vuelve a grabar; **Siguiente** lo guarda.
+3. En la revisión se ve lo que ha detectado la app. Puedes anotar cuántos parpadeos has contado tú (opcional) y observaciones. **Siguiente** guarda el paso.
 4. Al final: **Descargar JSON** (carpeta de descargas del móvil), **Compartir** (si el navegador lo permite) o **Copiar resumen** (sin las series, para pegarlo en el chat).
+
+## Si algo sale mal
+No hace falta empezar de cero: solo se rehace lo que falló y lo ya guardado se conserva.
+- **Repetir este paso** (durante el paso o en la revisión): descarta lo grabado y vuelve a la cuenta atrás del mismo paso.
+- **← Paso anterior**: descarta el paso en curso y rehace el anterior (útil si te das cuenta después de pulsar «Siguiente»). Al terminar la sesión, **Rehacer el último paso** hace lo mismo con el último.
+- **Detener**: guarda lo hecho y para. La tarjeta ofrece **Retomar sesión**, que continúa en el paso que se estaba haciendo, además de descargar lo hecho hasta ahora.
+- **Saltar**: deja el paso sin grabar (queda como `skipped`).
+- Si la cámara se reinicia (cambio de cámara o de prioridad, o salir de la pestaña), el paso en curso queda **interrumpido** y se ofrece repetirlo.
+- Repetir no reinicia el reposo estimado del detector, así que los parpadeos de los primeros segundos se siguen detectando. En el JSON, `attempt` indica el número de intento de cada paso; solo se guarda el último.
 
 `?escala=0.2` en la dirección acorta las duraciones de los pasos (mínimo 1,5 s), para comprobar el flujo rápido.
 
@@ -27,7 +36,7 @@ Solo medidas numéricas y la configuración: ninguna imagen, ningún nombre. Inc
   "detector": { /* umbrales del detector de parpadeos usados */ },
   "steps": [{
     "id": "wink-left", "title": "", "instruction": "",
-    "status": "completed|skipped|interrupted", "interruptReason": null,
+    "status": "completed|skipped|interrupted", "attempt": 1, "interruptReason": null,
     "startedAt": "ISO-8601", "plannedMs": 0, "durationMs": 0,
     "expect": { "left": 5, "right": 0 },          // lo que se debería detectar
     "user": { "counted": null, "notes": "" },     // lo que anota el usuario

@@ -117,6 +117,7 @@ describe('GuidedSession', () => {
     expect(snap.progress).toBeCloseTo(0.5);
     expect(snap.index).toBe(0);
     expect(snap.total).toBe(2);
+    expect(snap.completed).toBe(0);
   });
 
   it('abort conserva lo ya revisado', () => {
@@ -128,6 +129,130 @@ describe('GuidedSession', () => {
     s.abort();
     expect(s.state).toBe('aborted');
     expect(s.results).toHaveLength(1);
+  });
+
+  // Tres pasos para poder volver atrás desde el segundo.
+  const THREE = [...STEPS, { id: 'c', title: 'C', instruction: 'hazC', durationMs: 400 }];
+  function make3() {
+    let t = 0;
+    const s = new GuidedSession(THREE, { now: () => t, prepMs: 100 });
+    const at = (v) => { t = v; s.tick(); };
+    // Completa los pasos que se pidan, de principio a fin, anotando una muestra distinta en cada uno.
+    const doStep = (marker) => {
+      at(t + 100); // fin de la cuenta atrás
+      s.record(t, sample(marker, marker));
+      at(t + s.step.durationMs);
+      s.next();
+    };
+    return { s, at, doStep };
+  }
+
+  it('repetir el paso en curso conserva los anteriores y sube el nº de intento', () => {
+    const { s, at, doStep } = make3();
+    s.start();
+    doStep(0.31); // paso a, guardado
+    at(1000);
+    expect(s.step.id).toBe('b');
+    s.record(1000, sample(0.2, 0.2)); // algo ocurre durante el paso b…
+    s.repeat(); // …y se repite
+    expect(s.state).toBe('prep');
+    expect(s.step.id).toBe('b');
+    expect(s.cur.attempt).toBe(2);
+    expect(s.cur.rel).toEqual([]);
+    expect(s.results.map((r) => r.id)).toEqual(['a']);
+    expect(s.results[0].series.left.ear).toEqual([0.31]);
+  });
+
+  it('paso anterior: vuelve al paso previo, descarta su resultado y deja los demás', () => {
+    const { s, doStep } = make3();
+    s.start();
+    doStep(0.31); // a
+    doStep(0.32); // b
+    expect(s.step.id).toBe('c');
+    expect(s.previous()).toBe(true);
+    expect(s.step.id).toBe('b');
+    expect(s.state).toBe('prep');
+    expect(s.cur.attempt).toBe(2);
+    expect(s.results.map((r) => r.id)).toEqual(['a']);
+    doStep(0.4); // b rehecho
+    doStep(0.5); // c
+    expect(s.state).toBe('done');
+    expect(s.results.map((r) => r.id)).toEqual(['a', 'b', 'c']);
+    expect(s.results[1].series.left.ear).toEqual([0.4]); // el rehecho, no el primero
+    expect(s.results[1].attempt).toBe(2);
+    expect(s.results[0].attempt).toBe(1);
+  });
+
+  it('paso anterior no hace nada en el primer paso', () => {
+    const { s } = make3();
+    s.start();
+    expect(s.previous()).toBe(false);
+    expect(s.index).toBe(0);
+    expect(s.cur.attempt).toBe(1);
+  });
+
+  it('con la sesión terminada se puede rehacer el último paso', () => {
+    const { s, doStep } = make3();
+    s.start();
+    doStep(0.1);
+    doStep(0.2);
+    doStep(0.3);
+    expect(s.state).toBe('done');
+    expect(s.previous()).toBe(true);
+    expect(s.step.id).toBe('c');
+    expect(s.results.map((r) => r.id)).toEqual(['a', 'b']);
+    doStep(0.9);
+    expect(s.state).toBe('done');
+    expect(s.results[2].series.left.ear).toEqual([0.9]);
+  });
+
+  it('detener y retomar: se continúa en el paso que se estaba haciendo, con lo hecho intacto', () => {
+    const { s, at, doStep } = make3();
+    s.start();
+    doStep(0.31); // a
+    at(1000);
+    s.record(1000, sample(0.2, 0.2));
+    s.abort();
+    expect(s.state).toBe('aborted');
+    expect(s.results.map((r) => r.id)).toEqual(['a']);
+    s.resume();
+    expect(s.state).toBe('prep');
+    expect(s.step.id).toBe('b');
+    expect(s.cur.attempt).toBe(2);
+    expect(s.cur.rel).toEqual([]);
+    doStep(0.4);
+    doStep(0.5);
+    expect(s.state).toBe('done');
+    expect(s.results.map((r) => r.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('una sesión detenida también permite rehacer el último paso guardado', () => {
+    const { s, doStep } = make3();
+    s.start();
+    doStep(0.31);
+    doStep(0.32); // ahora en c
+    s.abort();
+    expect(s.previous()).toBe(true);
+    expect(s.step.id).toBe('b');
+    expect(s.results.map((r) => r.id)).toEqual(['a']);
+  });
+
+  it('abort y resume no hacen nada fuera de su estado', () => {
+    const { s } = make3();
+    s.abort();
+    expect(s.state).toBe('idle');
+    s.resume();
+    expect(s.state).toBe('idle');
+  });
+
+  it('empezar de nuevo reinicia los intentos', () => {
+    const { s, doStep } = make3();
+    s.start();
+    doStep(0.1);
+    s.abort();
+    s.reset();
+    s.start();
+    expect(s.cur.attempt).toBe(1);
   });
 
   it('la lista de pasos del asistente es coherente', () => {
@@ -191,6 +316,7 @@ describe('informe', () => {
     expect(full.steps[0].series.t).toHaveLength(10);
     expect(full.steps[0].series.left.ear).toHaveLength(10);
     expect(full.steps[0].user.counted).toBe(1);
+    expect(full.steps[0].attempt).toBe(1);
     expect(JSON.parse(JSON.stringify(full))).toEqual(full); // JSON válido y sin undefined
     const light = buildReport({ ...base, includeSeries: false });
     expect(light.steps[0].series).toBeUndefined();

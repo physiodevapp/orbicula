@@ -63,10 +63,15 @@
         <div class="step-title" id="asTitle"></div>
         <p class="step-text" id="asText"></p>
         <div class="control-row wrap">
+          <button class="btn btn-primary" id="asRepeatNow" type="button">Repetir este paso</button>
           <button class="btn" id="asFinish" type="button">Terminar paso</button>
-          <button class="btn" id="asSkip" type="button">Saltar</button>
-          <button class="btn" id="asAbort" type="button">Cancelar</button>
         </div>
+        <div class="control-row wrap">
+          <button class="btn btn-quiet" id="asPrev" type="button">← Paso anterior</button>
+          <button class="btn btn-quiet" id="asSkip" type="button">Saltar</button>
+          <button class="btn btn-quiet" id="asAbort" type="button">Detener</button>
+        </div>
+        <p class="hint">«Repetir» vuelve a la cuenta atrás de este paso sin perder los anteriores. «Detener» guarda lo hecho y se puede retomar.</p>
       </div>
 
       <div class="as-view" data-view="review">
@@ -82,14 +87,19 @@
           <textarea class="input" id="asNotes" rows="2" maxlength="400"></textarea>
         </label>
         <div class="control-row wrap">
-          <button class="btn" id="asRepeat" type="button">Repetir</button>
+          <button class="btn" id="asRepeat" type="button">Repetir este paso</button>
+          <button class="btn btn-quiet" id="asPrevReview" type="button">← Paso anterior</button>
           <button class="btn btn-primary" id="asNext" type="button">Siguiente</button>
         </div>
       </div>
 
       <div class="as-view" data-view="done">
-        <div class="step-title">Prueba completa</div>
-        <p class="hint">Descarga el archivo y adjúntalo en la conversación con Claude. Contiene solo medidas numéricas (sin imágenes ni nombres) y el modelo de navegador del dispositivo.</p>
+        <div class="step-title" id="asDoneTitle">Prueba completa</div>
+        <p class="hint" id="asDoneText">Descarga el archivo y adjúntalo en la conversación con Claude. Contiene solo medidas numéricas (sin imágenes ni nombres) y el modelo de navegador del dispositivo.</p>
+        <div class="control-row wrap">
+          <button class="btn btn-primary" id="asResume" type="button" hidden>Retomar sesión</button>
+          <button class="btn" id="asRedoLast" type="button">Rehacer el último paso</button>
+        </div>
         <div class="control-row wrap">
           <button class="btn btn-primary" id="asDownload" type="button">Descargar JSON</button>
           <button class="btn" id="asShare" type="button" hidden>Compartir</button>

@@ -9,8 +9,9 @@ export const PREP_MS = 3000;
 
 const r3 = (v) => (Number.isFinite(v) ? Math.round(v * 1000) / 1000 : null);
 
-const newResult = (step) => ({
+const newResult = (step, attempt) => ({
   id: step.id,
+  attempt, // nº de intento de este paso (sube al repetirlo)
   title: step.title,
   instruction: step.instruction,
   plannedMs: step.durationMs,
@@ -46,6 +47,7 @@ export class GuidedSession {
   reset() {
     this.state = 'idle';
     this.index = -1;
+    this.attempts = {}; // intentos por paso
     this.results = [];
     this.cur = null;
     this.phaseStart = 0;
@@ -70,7 +72,7 @@ export class GuidedSession {
       remainingMs = Math.max(0, step.durationMs - elapsed);
       progress = 1 - remainingMs / step.durationMs;
     }
-    return { state: this.state, index: this.index, total: this.steps.length, step, remainingMs, progress, current: this.cur };
+    return { state: this.state, index: this.index, total: this.steps.length, completed: this.results.length, step, remainingMs, progress, current: this.cur };
   }
 
   #emit() {
@@ -79,7 +81,9 @@ export class GuidedSession {
 
   #enter(i) {
     this.index = i;
-    this.cur = newResult(this.steps[i]);
+    const id = this.steps[i].id;
+    this.attempts[id] = (this.attempts[id] ?? 0) + 1;
+    this.cur = newResult(this.steps[i], this.attempts[id]);
     this.state = 'prep';
     this.phaseStart = this.now();
     this.onCue('prep');
@@ -90,6 +94,7 @@ export class GuidedSession {
   start() {
     if (this.state === 'prep' || this.state === 'running' || this.state === 'review') return;
     this.results = [];
+    this.attempts = {};
     this.startedAt = new Date().toISOString();
     this.#enter(0);
   }
@@ -199,10 +204,30 @@ export class GuidedSession {
     this.#enter(this.index);
   }
 
-  /** Cancela la sesión. Lo ya revisado se conserva en `results`. */
+  /**
+   * Vuelve al paso anterior (o, si la sesión ha terminado, rehace el último) y lo graba de nuevo.
+   * Descarta lo grabado del paso en curso y el resultado del anterior; el resto se conserva.
+   * @returns {boolean} false si no hay ningún paso anterior que rehacer
+   */
+  previous() {
+    if (!['prep', 'running', 'review', 'done', 'aborted'].includes(this.state) || !this.results.length) return false;
+    const target = this.results.length - 1; // un resultado por paso, en orden
+    this.results.pop();
+    this.#enter(target);
+    return true;
+  }
+
+  /** Detiene la sesión. Lo ya revisado se conserva en `results` y se puede retomar con `resume()`. */
   abort() {
+    if (!['prep', 'running', 'review'].includes(this.state)) return;
     this.cur = null;
     this.state = 'aborted';
     this.#emit();
+  }
+
+  /** Retoma una sesión detenida en el paso que se estaba haciendo (desde su cuenta atrás). */
+  resume() {
+    if (this.state !== 'aborted' || this.index < 0) return;
+    this.#enter(this.index);
   }
 }

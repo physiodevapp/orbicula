@@ -33,6 +33,8 @@ export function createAssistant({ getContext, getPerf, onStart }) {
     revTitle: $('asRevTitle'), summary: $('asSummary'), expect: $('asExpect'),
     countedRow: $('asCountedRow'), counted: $('asCounted'), notes: $('asNotes'),
     msg: $('asMsg'), share: $('asShare'),
+    prev: $('asPrev'), prevReview: $('asPrevReview'), resume: $('asResume'), redoLast: $('asRedoLast'),
+    doneTitle: $('asDoneTitle'), doneText: $('asDoneText'),
     coach: $('coach'), coachStep: $('coachStep'), coachTime: $('coachTime'), coachText: $('coachText'), coachBar: $('coachBar'),
   };
 
@@ -77,7 +79,7 @@ export function createAssistant({ getContext, getPerf, onStart }) {
 
   function viewFor(s) {
     if (s.state === 'prep' || s.state === 'running') return 'active';
-    if (s.state === 'aborted') return session.results.length ? 'done' : 'idle';
+    if (s.state === 'aborted') return s.completed ? 'done' : 'idle';
     return s.state; // idle | review | done
   }
 
@@ -100,7 +102,11 @@ export function createAssistant({ getContext, getPerf, onStart }) {
     root.dataset.state = viewFor(s);
     const running = s.state === 'prep' || s.state === 'running';
     el.coach.hidden = !running;
-    el.status.textContent = s.step && s.state !== 'idle' && s.state !== 'done' ? `Paso ${s.index + 1} de ${s.total}` : '';
+    el.status.textContent = s.state === 'aborted' && s.step
+      ? `Detenida en el paso ${s.index + 1} de ${s.total}`
+      : s.step && s.state !== 'idle' && s.state !== 'done' ? `Paso ${s.index + 1} de ${s.total}` : '';
+    // Con pasos ya guardados se puede volver atrás; sin ellos no hay nada que rehacer.
+    el.prev.disabled = el.prevReview.disabled = !s.completed;
 
     if (running) {
       el.title.textContent = s.step.title;
@@ -127,7 +133,16 @@ export function createAssistant({ getContext, getPerf, onStart }) {
       el.notes.value = c.user.notes ?? '';
     }
     if (s.state === 'done' || s.state === 'aborted' || s.state === 'idle') unlockScreen();
-    if (s.state === 'done') el.share.hidden = !navigator.canShare;
+    if (s.state === 'done' || s.state === 'aborted') {
+      const aborted = s.state === 'aborted';
+      el.share.hidden = !navigator.canShare;
+      el.resume.hidden = !aborted;
+      el.redoLast.hidden = !s.completed;
+      el.doneTitle.textContent = aborted ? 'Sesión detenida' : 'Prueba completa';
+      el.doneText.textContent = aborted
+        ? `Llevas ${s.completed} de ${s.total} pasos. Puedes retomar la sesión en el paso ${s.index + 1}, rehacer el último o descargar lo hecho. Contiene solo medidas numéricas, sin imágenes ni nombres.`
+        : 'Descarga el archivo y adjúntalo en la conversación con Claude. Contiene solo medidas numéricas (sin imágenes ni nombres) y el modelo de navegador del dispositivo.';
+    }
   }
 
   // ── Informe ──────────────────────────────────────────────────────────────────
@@ -182,7 +197,13 @@ export function createAssistant({ getContext, getPerf, onStart }) {
   $('asFinish').addEventListener('click', () => session.finishStep());
   $('asSkip').addEventListener('click', () => session.skip());
   $('asAbort').addEventListener('click', () => session.abort());
-  $('asRepeat').addEventListener('click', () => { onStart(); session.repeat(); });
+  // Repetir y volver atrás no reinician las medidas: el reposo estimado se conserva.
+  $('asRepeat').addEventListener('click', () => session.repeat());
+  $('asRepeatNow').addEventListener('click', () => session.repeat());
+  el.prev.addEventListener('click', () => session.previous());
+  el.prevReview.addEventListener('click', () => session.previous());
+  el.redoLast.addEventListener('click', () => { lockScreen(); session.previous(); });
+  el.resume.addEventListener('click', () => { lockScreen(); session.resume(); });
   $('asNext').addEventListener('click', () => session.next());
   $('asDownload').addEventListener('click', download);
   el.share.addEventListener('click', share);

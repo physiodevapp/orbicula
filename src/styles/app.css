@@ -263,3 +263,5 @@ main {
 }
 .input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 .control-row.wrap { flex-wrap: wrap; justify-content: flex-start; }
+
+.btn-quiet { color: var(--text2); font-size: var(--fs-xs); padding: var(--sp-2) var(--sp-3); min-height: 36px; }
