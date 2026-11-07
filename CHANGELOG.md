@@ -16,6 +16,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - En los vídeos sintéticos (Chromium): el párpado de 1,5 px se ve en su lado y no en el otro, y el EAR no cambia; el cabeceo se anula con el dorso nasal (de 0,04–0,13 a 0,006–0,017 DI/s). La postura compensa peor y añade 0,01–0,03 DI/s de temblor de la malla con la cara quieta (en Chromium MediaPipe solo analiza ~9/s; se decidirá con los datos del móvil en el 4c).
 - 22 tests nuevos.
 
+- **Modo seguido** en el asistente (casilla): sin pantalla de revisión entre pasos; al terminar uno (dos pitidos) el siguiente empieza solo 2 s después. Pensado para hacerse la prueba uno mismo con la cámara trasera sin tocar el móvil. Un paso interrumpido sí se detiene en la revisión.
+- **Voz** (casilla, activada por defecto): dice «Paso N: nombre» al empezar cada cuenta atrás y «Prueba terminada» al final. Solo con voces instaladas en el móvil (`localService`), para que ningún texto salga del dispositivo; si no hay ninguna en español, no se oye nada.
+
 ### Corregido (fase 4b)
 - La asimetría de las curvas fallaba al elegir una métrica que no está en la serie de la cara.
 

@@ -423,3 +423,47 @@ describe('asistente de la fase 4', () => {
     expect(describeSummary(s.cur)).toMatch(/Sin datos de flujo/);
   });
 });
+
+describe('modo seguido (sin revisión)', () => {
+  it('al terminar un paso pasa solo al siguiente tras la pausa, y termina la sesión', () => {
+    const { s, cues, at } = make();
+    s.autoAdvanceMs = 2000;
+    s.start();
+    at(300); // graba A
+    at(1300); // fin de A → revisión breve
+    expect(s.state).toBe('review');
+    expect(s.autoAdvancing).toBe(true);
+    at(3299);
+    expect(s.state).toBe('review');
+    at(3300); // pausa cumplida → cuenta atrás de B
+    expect(s.state).toBe('prep');
+    expect(s.index).toBe(1);
+    expect(s.results.map((r) => r.id)).toEqual(['a']);
+    at(3600); // graba B
+    at(4100); // fin de B
+    at(6100);
+    expect(s.state).toBe('done');
+    expect(s.results.map((r) => r.status)).toEqual(['completed', 'completed']);
+    expect(cues.filter((c) => c === 'end')).toHaveLength(2);
+  });
+
+  it('un paso interrumpido se queda en la revisión aunque esté el modo seguido', () => {
+    const { s, at } = make();
+    s.autoAdvanceMs = 2000;
+    s.start();
+    at(300);
+    s.interrupt('la cámara se reinició');
+    expect(s.autoAdvancing).toBe(false);
+    at(10000);
+    expect(s.state).toBe('review');
+  });
+
+  it('sin modo seguido la revisión espera a «Siguiente»', () => {
+    const { s, at } = make();
+    s.start();
+    at(300);
+    at(1300);
+    at(60000);
+    expect(s.state).toBe('review');
+  });
+});

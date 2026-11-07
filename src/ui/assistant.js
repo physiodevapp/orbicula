@@ -1,7 +1,7 @@
 // Asistente de pruebas: guía paso a paso (GuidedSession), avisa sobre el vídeo con la cuenta
 // atrás y guarda el registro como un JSON que se descarga o se comparte. Todo en el
 // dispositivo: no hay ninguna llamada de red.
-import { GuidedSession } from '../assistant/session.js';
+import { GuidedSession, AUTO_PAUSE_MS } from '../assistant/session.js';
 import { PLANS, DEFAULT_PLAN } from '../assistant/steps.js';
 import { buildReport, describeSummary } from '../assistant/report.js';
 import { downloadJson, shareJson, copyJson, stamp } from './share.js';
@@ -38,7 +38,7 @@ const mmss = (ms) => `${Math.floor(ms / 60000)}:${pad(Math.ceil((ms % 60000) / 1
 export function createAssistant({ getContext, getPerf, onStart }) {
   const root = $('assistant');
   const el = {
-    status: $('asStatus'), code: $('asCode'), sound: $('asSound'),
+    status: $('asStatus'), code: $('asCode'), sound: $('asSound'), auto: $('asAuto'), voice: $('asVoice'),
     title: $('asTitle'), text: $('asText'),
     revTitle: $('asRevTitle'), summary: $('asSummary'), expect: $('asExpect'),
     countedRow: $('asCountedRow'), counted: $('asCounted'), notes: $('asNotes'),
@@ -65,11 +65,42 @@ export function createAssistant({ getContext, getPerf, onStart }) {
     } catch { /* sin audio */ }
   }
   const buzz = (pattern) => el.sound.checked && navigator.vibrate?.(pattern);
+
+  // ── Voz: el nombre de cada paso, para saber en cuál estás sin mirar la pantalla ───────────────
+  // Solo con voces instaladas en el móvil (localService): una voz «en la nube» mandaría el texto
+  // fuera del dispositivo. El texto es siempre el de la app (nunca datos del paciente).
+  const localVoice = () => {
+    try {
+      const voices = speechSynthesis.getVoices().filter((v) => v.localService);
+      return voices.find((v) => /^es(-|_|$)/i.test(v.lang)) ?? null;
+    } catch {
+      return null;
+    }
+  };
+  try { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = () => {}; } catch { /* sin voz */ }
+  function say(text) {
+    if (!el.voice.checked) return;
+    const voice = localVoice();
+    if (!voice) return;
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.voice = voice;
+      u.lang = voice.lang;
+      u.rate = 1.05;
+      speechSynthesis.speak(u);
+    } catch { /* sin voz */ }
+  }
+
   function onCue(cue) {
-    if (cue === 'prep') { beep(440); buzz(40); }
+    if (cue === 'prep') {
+      beep(440); buzz(40);
+      const s = session.snapshot();
+      if (s.step) say(`Paso ${s.index + 1}: ${s.step.title}.`);
+    }
     else if (cue === 'go') { beep(880, 200); buzz(150); }
     else if (cue === 'end') { beep(660); beep(660, 130, 0.22); buzz([80, 60, 80]); }
-    else if (cue === 'done') { beep(660); beep(880, 130, 0.18); beep(1100, 200, 0.36); buzz([100, 60, 100, 60, 200]); }
+    else if (cue === 'done') { beep(660); beep(880, 130, 0.18); beep(1100, 200, 0.36); buzz([100, 60, 100, 60, 200]); say('Prueba terminada.'); }
     // Repeticiones: agudo y largo = «ahora»; grave = «suelta».
     else if (cue === 'hold') { beep(1175, 260); buzz(120); }
     else if (cue === 'release') { beep(392, 220); buzz(40); }
@@ -137,6 +168,9 @@ export function createAssistant({ getContext, getPerf, onStart }) {
       el.coachStep.textContent = `${s.index + 1}/${s.total} · ${s.step.title}${s.step.reps ? ` — ${s.step.instruction}` : ''}`;
       renderTick();
       timer ??= setInterval(() => { session.tick(); renderTick(); }, 100);
+    } else if (s.autoAdvancing) {
+      // Modo seguido: la revisión dura solo la pausa y se pasa sola al siguiente paso.
+      timer ??= setInterval(() => { session.tick(); renderTick(); }, 100);
     } else if (timer) {
       clearInterval(timer);
       timer = null;
@@ -151,7 +185,7 @@ export function createAssistant({ getContext, getPerf, onStart }) {
       const exp = !x ? '' : x.closures != null
         ? `Esperado: ${x.closures} cierres en cada ojo.`
         : `Esperado: I ${x.left}, D ${x.right} (parpadeos o cierres).`;
-      el.expect.textContent = [exp, s.step.hint].filter(Boolean).join(' ');
+      el.expect.textContent = [s.autoAdvancing ? 'Modo seguido: el siguiente paso empieza solo.' : '', exp, s.step.hint].filter(Boolean).join(' ');
       el.countedRow.hidden = !s.step.countable;
       el.counted.value = c.user.counted ?? '';
       el.notes.value = c.user.notes ?? '';
@@ -207,6 +241,8 @@ export function createAssistant({ getContext, getPerf, onStart }) {
     audio ??= (() => { try { return new AudioContext(); } catch { return null; } })(); // se crea con un gesto del usuario
     planId = el.plan.value in PLANS ? el.plan.value : DEFAULT_PLAN;
     session.steps = stepsOf(planId);
+    session.autoAdvanceMs = el.auto.checked ? AUTO_PAUSE_MS : null;
+    say(''); // la voz, como el audio, se activa con un gesto del usuario
     lockScreen();
     el.status.textContent = PLANS[planId].flow ? 'Preparando el flujo óptico…' : '';
     try {
@@ -236,6 +272,17 @@ export function createAssistant({ getContext, getPerf, onStart }) {
   $('asNew').addEventListener('click', () => { el.msg.textContent = ''; session.reset(); });
   el.counted.addEventListener('input', () => session.setUser({ counted: el.counted.value === '' ? null : Number(el.counted.value) }));
   el.notes.addEventListener('input', () => session.setUser({ notes: el.notes.value }));
+
+  // Preferencias de comodidad (si el almacenamiento falla, no pasa nada).
+  for (const [box, key] of [[el.auto, 'asAuto'], [el.voice, 'asVoice']]) {
+    try {
+      const v = localStorage.getItem(`orbicula.${key}`);
+      if (v != null) box.checked = v === '1';
+    } catch { /* sin almacenamiento */ }
+    box.addEventListener('change', () => { try { localStorage.setItem(`orbicula.${key}`, box.checked ? '1' : '0'); } catch { /* nada */ } });
+  }
+  // Durante la sesión se puede cambiar el modo seguido (p. ej. para revisar un paso concreto).
+  el.auto.addEventListener('change', () => { session.autoAdvanceMs = el.auto.checked ? AUTO_PAUSE_MS : null; });
 
   render(session.snapshot());
 

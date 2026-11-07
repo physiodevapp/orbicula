@@ -14,6 +14,11 @@ Guía paso a paso dentro de la app (tarjeta «Asistente de pruebas», debajo del
 3. En la revisión se ve lo que ha detectado la app. Puedes anotar cuántos parpadeos has contado tú (opcional) y observaciones. **Siguiente** guarda el paso.
 4. Al final: **Descargar JSON** (carpeta de descargas del móvil), **Compartir** (si el navegador lo permite) o **Copiar resumen** (sin las series, para pegarlo en el chat).
 
+## Hacerse la prueba uno mismo con la cámara trasera
+- **Modo seguido** (casilla antes de «Empezar»): no hay revisión entre pasos. Al terminar un paso suenan dos pitidos y, 2 s después, empieza solo la cuenta atrás del siguiente. Al final, tres pitidos ascendentes y una vibración larga: ya se puede coger el móvil y descargar el JSON. Si un paso sale mal: **Rehacer el último paso** al terminar, o pulsar **Detener** y **Retomar**.
+- **Voz**: dice «Paso N: nombre del paso» al empezar cada cuenta atrás. Usa solo voces instaladas en el móvil; si no se oye, comprobar en Ajustes de Android → Accesibilidad → Texto a voz que hay una voz en español descargada.
+- Sonidos: medio y corto = cuenta atrás; más agudo = empieza la grabación; **muy agudo = «ahora»**; **grave = «suelta»**; dos iguales = fin del paso.
+
 ## Si algo sale mal
 No hace falta empezar de cero: solo se rehace lo que falló y lo ya guardado se conserva.
 - **Repetir este paso** (durante el paso o en la revisión): descarta lo grabado y vuelve a la cuenta atrás del mismo paso.

@@ -2,7 +2,8 @@
 // Pulsa «Siguiente» en cada revisión hasta terminar. Ver docs/desarrollo.md.
 //
 //   node scripts/dev/run-assistant.cjs --video /ruta/lid.y4m --out /ruta/informe.json
-//        [--plan phase4|phase3] [--query '?escala=0.25'] [--url http://127.0.0.1:4173/]
+//        [--plan phase4|phase3] [--query '?escala=0.25'] [--url http://127.0.0.1:4173/] [--auto]
+// Con --auto usa el modo seguido y no pulsa nada entre pasos (comprueba que avanza solo).
 const { chromium } = require('playwright');
 
 const arg = (name, def) => {
@@ -14,6 +15,7 @@ const VIDEO = arg('video', null);
 const OUT = arg('out', 'informe.json');
 const PLAN = arg('plan', 'phase4');
 const QUERY = arg('query', '?escala=0.25');
+const AUTO = process.argv.includes('--auto');
 
 (async () => {
   const args = ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--enable-unsafe-swiftshader'];
@@ -31,13 +33,15 @@ const QUERY = arg('query', '?escala=0.25');
   await page.click('#startBtn');
   await page.waitForFunction(() => /análisis/.test(document.querySelector('#anaPill')?.textContent ?? ''), null, { timeout: 60000 });
   await page.selectOption('#asPlan', PLAN);
+  if (AUTO) await page.check('#asAuto');
+  else await page.uncheck('#asAuto');
   await page.click('#asStart');
   const t0 = Date.now();
   let reviews = 0;
   while (Date.now() - t0 < 600000) {
     const st = await page.getAttribute('#assistant', 'data-state');
     if (st === 'done') break;
-    if (st === 'review') {
+    if (st === 'review' && !AUTO) {
       reviews++;
       console.log(`— ${await page.textContent('#asRevTitle')}\n${(await page.textContent('#asSummary')).trim()}`);
       await page.click('#asNext');
@@ -46,6 +50,10 @@ const QUERY = arg('query', '?escala=0.25');
   }
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#asDownload')]);
   await dl.saveAs(OUT);
+  if (AUTO) {
+    const steps = JSON.parse(require('fs').readFileSync(OUT, 'utf8')).steps;
+    console.log(`modo seguido: ${steps.length} pasos guardados sin pulsar nada (${steps.map((x) => x.status).join(', ')})`);
+  }
   console.log(`pasos revisados: ${reviews}; informe en ${OUT}`);
   console.log('peticiones externas:', external);
   console.log('errores de consola:', errors);

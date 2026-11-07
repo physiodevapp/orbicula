@@ -6,6 +6,8 @@
 //          → siguiente paso … → done.   Se puede interrumpir, saltar o repetir un paso.
 
 export const PREP_MS = 3000;
+/** Modo seguido: pausa entre el final de un paso (dos pitidos) y la cuenta atrás del siguiente. */
+export const AUTO_PAUSE_MS = 2000;
 
 const r3 = (v) => (Number.isFinite(v) ? Math.round(v * 1000) / 1000 : null);
 
@@ -83,6 +85,9 @@ export class GuidedSession {
     this.getPerf = getPerf;
     this.onChange = onChange;
     this.onCue = onCue;
+    // Modo seguido: sin revisión; al terminar un paso se pasa solo al siguiente tras esta pausa
+    // (null = desactivado). Pensado para hacerse la prueba uno mismo con la cámara trasera.
+    this.autoAdvanceMs = null;
     this.reset();
   }
 
@@ -121,7 +126,7 @@ export class GuidedSession {
       const last = due.at(-1);
       rep = { of: step.reps.count, k: last ? last.k + 1 : 0, holding: last?.kind === 'hold' };
     }
-    return { state: this.state, index: this.index, total: this.steps.length, completed: this.results.length, step, remainingMs, progress, current: this.cur, rep };
+    return { state: this.state, index: this.index, total: this.steps.length, completed: this.results.length, step, remainingMs, progress, current: this.cur, rep, autoAdvancing: this.autoAdvancing };
   }
 
   #emit() {
@@ -148,9 +153,18 @@ export class GuidedSession {
     this.#enter(0);
   }
 
+  /** ¿Pasará solo al siguiente paso? (para que la interfaz siga llamando a tick en la revisión) */
+  get autoAdvancing() {
+    return this.state === 'review' && this.autoAdvanceMs != null && this.cur?.status === 'completed';
+  }
+
   /** Avanza las fases por tiempo; la interfaz lo llama unas 10 veces por segundo. */
   tick() {
     const t = this.now();
+    if (this.autoAdvancing && t - this.phaseStart >= this.autoAdvanceMs) {
+      this.next();
+      return;
+    }
     if (this.state === 'prep' && t - this.phaseStart >= this.prepMs) {
       this.state = 'running';
       this.phaseStart = t;
@@ -226,6 +240,7 @@ export class GuidedSession {
     this.cur.durationMs = Math.round(this.now() - this.phaseStart);
     this.cur.perf = this.getPerf();
     this.state = 'review';
+    this.phaseStart = this.now(); // para la pausa del modo seguido
     this.onCue('end');
     this.#emit();
   }
