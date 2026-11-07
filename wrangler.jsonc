@@ -1,0 +1,15 @@
+{
+  // Despliegue en Cloudflare Workers con archivos estáticos (sin código de servidor).
+  // Workers Builds: `main` → `npx wrangler deploy` (producción); el resto de
+  // ramas → `npx wrangler preview` (previsualización por rama).
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "orbicula",
+  "compatibility_date": "2026-10-13",
+  "assets": {
+    "directory": "./dist"
+  },
+  "workers_dev": true,
+  "preview_urls": true,
+  // Obligatorio para `wrangler preview` aunque vaya vacío.
+  "previews": {}
+}

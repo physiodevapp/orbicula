@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>orbicula</title>
+  <meta name="description" content="Cuantificación de movimientos finos de la musculatura periocular con la cámara del móvil.">
+  <meta name="theme-color" content="#0a0d12">
+  <meta name="referrer" content="no-referrer">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+</head>
+<body>
+  <header class="app-header" id="appHeader">
+    <span class="logo">orbicula<span class="logo-dot">.</span></span>
+    <span class="tag">v0 · prueba</span>
+  </header>
+
+  <main>
+    <div class="banner" id="errorBanner" role="alert" hidden></div>
+
+    <section class="card" id="startCard">
+      <div class="card-title">Cámara</div>
+      <p class="card-text">orbicula usa la cámara para medir movimientos alrededor de los ojos. La imagen se procesa en el móvil y no sale de él.</p>
+      <button class="btn btn-primary" id="startBtn" type="button">Activar cámara</button>
+    </section>
+
+    <section id="liveView" hidden>
+      <div class="stage">
+        <video id="video" playsinline muted autoplay></video>
+        <div class="stats" aria-live="polite">
+          <span class="pill" id="fpsPill">— fps</span>
+          <span class="pill" id="resPill">—</span>
+          <span class="pill" id="camPill">—</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="banner warn" id="fpsWarning" hidden>
+      El directo no llega a 24 fps. Prueba la prioridad «fps» o, para máxima sensibilidad, graba con la app de cámara y usa el modo de vídeo grabado (llegará en una fase posterior).
+    </div>
+
+    <section class="controls" id="controls" hidden>
+      <div class="control-row">
+        <span class="control-label">Cámara</span>
+        <div class="segmented" role="group" aria-label="Cámara">
+          <button type="button" data-facing="rear" aria-pressed="true">Trasera</button>
+          <button type="button" data-facing="front" aria-pressed="false">Frontal</button>
+        </div>
+      </div>
+      <div class="control-row">
+        <span class="control-label">Prioridad</span>
+        <div class="segmented" role="group" aria-label="Prioridad de captura">
+          <button type="button" data-priority="resolution" aria-pressed="true">Resolución</button>
+          <button type="button" data-priority="fps" aria-pressed="false">fps</button>
+        </div>
+      </div>
+      <div class="control-row" id="deviceRow" hidden>
+        <span class="control-label">Dispositivo</span>
+        <select class="select" id="deviceSelect" aria-label="Dispositivo de cámara"></select>
+      </div>
+
+      <details class="details">
+        <summary>Detalle técnico de la captura</summary>
+        <dl id="captureDetails"></dl>
+      </details>
+    </section>
+  </main>
+
+  <footer class="app-footer" id="appFooter">
+    <span>Parte del ecosistema PhysiQ</span>
+    <span>Herramienta de apoyo clínico, no de diagnóstico</span>
+    <span class="build" id="buildInfo"></span>
+  </footer>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
