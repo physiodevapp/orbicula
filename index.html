@@ -35,6 +35,68 @@
           <span class="pill" id="anaPill">Cargando modelo…</span>
           <span class="pill" id="roiPill" hidden>—</span>
         </div>
+        <div class="coach" id="coach" aria-live="polite" hidden>
+          <div class="coach-head"><span id="coachStep"></span><span id="coachTime"></span></div>
+          <div class="coach-text" id="coachText"></div>
+          <div class="coach-bar"><i id="coachBar"></i></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="assistant" id="assistant" data-state="idle" aria-label="Asistente de pruebas" hidden>
+      <div class="assistant-head">
+        <span class="card-title">Asistente de pruebas</span>
+        <span class="control-label" id="asStatus"></span>
+      </div>
+
+      <div class="as-view" data-view="idle">
+        <p class="hint">Te guía por cada prueba (reposo, parpadeo natural, guiños, cierres, mirada y cabeceo) y guarda las medidas en un archivo JSON que puedes compartir. Dura unos 7 minutos. No se guarda ninguna imagen.</p>
+        <label class="field">
+          <span class="control-label">Código (opcional)</span>
+          <input class="input" id="asCode" maxlength="24" autocomplete="off" placeholder="p. ej. P01">
+        </label>
+        <label class="check"><input type="checkbox" id="asSound" checked> Sonidos y vibración</label>
+        <button class="btn btn-primary" id="asStart" type="button">Empezar</button>
+      </div>
+
+      <div class="as-view" data-view="active">
+        <div class="step-title" id="asTitle"></div>
+        <p class="step-text" id="asText"></p>
+        <div class="control-row wrap">
+          <button class="btn" id="asFinish" type="button">Terminar paso</button>
+          <button class="btn" id="asSkip" type="button">Saltar</button>
+          <button class="btn" id="asAbort" type="button">Cancelar</button>
+        </div>
+      </div>
+
+      <div class="as-view" data-view="review">
+        <div class="step-title" id="asRevTitle"></div>
+        <pre class="summary" id="asSummary"></pre>
+        <p class="hint" id="asExpect"></p>
+        <label class="field" id="asCountedRow">
+          <span class="control-label">Contados por mí (opcional)</span>
+          <input class="input" id="asCounted" type="number" inputmode="numeric" min="0" max="999">
+        </label>
+        <label class="field">
+          <span class="control-label">Observaciones (opcional)</span>
+          <textarea class="input" id="asNotes" rows="2" maxlength="400"></textarea>
+        </label>
+        <div class="control-row wrap">
+          <button class="btn" id="asRepeat" type="button">Repetir</button>
+          <button class="btn btn-primary" id="asNext" type="button">Siguiente</button>
+        </div>
+      </div>
+
+      <div class="as-view" data-view="done">
+        <div class="step-title">Prueba completa</div>
+        <p class="hint">Descarga el archivo y adjúntalo en la conversación con Claude. Contiene solo medidas numéricas (sin imágenes ni nombres) y el modelo de navegador del dispositivo.</p>
+        <div class="control-row wrap">
+          <button class="btn btn-primary" id="asDownload" type="button">Descargar JSON</button>
+          <button class="btn" id="asShare" type="button" hidden>Compartir</button>
+          <button class="btn" id="asCopy" type="button">Copiar resumen</button>
+        </div>
+        <p class="hint" id="asMsg"></p>
+        <button class="btn" id="asNew" type="button">Nueva sesión</button>
       </div>
     </section>
 

@@ -37,6 +37,10 @@ v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolu
 - **Asimetría** = (I − D) / (I + D) sobre los últimos 10 s de la métrica elegida; I y D son siempre las del paciente.
 - Todos los umbrales son provisionales y se ajustan con las pruebas en el móvil.
 
+## Asistente de pruebas
+
+Debajo del vídeo hay un asistente que guía por cada prueba y guarda las medidas en un JSON que se puede descargar y compartir. Ver [`docs/pruebas.md`](docs/pruebas.md).
+
 ## Créditos
 
 Modelo Face Landmarker y librería `@mediapipe/tasks-vision` de Google (licencia Apache 2.0), servidos desde este repositorio.

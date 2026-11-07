@@ -13,6 +13,7 @@ import { WorkerAnalysis } from './landmarks/worker-client.js';
 import { Analysis } from './landmarks/analysis.js';
 import { sampleOf } from './landmarks/process.js';
 import { BlinkDetector } from './metrics/blinks.js';
+import { createAssistant } from './ui/assistant.js';
 import { Series } from './metrics/series.js';
 import { asymmetry } from './metrics/asymmetry.js';
 import { Overlay } from './ui/overlay.js';
@@ -74,6 +75,46 @@ const curves = new Curves(
     right: { events: detectors.right.events, baseline: detectors.right.baseline },
   }),
 );
+
+/** Datos del informe del asistente de pruebas: solo medidas y configuración, sin imágenes. */
+const round1 = (v) => (Number.isFinite(v) ? Math.round(v * 10) / 10 : null);
+function captureContext() {
+  const info = camera.info;
+  return {
+    build: { version: __APP_VERSION__, branch: __BRANCH__, commit: __COMMIT__ },
+    device: {
+      userAgent: navigator.userAgent,
+      hardwareConcurrency: navigator.hardwareConcurrency ?? null,
+      deviceMemory: navigator.deviceMemory ?? null,
+      language: navigator.language,
+      screen: { width: screen.width, height: screen.height, pixelRatio: window.devicePixelRatio },
+    },
+    capture: {
+      facing: info?.facing ?? null,
+      deviceLabel: info?.label ?? null,
+      priority: state.priority,
+      requested: { ...PRIORITIES[state.priority], fps: REQUESTED_FPS },
+      settings: { width: info?.width ?? null, height: info?.height ?? null, fps: info?.frameRate ?? null, maxFps: info?.maxFrameRate ?? null },
+      frame: camera.frameSize,
+      strictFps: info?.strictFps ?? null,
+      previewMirrored: state.displayMirrored,
+    },
+    analysis: {
+      mode: analysis?.mode ?? null,
+      delegate: analysis?.delegate ?? null,
+      imageSize: analysis?.analysisSize ?? null,
+      blendshapes: els.blendToggle.checked,
+      swapNames: els.swapToggle.checked,
+    },
+    detector: { ...detectors.left.opt },
+  };
+}
+
+const assistant = createAssistant({
+  getContext: captureContext,
+  getPerf: () => ({ cameraFps: round1(camera.meter.fps), analysisFps: round1(analysis?.fps), analysisMs: round1(analysis?.ms) }),
+  onStart: () => resetMeasures(), // el reposo y las series empiezan de cero con cada paso
+});
 
 // Preferencias del clínico (solo comodidad: si el almacenamiento falla, no pasa nada).
 const pref = {
@@ -280,10 +321,15 @@ function onResult(r) {
 
   const sample = sampleOf(r);
   series.push(r.t, sample);
+  const newEvents = { left: [], right: [] };
   for (const side of SIDES) {
     const event = detectors[side].push(r.t, sample ? sample[side].ear : NaN);
-    if (event) logBlink(side, event);
+    if (event) {
+      logBlink(side, event);
+      newEvents[side].push(event);
+    }
   }
+  assistant.record(r.t, sample, newEvents);
 
   if (r.face && state.showRoi) overlay.draw(r, { displayMirrored: state.displayMirrored });
   else overlay.clear();
@@ -348,6 +394,7 @@ async function start() {
   showError('');
   els.startBtn.disabled = true;
   lowSince = null;
+  assistant.interrupt('la cámara se reinició (cambio de cámara, de prioridad o de pestaña)');
   resetMeasures(); // otra cámara u otra resolución: el reposo y las series ya no valen
   try {
     const info = await camera.start(state);
@@ -362,6 +409,7 @@ async function start() {
     els.startCard.hidden = true;
     els.live.hidden = false;
     els.curvesView.hidden = false;
+    assistant.show();
     els.controls.hidden = false;
     // La resolución real se conoce cuando llega el primer frame.
     const onMeta = () => renderDetails(info, camera.frameSize);

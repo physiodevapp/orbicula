@@ -11,7 +11,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - Dos curvas en tiempo real (I y D, ventana de 10 s, escala fija) de EAR, apertura o blendshape, con el reposo y los parpadeos marcados; contadores por lado, índice de asimetría (I − D) / (I + D) de los últimos 10 s y registro de los últimos parpadeos.
 - Las marcas de tiempo son las de captura de la cámara (`captureTime`) cuando el navegador las da.
 - Casilla «Calcular blendshapes» para medir su coste.
-- 54 tests (señales sintéticas de parpadeo con ruido, jitter, deriva, pérdida de cara y espejo).
+- **Asistente de pruebas** (`src/assistant/`, `src/ui/assistant.js`, `docs/pruebas.md`): guía paso a paso (reposo, parpadeo espontáneo, guiños, parpadeo flojo, cierre mantenido, mirada arriba y abajo, cabeceo) con cuenta atrás, instrucción sobre el vídeo, pitidos y vibración, pantalla encendida y revisión de cada paso (lo detectado, lo contado por el usuario y observaciones). Guarda un JSON de diagnóstico (`orbicula-test-session/1`) con configuración, rendimiento, eventos y series, que se descarga, se comparte o se copia sin series. El motor de pasos (`GuidedSession`) es la base del protocolo guiado de la fase 5.
+- 65 tests (señales sintéticas de parpadeo con ruido, jitter, deriva, pérdida de cara y espejo).
 
 ### Añadido (fase 2: landmarks)
 - MediaPipe Face Landmarker 1.1.0 con el modelo (`public/modelos/`) y el WASM servidos desde el propio sitio; `scripts/copy-wasm.mjs` copia el WASM antes de `dev` y `build`. GPU con respaldo a CPU.
