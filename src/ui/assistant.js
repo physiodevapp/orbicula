@@ -33,6 +33,15 @@ function stepsOf(plan, settings) {
   })).map((s) => (s.reps && k < 1 ? { ...s, durationMs: s.reps.offsetMs + s.reps.count * s.reps.everyMs } : s));
 }
 
+/** Lo que dice la voz cuando el reposo no vale, según el motivo. */
+const INVALID_SAY = {
+  face: 'No te veo bien la cara. Encuádrala de frente y con buena luz.',
+  head: 'Te has movido. Apoya la cabeza y quédate quieto.',
+  blinks: 'Has parpadeado mucho. Parpadea con calma y sin forzar.',
+  clean: 'No he tenido momentos tranquilos suficientes. Quédate quieto y parpadea poco.',
+  noflow: 'No me llegan datos del movimiento. Comprueba que se ve la cara.',
+};
+
 const pad = (n) => String(n).padStart(2, '0');
 const mmss = (ms) => `${Math.floor(ms / 60000)}:${pad(Math.ceil((ms % 60000) / 1000) % 60)}`;
 
@@ -107,7 +116,7 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
     }
     else if (cue === 'go') { beep(880, 200); buzz(150); }
     // Reposo no válido: dos pitidos graves y la voz lo explica; el paso se repite.
-    else if (cue === 'invalid') { beep(330, 200); beep(330, 200, 0.28); buzz([200, 80, 200]); say('El reposo no ha valido. Apoya la cabeza y quédate quieto. Repetimos.'); }
+    else if (cue === 'invalid') { beep(330, 200); beep(330, 200, 0.28); buzz([200, 80, 200]); say(`El reposo no ha valido. ${INVALID_SAY[session.cur?.calibration?.reasonCode] ?? 'Quédate quieto.'} Repetimos.`); }
     else if (cue === 'end') { beep(660); beep(660, 130, 0.22); buzz([80, 60, 80]); }
     else if (cue === 'done') { beep(660); beep(880, 130, 0.18); beep(1100, 200, 0.36); buzz([100, 60, 100, 60, 200]); say('Prueba terminada.'); }
     // Repeticiones: agudo y largo = «ahora»; grave = «suelta».
@@ -147,7 +156,8 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
 
   function viewFor(s) {
     if (s.state === 'prep' || s.state === 'running') return 'active';
-    if (s.state === 'aborted') return s.completed ? 'done' : 'idle';
+    // Detenida sin ningún paso bueno: con intentos no válidos hay algo que descargar para diagnosticar.
+    if (s.state === 'aborted') return s.completed || session.rejections?.length ? 'done' : 'idle';
     return s.state; // idle | review | done
   }
 
@@ -236,7 +246,7 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
 
   // ── Informe ──────────────────────────────────────────────────────────────────
   const report = (includeSeries) =>
-    buildReport({ results: session.results, startedAt: session.startedAt, code: el.code.value.trim() || null, plan: planId, settings: readSettings(), summary: fixedPlan ? summarizeProtocol(session.results) : null, includeSeries, ...getContext() });
+    buildReport({ results: session.results, startedAt: session.startedAt, code: el.code.value.trim() || null, plan: planId, settings: readSettings(), rejections: session.rejections, summary: fixedPlan ? summarizeProtocol(session.results) : null, includeSeries, ...getContext() });
 
   function fileName() {
     const code = el.code.value.trim().replace(/[^\w-]/g, '');

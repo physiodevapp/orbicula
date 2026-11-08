@@ -125,6 +125,7 @@ export class GuidedSession {
     this.index = -1;
     this.attempts = {}; // intentos por paso
     this.results = [];
+    this.rejections = []; // intentos no válidos (el reposo del protocolo), para diagnosticar
     this.cur = null;
     this.phaseStart = 0;
     this.startedAt = null;
@@ -179,6 +180,7 @@ export class GuidedSession {
   start() {
     if (this.state === 'prep' || this.state === 'running' || this.state === 'review') return;
     this.results = [];
+    this.rejections = [];
     this.attempts = {};
     this.startedAt = new Date().toISOString();
     this.#enter(0);
@@ -355,6 +357,7 @@ export class GuidedSession {
   /** Repite el paso actual desde la cuenta atrás, descartando lo grabado. */
   repeat() {
     if (!['prep', 'running', 'review'].includes(this.state)) return;
+    if (this.cur?.status === 'invalid') this.rejections.push({ step: this.cur.id, attempt: this.cur.attempt, calibration: this.cur.calibration, perf: this.cur.perf });
     this.#enter(this.index);
   }
 

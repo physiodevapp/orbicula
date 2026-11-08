@@ -133,6 +133,26 @@ describe('calibración sobre el reposo', () => {
     expect(cal.reason).toMatch(/cabeza/);
   });
 
+  it('si no vale, dice el motivo con números y un código: cabeza, parpadeos, cara o tramos tranquilos', () => {
+    const head = calibrate(fakeStep(20000, { head: (t) => (t % 4000 < 3000 ? 0.5 : 0.02) }));
+    expect(head.reasonCode).toBe('head');
+    expect(head.reason).toMatch(/la cabeza se ha movido \(.*de reposo útil; hacen falta 10,0 s/);
+    expect(head.diagnosis.movingMs).toBeGreaterThan(head.diagnosis.blinkedMs);
+    // Un parpadeo cada 1,2 s, sin mover la cabeza.
+    const many = [];
+    for (let t = 1500; t < 19500; t += 1200) many.push({ kind: 'blink', t, duration: 200, completeness: 0.7 });
+    const blinks = calibrate(fakeStep(20000, { events: { left: many, right: [] } }));
+    expect(blinks.valid).toBe(false);
+    expect(blinks.reasonCode).toBe('blinks');
+    expect(blinks.reason).toMatch(/demasiados parpadeos/);
+    // Sin cara en la mitad de las muestras.
+    const noFace = fakeStep(20000);
+    noFace.series.left.ear = noFace.series.left.ear.map((e, i) => (i % 2 ? null : e));
+    noFace.series.right.ear = noFace.series.right.ear.map((e, i) => (i % 2 ? null : e));
+    expect(calibrate(noFace).reasonCode).toBe('face');
+    expect(calibrate(fakeStep(20000)).reasonCode).toBeUndefined();
+  });
+
   it('aparta las ventanas de los parpadeos del umbral', () => {
     // Un «salto» del cierre durante un parpadeo no debe subir el umbral.
     const closure = (t) => (t > 9000 && t < 9400 ? 0.05 : 0);

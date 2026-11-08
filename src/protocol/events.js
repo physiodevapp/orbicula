@@ -143,6 +143,9 @@ export function calibrate(step, options = {}) {
   const dt = median(v.ft.slice(1).map((t, i) => t - v.ft[i])) ?? 0;
   const ok = v.ft.map((t) => !overlaps(bad, t, t));
   const validMs = ok.filter(Boolean).length * dt;
+  // Qué aparta más tiempo: la cabeza o los parpadeos (para decir el motivo si el reposo no vale).
+  const movingMs = v.ft.filter((t) => overlaps(moveWins, t, t)).length * dt;
+  const blinkedMs = v.ft.filter((t) => overlaps(blinkWins, t, t)).length * dt;
   // Subida: solo cuentan los pares cuya ventana entera ([t − 2,1 s, t]) está limpia.
   const span = o.medianMs + o.riseMs;
   const clean = v.ft.map((t) => t - (v.ft[0] ?? t) >= span && !overlaps(bad, t - span, t));
@@ -195,14 +198,32 @@ export function calibrate(step, options = {}) {
   out.warning = spiky.length
     ? `Umbral alto en ${spiky.map((x) => (x === 'left' ? 'el ojo izquierdo' : 'el ojo derecho')).join(' y ')}: lo ha fijado una sacudida suelta del párpado durante el reposo. Vale, pero detectará menos contracciones finas; si quieres más sensibilidad, repite el reposo.`
     : null;
+  // Si no vale, el motivo con números (se ve en la revisión y viaja en el JSON) y un código para la voz.
+  const s1 = (ms) => `${(ms / 1000).toFixed(1).replace('.', ',')} s`;
   const reasons = [];
-  if (out.faceFraction < 1 - o.maxFaceLoss) reasons.push('se ha perdido la cara demasiado tiempo');
-  if (validMs < o.minValidMs) reasons.push('la cabeza se ha movido o ha habido demasiados parpadeos');
-  else if (cleanMs < o.minCleanMs) reasons.push('no hay tramos limpios suficientes para el umbral');
-  if (!v.ft.length) reasons.push('no hay datos del flujo');
+  const codes = [];
+  if (!v.ft.length) {
+    reasons.push('no hay datos del flujo');
+    codes.push('noflow');
+  } else {
+    if (out.faceFraction < 1 - o.maxFaceLoss) {
+      reasons.push(`se ha perdido la cara (detectada el ${Math.round(out.faceFraction * 100)} % del tiempo; hace falta el ${Math.round((1 - o.maxFaceLoss) * 100)} %)`);
+      codes.push('face');
+    }
+    if (validMs < o.minValidMs) {
+      const head = movingMs >= blinkedMs;
+      reasons.push(`${head ? 'la cabeza se ha movido' : 'hay demasiados parpadeos'} (${s1(validMs)} de reposo útil; hacen falta ${s1(o.minValidMs)}; la cabeza aparta ${s1(movingMs)} y los parpadeos ${s1(blinkedMs)})`);
+      codes.push(head ? 'head' : 'blinks');
+    } else if (cleanMs < o.minCleanMs) {
+      reasons.push(`no hay tramos tranquilos suficientes (${s1(cleanMs)}; hacen falta ${s1(o.minCleanMs)} sin parpadeos ni movimiento seguidos)`);
+      codes.push('clean');
+    }
+  }
+  out.diagnosis = { validMs: Math.round(validMs), neededMs: Math.round(o.minValidMs), cleanMs: Math.round(cleanMs), neededCleanMs: o.minCleanMs, movingMs: Math.round(movingMs), blinkedMs: Math.round(blinkedMs), faceFraction: out.faceFraction, headStill: out.headStill };
   if (reasons.length) {
     out.valid = false;
     out.reason = reasons.join('; ');
+    out.reasonCode = codes[0];
   }
   return out;
 }

@@ -23,6 +23,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
   Las asimetrías de 0,20 o más se destacan, de forma orientativa. Los recuentos de contracciones no llevan asimetría.
 - El JSON del protocolo lleva el resumen (`summary`) además de las series.
+- **Cuando el reposo no vale, dice por qué, con números.**
+  - Motivos: cara perdida, cabeza movida, demasiados parpadeos o sin tramos tranquilos seguidos. Se ve en la revisión y en el JSON (`calibration.reason`, `reasonCode`, `diagnosis`).
+  - La voz da el motivo en lugar de un «no ha valido» genérico.
+  - Los intentos no válidos se guardan en el JSON (`rejections`), también si detienes el protocolo sin haber pasado del reposo.
 - `scripts/dev/summary.mjs`: imprime el resumen de un JSON del protocolo.
 - 14 tests nuevos.
 

@@ -115,6 +115,22 @@ describe('reposo no válido en el protocolo', () => {
     expect(started).toEqual(['rest', 'rest']);
   });
 
+  it('guarda cada intento no válido (con su calibración) para poder diagnosticarlo, y se vacía al empezar', () => {
+    const x = setup(() => false);
+    x.s.start();
+    runRest(x);
+    x.s.repeat();
+    runRest(x);
+    x.s.repeat();
+    expect(x.s.rejections.map((r) => [r.step, r.attempt])).toEqual([['rest', 1], ['rest', 2]]);
+    expect(x.s.rejections[0].calibration.reason).toMatch(/cabeza/);
+    const r = buildReport({ results: x.s.results, rejections: x.s.rejections, startedAt: 'x', build: {}, device: {}, capture: {}, analysis: {}, detector: {} });
+    expect(r.rejections).toHaveLength(2);
+    x.s.abort();
+    x.s.start();
+    expect(x.s.rejections).toEqual([]);
+  });
+
   it('sin modo seguido espera al usuario, que puede repetir', () => {
     const x = setup(() => false);
     x.s.start();
