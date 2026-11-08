@@ -39,7 +39,7 @@ const mmss = (ms) => `${Math.floor(ms / 60000)}:${pad(Math.ceil((ms % 60000) / 1
  *   getContext: build, device, capture, analysis, flujo y detector para el informe
  *   onStart: se llama al empezar una sesión (la app reinicia sus medidas y, si el plan lo pide, enciende el flujo)
  */
-export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () => {}, prefix = 'as', rootId = 'assistant', busyKey = 'assistant', plan: fixedPlan = null }) {
+export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () => {}, onStepStart = () => {}, prefix = 'as', rootId = 'assistant', busyKey = 'assistant', plan: fixedPlan = null }) {
   const root = $(rootId);
   const P = prefix;
   const el = {
@@ -140,6 +140,7 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
     onCue,
     onChange: (s) => render(s),
     onStepEnd: (result, step) => onStepEnd(result, step),
+    onStepStart: (step) => onStepStart(step),
   });
 
   function viewFor(s) {

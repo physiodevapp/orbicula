@@ -173,6 +173,9 @@ const sessionDeps = {
       if (!state.showFlow) throw new Error('no se pudo cargar el flujo óptico');
     }
   },
+  // Mientras se calibra (el reposo, también al repetirlo) no hay eventos: los umbrales de un intento
+  // anterior no valen y los «eventos» del propio reposo no significan nada.
+  onStepStart: (step) => { if (step.calibrates) setCalibration(null); },
   // El paso de reposo da la calibración de los eventos (fase 5). Con `minValidFraction`, el tiempo válido
   // mínimo es esa fracción del reposo (el protocolo); si no, el de por defecto.
   onStepEnd: (result, step) => {

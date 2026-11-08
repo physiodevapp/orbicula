@@ -197,6 +197,20 @@ Por eso una contracción de **menos de 0,5 s queda como `brief`** («breve»). S
 - **Lo que no hace todavía (5c):** resumen por fase y lado, asimetrías, FFT, co-activación y completitud relativa al cierre forzado. El JSON ya lleva lo necesario, incluida la serie `smile`.
 - **Pendiente de decidir con tus datos:** los gestos duran 3 s con 4 s de pausa.
 
+### Primera prueba del protocolo en el móvil (2026-11-08 13:38, commit d3d77ed, trasera «fps»)
+- **Completo y limpio:** las seis fases en unos 4 min y 30 s, sin errores. Rendimiento: análisis de la cara de 23,8 a 27,1/s, flujo de 27 a 30 pares/s y sin rebaja automática, con el móvil frío.
+- **Reposo:** el primer intento no valió y se repitió solo. El segundo dio 22,9 s de tiempo válido y calibración válida.
+- **Parpadeo espontáneo:** 19 por minuto en el ojo izquierdo y 21 en el derecho.
+- **Cierres (suave y forzado):** el EAR baja un 82–97 %, así que todas las repeticiones cuentan como parpadeos largos y el flujo se congela. En los cierres manda el EAR.
+- **Sonrisa:** el blendshape de sonrisa llega a 0,96–0,98 en los dos lados, simétrico. En las repeticiones 1 y 2 el EAR baja un 67–69 % en los dos ojos (sonrisa de Duchenne), y en la 3 casi cierra el ojo.
+- **Elevación de cejas:** la repetición 3 da una subida del cierre de 0,09–0,10 DI sin que cambie el EAR. Es la ceja moviendo el párpado superior.
+
+**Para el 5c: el umbral del reposo.** Salió de 0,063 DI en los dos ojos, el más alto de todas las pruebas (las anteriores, de 0,020 a 0,057).
+- Lo fija un solo pico a los 25,7 s: el cierre sube 0,06 DI en un par de frames, el EAR baja un 13 % y vuelve enseguida. Es una micro-sacudida del párpado, de menos de 0,2 s. El percentil 95 del reposo es 0,0045 DI.
+- Esas sacudidas no cuentan nunca como eventos (duran menos de 0,5 s), pero suben el umbral y le quitan sensibilidad.
+- **No se ha cambiado.** Probé fijar el umbral como «lo mínimo para que el propio reposo no dé un evento de 0,5 s o más», y no funciona: las colas lentas tras los parpadeos hacen que sea más alto que el máximo.
+- Hay que buscar otra forma, por ejemplo un percentil alto de las subidas sostenidas, y validarla contra los JSON de la fase 4 y de las pruebas de la 5a.
+
 ## Pruebas
 - **Tests unitarios:**
   - que la subida causal equivale al estadístico por ventanas;

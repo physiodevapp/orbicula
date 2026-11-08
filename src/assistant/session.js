@@ -105,13 +105,14 @@ export class GuidedSession {
    * @param {{now?: () => number, prepMs?: number, getPerf?: () => object|null,
    *          onChange?: (snapshot: object) => void, onCue?: (cue: string) => void}} opts
    */
-  constructor(steps, { now = () => performance.now(), prepMs = PREP_MS, getPerf = () => null, onChange = () => {}, onCue = () => {}, onStepEnd = () => {} } = {}) {
+  constructor(steps, { now = () => performance.now(), prepMs = PREP_MS, getPerf = () => null, onChange = () => {}, onCue = () => {}, onStepEnd = () => {}, onStepStart = () => {} } = {}) {
     this.steps = steps;
     this.now = now;
     this.prepMs = prepMs;
     this.getPerf = getPerf;
     this.onChange = onChange;
     this.onCue = onCue;
+    this.onStepStart = onStepStart; // (paso) al empezar la cuenta atrás de un paso (también al repetirlo)
     this.onStepEnd = onStepEnd; // (resultado, paso) al terminar un paso grabado entero (p. ej. para calibrar)
     // Modo seguido: sin revisión; al terminar un paso se pasa solo al siguiente tras esta pausa
     // (null = desactivado). Pensado para hacerse la prueba uno mismo con la cámara trasera.
@@ -169,6 +170,7 @@ export class GuidedSession {
     this.cur = newResult(this.steps[i], this.attempts[id]);
     this.state = 'prep';
     this.phaseStart = this.now();
+    this.onStepStart(this.steps[i]);
     this.onCue('prep');
     this.#emit();
   }

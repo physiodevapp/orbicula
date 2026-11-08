@@ -19,7 +19,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - Los eventos y la calibración funcionan igual que en el asistente (misma `calibrate` y mismo `EventDetector`).
 - El JSON (`orbicula-test-session/3`) lleva ahora la serie **`smile`** (blendshape de sonrisa, por lado) y `settings`. Es lo que necesitará la co-activación ojo–boca.
 - `createAssistant` admite varias tarjetas (`prefix`, `rootId`, `busyKey`, `plan`); no se pueden grabar dos a la vez. `scripts/dev/run-assistant.cjs --card protocol` recorre el protocolo.
-- 11 tests nuevos.
+- 12 tests nuevos.
+- **Sin eventos mientras se calibra:** al empezar el reposo (también al repetirlo) se quitan los umbrales del intento anterior. Antes, el reposo repetido mostraba «contracciones» calculadas con los umbrales de un reposo que no había valido.
 
 ### Añadido (fase 5a: calibración y eventos)
 - **Calibración sobre el reposo** (`src/protocol/events.js`, `calibrate`). Por lado salen:

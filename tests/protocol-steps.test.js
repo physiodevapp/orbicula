@@ -106,6 +106,15 @@ describe('reposo no válido en el protocolo', () => {
     expect(x.s.results[0]).toMatchObject({ id: 'rest', attempt: 2, status: 'completed' });
   });
 
+  it('avisa al empezar cada paso, también al repetirlo (para quitar los umbrales de un intento anterior)', () => {
+    const started = [];
+    const x = setup(() => false, { onStepStart: (st) => started.push(st.id) });
+    x.s.start();
+    runRest(x);
+    x.s.repeat();
+    expect(started).toEqual(['rest', 'rest']);
+  });
+
   it('sin modo seguido espera al usuario, que puede repetir', () => {
     const x = setup(() => false);
     x.s.start();
