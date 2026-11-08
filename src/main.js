@@ -16,6 +16,7 @@ import { Analysis } from './landmarks/analysis.js';
 import { sampleOf } from './landmarks/process.js';
 import { BlinkDetector } from './metrics/blinks.js';
 import { createAssistant } from './ui/assistant.js';
+import { createVideoCard } from './ui/video.js';
 import { PROTOCOL_PLAN } from './assistant/steps.js';
 import { createBenchmark } from './ui/benchmark.js';
 import { Series } from './metrics/series.js';
@@ -155,6 +156,9 @@ function captureContext() {
     detector: { ...detectors.left.opt },
   };
 }
+
+// Vídeo grabado (fase 6): solo la build y el dispositivo, no hace falta la cámara.
+createVideoCard({ getContext: () => { const c = captureContext(); return { build: c.build, device: c.device }; } });
 
 /** Lo que comparten el asistente de pruebas y el protocolo clínico: las mismas medidas y la misma calibración. */
 const sessionDeps = {

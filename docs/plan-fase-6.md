@@ -84,6 +84,29 @@ El vídeo de la app de cámara no sabe en qué fase está cada momento. Hay tres
    - En directo, cuando el análisis se queda por debajo de 24/s, el aviso propone el vídeo grabado (criterio 1).
    - README, CHANGELOG y la conclusión.
 
+## Paso 6a (hecho; pendiente de la prueba en el móvil)
+- `src/video/mp4.js`: lee el índice del MP4 sin cargar el archivo. Busca las cajas de primer nivel y pasa a `mp4box` solo `ftyp` y `moov`; cada muestra se lee del archivo por su posición. Da:
+  - el giro de la matriz de la pista;
+  - el tamaño ya girado;
+  - los tiempos de presentación de cada muestra (ms desde la primera);
+  - el ritmo real y si es variable;
+  - la configuración del decodificador.
+- `src/video/decode.js`: un generador de fotogramas con WebCodecs, en orden de presentación, sin adelantar más de 3 fotogramas listos, y el giro con un lienzo (`rotateFrame`).
+  - **Primer error, ya corregido:** con fotogramas B (H.264) el decodificador retiene varias muestras antes de dar el primer fotograma, y limitar la entrada por su cola lo bloqueaba. Ahora se limita por los fotogramas listos sin recoger, con un test que simula ese decodificador.
+- Tarjeta «Vídeo grabado» (`src/ui/video.js`), visible sin activar la cámara:
+  - archivo, ficha y cámara con que se grabó, con la casilla del espejo (para el 6b);
+  - «Probar la lectura (15 s)» con miniatura del primer fotograma ya girado;
+  - JSON `orbicula-video-probe/1`, sin el nombre del archivo ni imágenes.
+- **En la nube (Chromium de Playwright):**
+
+  | Vídeo | Fotogramas | Ritmo de lectura (descodificar y girar) |
+  |---|---|---|
+  | H.264 con fotogramas B, 60 fps y girado | 240/240 | 384 por segundo |
+  | fps variable | 50/50 | — |
+  | VP9 | 120/120 | — |
+
+  El giro coincide con el que aplica `ffmpeg`: los cuadrantes de la miniatura son 110, 97, 141 y 143, y los de la referencia, 113, 99, 138 y 141.
+
 ## Pruebas
 - **Vídeos de prueba fabricados con `ffmpeg`** a partir de los vídeos sintéticos de `make-face-videos.py`:
   - MP4 H.264 y VP9;

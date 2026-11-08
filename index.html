@@ -24,6 +24,35 @@
       <button class="btn btn-primary" id="startBtn" type="button">Activar cámara</button>
     </section>
 
+    <section class="card" id="videoCard">
+      <div class="card-title">Vídeo grabado</div>
+      <p class="card-text">Analiza un vídeo grabado con la app de cámara del móvil, fotograma a fotograma: es el modo más sensible. El vídeo se lee en el móvil y no sale de él. <b>De momento (paso 6a)</b> solo lee el archivo y mide cuánto tarda en decodificarlo.</p>
+      <label class="field">
+        <span class="control-label">Archivo de vídeo (MP4)</span>
+        <input class="input" id="vidFile" type="file" accept="video/mp4,video/quicktime,video/*">
+      </label>
+      <div class="control-row wrap">
+        <label class="field"><span class="control-label">Grabado con</span>
+          <select class="select" id="vidFacing" aria-label="Cámara con que se grabó"><option value="rear">la trasera</option><option value="front">la frontal</option></select></label>
+        <label class="check"><input type="checkbox" id="vidMirror"> El vídeo está en espejo</label>
+      </div>
+      <pre class="summary" id="vidInfo"></pre>
+      <div id="vidOut" hidden>
+        <div class="control-row wrap">
+          <button class="btn btn-primary" id="vidProbe" type="button" disabled>Probar la lectura (15 s)</button>
+          <button class="btn btn-quiet" id="vidCancel" type="button" hidden>Cancelar</button>
+        </div>
+        <div class="coach-bar" id="vidBarWrap" hidden><i id="vidBar"></i></div>
+        <pre class="summary" id="vidResult"></pre>
+        <canvas class="vid-thumb" id="vidThumb" hidden aria-label="Primer fotograma, ya girado"></canvas>
+        <div class="control-row wrap">
+          <button class="btn" id="vidDownload" type="button">Descargar JSON</button>
+          <button class="btn" id="vidCopy" type="button">Copiar ficha</button>
+        </div>
+        <p class="hint" id="vidMsg"></p>
+      </div>
+    </section>
+
     <section id="liveView" hidden>
       <div class="stage">
         <video id="video" playsinline muted autoplay></video>

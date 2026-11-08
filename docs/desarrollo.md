@@ -37,6 +37,18 @@ node scripts/dev/run-assistant.cjs --video /tmp/caras/lid.y4m --out /tmp/informe
 ```
 `run-assistant.cjs --card protocol --video /tmp/caras/lid.y4m --out /tmp/protocolo.json --auto` recorre la tarjeta del protocolo clínico (con `nod.y4m`, el reposo sale no válido y se repite). `check-flow.cjs` abre la app con `?debug` (que expone las series en `window.__orbicula`), enciende la curva «Flujo» y resume un ciclo del vídeo por tramos de 0,5 s: el máximo de la velocidad residual del párpado superior por lado y compensación, y el EAR. El vídeo empieza en un punto cualquiera del bucle de 16 s: hay que buscar el patrón (en `lid.y4m`, un pico al bajar y otro al subir, 1,5 s después). `run-assistant.cjs` recorre el asistente pulsando «Siguiente» en cada revisión e imprime los resúmenes.
 
+## Vídeo grabado (fase 6)
+```bash
+# MP4 de prueba: H.264 con fotogramas B y la marca de giro de los móviles (horario 90°), y VP9
+ffmpeg -f lavfi -i testsrc2=size=320x180:rate=60 -t 4 -c:v libx264 -pix_fmt yuv420p base.mp4
+ffmpeg -display_rotation:v:0 -90 -i base.mp4 -c copy phone.mp4
+node scripts/dev/check-video.cjs /tmp/phone.mp4 /tmp/informe-video.json
+```
+El Chromium de Playwright decodifica H.264 y VP9 con WebCodecs. `tests/fixtures/` tiene tres MP4 diminutos para los tests: índice al final y girado, índice al principio, y fps variable. Para comprobar el giro, se comparan los cuadrantes de la miniatura con los del primer fotograma girado por `ffmpeg`:
+```bash
+ffmpeg -i phone.mp4 -frames:v 1 ref.png
+```
+
 ## Repetir los eventos de la fase 5 con datos reales
 ```bash
 node scripts/dev/replay-events.mjs informe.json ['{"riseFloor":0.002}']

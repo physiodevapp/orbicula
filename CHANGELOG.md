@@ -4,6 +4,20 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (fase 6a: lectura de vídeo grabado)
+- **Tarjeta «Vídeo grabado».** Se elige un MP4 de la app de cámara y se ve su ficha:
+  - códec y resolución;
+  - giro y tamaño ya girado;
+  - duración y fps reales (y si son variables);
+  - fotogramas clave;
+  - si el navegador lo puede decodificar.
+
+  «Probar la lectura» decodifica los primeros 15 s y mide cuántos fotogramas por segundo da el móvil con el giro aplicado. Muestra una miniatura del primer fotograma ya girado.
+- **Lectura sin cargar el archivo en memoria:** solo el índice (`moov`) con `mp4box` 2.4.1, y cada fotograma comprimido desde su posición en el archivo. Se decodifica con WebCodecs, sin adelantar más de 3 fotogramas.
+- JSON `orbicula-video-probe/1`: ficha y prueba de lectura, sin el nombre del archivo ni imágenes.
+- `scripts/dev/check-video.cjs` y tres MP4 diminutos en `tests/fixtures/`.
+- 12 tests nuevos.
+
 ### Documentación (fase 5d)
 - `README.md`: instrucciones de uso clínico del protocolo (preparación, fases, cómo leer el resumen y límites conocidos).
 - `docs/plan-fase-5.md`: conclusión de la fase, tabla de parámetros provisionales y lo pendiente.
