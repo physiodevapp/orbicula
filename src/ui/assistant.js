@@ -4,6 +4,8 @@
 import { GuidedSession, AUTO_PAUSE_MS, randomPattern } from '../assistant/session.js';
 import { PLANS, DEFAULT_PLAN, spokenPrepMs } from '../assistant/steps.js';
 import { cleanSettings, PROTOCOL_DEFAULTS } from '../protocol/steps.js';
+import { summarizeProtocol } from '../protocol/summary.js';
+import { renderSummary } from './summary.js';
 import { buildReport, describeSummary } from '../assistant/report.js';
 import { downloadJson, shareJson, copyJson, stamp } from './share.js';
 
@@ -218,6 +220,8 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
     if (s.state === 'done' || s.state === 'aborted' || s.state === 'idle') unlockScreen();
     if (s.state === 'done' || s.state === 'aborted') {
       const aborted = s.state === 'aborted';
+      const sumEl = fixedPlan ? $(`${P}SummaryView`) : null;
+      if (sumEl) renderSummary(sumEl, summarizeProtocol(session.results), session.results);
       el.share.hidden = !navigator.canShare;
       el.resume.hidden = !aborted;
       el.redoLast.hidden = !s.completed;
@@ -225,14 +229,14 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
       el.doneText.textContent = aborted
         ? `Llevas ${s.completed} de ${s.total} pasos. Puedes retomar la sesión en el paso ${s.index + 1}, rehacer el último o descargar lo hecho. Contiene solo medidas numéricas, sin imágenes ni nombres.`
         : fixedPlan
-          ? 'Descarga el archivo JSON con las medidas de cada fase (sin imágenes ni nombres). El resumen por fase y lado llegará en el siguiente paso.'
+          ? 'Descarga el archivo JSON con las series y el resumen de cada fase (sin imágenes ni nombres). Contiene solo medidas numéricas.'
           : 'Descarga el archivo y adjúntalo en la conversación con Claude. Contiene solo medidas numéricas (sin imágenes ni nombres) y el modelo de navegador del dispositivo.';
     }
   }
 
   // ── Informe ──────────────────────────────────────────────────────────────────
   const report = (includeSeries) =>
-    buildReport({ results: session.results, startedAt: session.startedAt, code: el.code.value.trim() || null, plan: planId, settings: readSettings(), includeSeries, ...getContext() });
+    buildReport({ results: session.results, startedAt: session.startedAt, code: el.code.value.trim() || null, plan: planId, settings: readSettings(), summary: fixedPlan ? summarizeProtocol(session.results) : null, includeSeries, ...getContext() });
 
   function fileName() {
     const code = el.code.value.trim().replace(/[^\w-]/g, '');

@@ -260,7 +260,8 @@ function sideMetrics(phase, step, v, side, cal, ctx) {
 }
 
 /** Métricas en las que tiene sentido la asimetría (magnitudes positivas). */
-const ASYM_KEYS = ['ear', 'aperture', 'blinksPerMin', 'blinkCompleteness', 'blinkVsMax', 'closure', 'eyeOpening', 'browRecruit', 'canthusRecruit', 'browLift', 'browPeak', 'smile', 'contractions'];
+const ASYM_KEYS = ['ear', 'aperture', 'blinksPerMin', 'blinkCompleteness', 'blinkVsMax', 'closure', 'eyeOpening', 'browRecruit', 'canthusRecruit', 'browLift', 'browPeak', 'smile'];
+// (los recuentos de contracciones no llevan asimetría: con 1 o 2 eventos, 2 frente a 1 sería +0,33 sin significar nada)
 
 /**
  * Resumen del protocolo.

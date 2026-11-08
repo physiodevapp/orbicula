@@ -15,6 +15,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
   - **Sonrisa:** sonrisa por lado, cierre del ojo y co-activación ojo–boca.
   - **Calidad de cada fase.**
 - **Pico espectral** (`src/protocol/spectrum.js`, método de Welch) para la actividad rítmica de los párpados (mioquimias). Los umbrales son provisionales.
+- **Pantalla del resumen** al acabar el protocolo (`src/ui/summary.js`):
+  - una tarjeta por fase con izquierda, derecha y asimetría, preparada para 380 px;
+  - los avisos de la calibración y las fases marcadas como «poco fiable», con el motivo;
+  - la lista de contracciones finas, con su fase, lado, duración y pico;
+  - el aviso de que no es una herramienta de diagnóstico.
+
+  Las asimetrías de 0,20 o más se destacan, de forma orientativa. Los recuentos de contracciones no llevan asimetría.
+- El JSON del protocolo lleva el resumen (`summary`) además de las series.
 - `scripts/dev/summary.mjs`: imprime el resumen de un JSON del protocolo.
 - 14 tests nuevos.
 

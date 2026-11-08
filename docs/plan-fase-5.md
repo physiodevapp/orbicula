@@ -261,8 +261,13 @@ Se probaron tres reglas sobre los seis JSON con flujo (17:47, 18:38, 18:55, 19:1
 
 **Límite:** el % de parpadeos incompletos sale alto (70–84 %). A unos 27 análisis/s, el mínimo de un parpadeo de unos 180 ms cae a menudo entre dos frames, así que la completitud sale por debajo de la real. Esta métrica es orientativa: sirve para comparar lados y sesiones, y el vídeo grabado (fase 6) la mejorará.
 
-### 6. Pantalla del resumen
-Pendiente, con Sonnet.
+### 6. Pantalla del resumen (hecha; pendiente de la prueba en el móvil)
+- `src/ui/summary.js`, dentro de la tarjeta «Protocolo clínico», al terminar (o detener) el protocolo: una tarjeta por fase, con I, D y asimetría, y a 380 px sin desbordar.
+- **Las asimetrías de 0,20 o más se destacan.** Es orientativo: no hay datos de referencia, y el resumen no clasifica nada.
+- **Sin asimetría en los recuentos de contracciones:** con 1 o 2 eventos, 2 frente a 1 daba +0,33 sin significar nada.
+- **El reposo no lista eventos:** es la calibración.
+- El mismo resumen va en el JSON (`summary`).
+- **Comprobado en la nube:** con la cámara simulada, el protocolo termina solo y saca las seis tarjetas y la lista de contracciones. Sin errores y sin desbordar a 380 px.
 
 ## Pruebas
 - **Tests unitarios:**
