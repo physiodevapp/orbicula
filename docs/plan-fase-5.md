@@ -315,7 +315,7 @@ Se probaron tres reglas sobre los seis JSON con flujo (17:47, 18:38, 18:55, 19:1
   - **Cierre del ojo con la sonrisa:** I 19 % y D 29 %, asimetría −0,21, destacada en el resumen y en la dirección correcta. Es la medida que detecta la asimetría.
   - **Sonrisa de la boca (`mouthSmile`):** I 0,948 y D 0,972, asimetría −0,013. La derecha sale más alta en las tres repeticiones, pero por solo 0,02–0,03: el indicador está casi saturado y **da la dirección, no la magnitud**.
   - **Co-activación:** I 0,81 y D 0,75. No distingue.
-  - **Pendiente de decidir:** medir la posición de las comisuras de la boca (landmarks 61 y 291, respecto al reposo y normalizada a la distancia intercantal) para tener una magnitud de la sonrisa sin saturar.
+  - **Decidido (2026-11-08): después de la fase 7.** Medir la posición de las comisuras de la boca (landmarks 61 y 291, respecto al reposo y normalizada a la distancia intercantal) para tener una magnitud de la sonrisa sin saturar.
 - **Cámara frontal** (criterio de aceptación 2): el guiño de un solo ojo en el lado correcto está probado con la trasera, no con la frontal.
 - **Calor:** probar un protocolo con el móvil caliente (tras varias pruebas seguidas).
 
