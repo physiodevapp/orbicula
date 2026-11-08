@@ -311,7 +311,11 @@ Se probaron tres reglas sobre los seis JSON con flujo (17:47, 18:38, 18:55, 19:1
 - Los eventos de ceja y canto son experimentales y no se resumen.
 
 **Pendiente (no bloquea cerrar la fase):**
-- **Sonrisa asimétrica:** nunca se ha probado una sonrisa más fuerte de un lado. Hay que hacer el protocolo con una sonrisa claramente asimétrica (por ejemplo, más fuerte a la izquierda) para ver si el indicador `mouthSmile` la separa o se satura (0,97–0,98 en los dos lados con la sonrisa amplia). Si se satura, habrá que medir también la posición de las comisuras de la boca.
+- **Sonrisa asimétrica (probada, 2026-11-08 17:44, commit bf010c5, más fuerte a la derecha):**
+  - **Cierre del ojo con la sonrisa:** I 19 % y D 29 %, asimetría −0,21, destacada en el resumen y en la dirección correcta. Es la medida que detecta la asimetría.
+  - **Sonrisa de la boca (`mouthSmile`):** I 0,948 y D 0,972, asimetría −0,013. La derecha sale más alta en las tres repeticiones, pero por solo 0,02–0,03: el indicador está casi saturado y **da la dirección, no la magnitud**.
+  - **Co-activación:** I 0,81 y D 0,75. No distingue.
+  - **Pendiente de decidir:** medir la posición de las comisuras de la boca (landmarks 61 y 291, respecto al reposo y normalizada a la distancia intercantal) para tener una magnitud de la sonrisa sin saturar.
 - **Cámara frontal** (criterio de aceptación 2): el guiño de un solo ojo en el lado correcto está probado con la trasera, no con la frontal.
 - **Calor:** probar un protocolo con el móvil caliente (tras varias pruebas seguidas).
 
