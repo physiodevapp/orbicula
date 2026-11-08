@@ -1,6 +1,10 @@
 # Plan de la fase 6: vídeo grabado
 
-**Borrador, pendiente de que lo apruebe el autor.** Se lee junto con `CLAUDE.md`, la conclusión de `docs/plan-fase-5.md` y `docs/desarrollo.md`. La rama sale de `feat/fase-5-protocolo` (PR #5); cuando se fusione, se rebasa sobre `main`.
+**Aprobado por el autor el 2026-11-08, con las recomendaciones:**
+- **fases:** primero A (análisis libre) y después C (orbicula graba su propio vídeo durante el protocolo);
+- en C, el vídeo **solo en memoria**, con una casilla, y borrado al procesarlo;
+- reposo del análisis libre: **30 s**;
+- la configuración de la app de cámara se lee del propio archivo en el 6a. Se lee junto con `CLAUDE.md`, la conclusión de `docs/plan-fase-5.md` y `docs/desarrollo.md`. La rama sale de `feat/fase-5-protocolo` (PR #5); cuando se fusione, se rebasa sobre `main`.
 
 ## Qué tiene que hacer
 De `CLAUDE.md`:
@@ -111,8 +115,8 @@ El vídeo de la app de cámara no sabe en qué fase está cada momento. Hay tres
 - **6c:** Opus para la parte de sincronización si se hace B; Sonnet si es C.
 - **6d:** Sonnet.
 
-## Decisiones que necesito del autor
-1. **Opción para las fases:** empezar por A y después C (recomendado), solo A, o A y después B.
-2. Si en C te parece bien que el vídeo exista **temporalmente en memoria**, solo con una casilla marcada, y se borre al procesarlo.
-3. **Duración del reposo** en el análisis libre (A): 30 s por defecto.
-4. **La configuración de tu app de cámara:** resolución y fps con que sueles grabar, y si tiene la opción de códec «Más compatible» (H.264) o «Alta eficiencia» (HEVC).
+## Decisiones del autor (tomadas)
+1. **Fases:** A y después C. B queda para cuando haya un segundo dispositivo.
+2. **En C:** el vídeo, temporal y en memoria, con casilla.
+3. **Reposo:** 30 s.
+4. **App de cámara:** se lee del archivo (6a).
