@@ -1,5 +1,7 @@
 # Plan de la fase 5: protocolo guiado
 
+**Estado: fase hecha (5a–5d).** La conclusión y lo pendiente están en «Conclusión de la fase 5».
+
 **Aprobado por el autor el 2026-11-07, con las recomendaciones:**
 - umbral = máximo del reposo;
 - duraciones de la tabla;
@@ -276,6 +278,45 @@ Se probaron tres reglas sobre los seis JSON con flujo (17:47, 18:38, 18:55, 19:1
 - **Parpadeo:** 13–14 por minuto; el cierre de los parpadeos es de solo un 40 % del cierre máximo (92 % incompletos). Menos que a las 13:38 (61 %): parpadeos más suaves o más breves, con el límite de siempre de ~27 fps.
 - **Sonrisa:** el blendshape de sonrisa **satura** a 0,97–0,98 en los dos lados, y el cierre del ojo con la sonrisa es de 31 % y 29 %. Con una sonrisa amplia no se distingue qué lado sonríe más. Sin datos de que se hiciera asimétrica.
 
+## Conclusión de la fase 5 (paso 5d)
+
+**Qué hay:** el protocolo clínico guiado de `CLAUDE.md`. Son seis fases con voz y pitidos, un reposo que se repite solo si no vale (y dice por qué), la calibración de los umbrales sobre el reposo del propio paciente, los eventos en directo y un resumen por fase y lado con su asimetría. El resumen se ve en pantalla y viaja en el JSON.
+
+**Qué se ha comprobado y con qué datos** (todo con un solo sujeto sano, el autor; la cámara trasera de su móvil):
+- **Contracciones mínimas** (tres pruebas con controles): 25/29 y 26/29 detectadas por ojo, con **0/26 falsas alarmas**. En la fase 4, el EAR sacaba 6/13 y 10/13.
+- **Reposos, parpadeo espontáneo, cabeceo y giro:** sin eventos que cuenten.
+- **Dos protocolos completos en el móvil** (13:38 y 17:24): sin errores, con 25–28 análisis/s y sin rebaja del flujo, con el móvil frío. Los gestos simétricos dan asimetrías cercanas a 0.
+- **Criterios de aceptación 3 y 4** (de la fase 4) siguen cumpliéndose con la medida que genera los eventos.
+
+**Parámetros provisionales** (se fijaron con esos datos; cámbialos solo con más pruebas):
+
+| Parámetro | Valor | Dónde |
+|---|---|---|
+| Umbral de los eventos | máximo de la subida en el reposo válido; suelo 0,001 DI | `events.js` |
+| Duración mínima de una contracción | 0,5 s | `events.js` |
+| Aviso de umbral alto | máximo > 6 × el p95 del reposo | `events.js` |
+| Cabeza quieta | 3 × la mediana del reposo, entre 0,1 y 0,3 DI/s | `events.js` |
+| Congelar el cierre por flujo | EAR < 50 % de su reposo, con 150 ms de margen | `processor.js` |
+| Reposo válido | cara ≥ 90 %; tiempo útil ≥ ⅓ del reposo; 3 s tranquilos seguidos | `steps.js`, `events.js` |
+| Parpadeo incompleto | < 80 % del cierre máximo del ojo | `summary.js` |
+| Asimetría destacada | ≥ 0,20 | `ui/summary.js` |
+| Actividad rítmica | prominencia ≥ 10 dB, pico en la mitad de las ventanas | `spectrum.js` |
+| Fase poco fiable | análisis < 20/s, cara < 90 % o cabeza en movimiento > 20 % del tiempo | `summary.js` |
+
+**Limitaciones:**
+- Un solo sujeto, sin pacientes ni patrón de referencia (EMG): ninguna cifra es todavía un valor clínico de referencia.
+- La actividad rítmica (mioquimias) solo se ha validado con señales sintéticas.
+- A ~27 fps, el cierre de un parpadeo breve se subestima: el % de incompletos es orientativo.
+- Con el móvil en la mano o con la cabeza moviéndose, el umbral sube y se pierde sensibilidad.
+- Los eventos de ceja y canto son experimentales y no se resumen.
+
+**Pendiente (no bloquea cerrar la fase):**
+- **Sonrisa asimétrica:** nunca se ha probado una sonrisa más fuerte de un lado. Hay que hacer el protocolo con una sonrisa claramente asimétrica (por ejemplo, más fuerte a la izquierda) para ver si el indicador `mouthSmile` la separa o se satura (0,97–0,98 en los dos lados con la sonrisa amplia). Si se satura, habrá que medir también la posición de las comisuras de la boca.
+- **Cámara frontal** (criterio de aceptación 2): el guiño de un solo ojo en el lado correcto está probado con la trasera, no con la frontal.
+- **Calor:** probar un protocolo con el móvil caliente (tras varias pruebas seguidas).
+
+**Siguiente:** fase 6 (vídeo grabado), con Opus para el plan y la implementación.
+
 ## Pruebas
 - **Tests unitarios:**
   - que la subida causal equivale al estadístico por ventanas;
@@ -298,11 +339,11 @@ Se probaron tres reglas sobre los seis JSON con flujo (17:47, 18:38, 18:55, 19:1
 - **Contracciones durante cierres completos:** en el cierre suave y el forzado, el flujo pierde el seguimiento. Ahí manda el EAR y no se abren eventos `contraction` mientras el EAR marque un cierre.
 - **El blendshape de sonrisa con la cara girada o con poca luz:** se marca como poco fiable si la cara se pierde o la cabeza se mueve.
 
-## Decisiones que necesito del autor
-1. **Umbral de los eventos:** el máximo del reposo (menos falsas alarmas; recomendado) o el percentil 95 (más sensible).
-2. **Duraciones por defecto** de la tabla de fases.
-3. **Tarjeta «Protocolo» aparte** del asistente de pruebas (recomendado) o sustituirlo.
-4. Si la voz habla al paciente de **tú** (como ahora) o de **usted**.
+## Decisiones del autor (tomadas)
+1. **Umbral de los eventos:** el máximo del reposo.
+2. **Duraciones por defecto:** las de la tabla de fases.
+3. **Tarjeta «Protocolo» aparte** del asistente de pruebas.
+4. La voz habla al paciente de **tú**.
 
 ## Modelo recomendado
 - **Plan:** Opus, esfuerzo alto (esta sesión).

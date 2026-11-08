@@ -4,6 +4,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Documentación (fase 5d)
+- `README.md`: instrucciones de uso clínico del protocolo (preparación, fases, cómo leer el resumen y límites conocidos).
+- `docs/plan-fase-5.md`: conclusión de la fase, tabla de parámetros provisionales y lo pendiente.
+
 ### Añadido (fase 5c)
 - **Aviso de umbral alto:** si el máximo de la subida en el reposo supera 6 veces su p95, una sacudida suelta del párpado ha fijado el umbral. La calibración lo dice (`warning`) y propone repetir el reposo si se quiere más sensibilidad.
   - El umbral sigue siendo el máximo del reposo.
