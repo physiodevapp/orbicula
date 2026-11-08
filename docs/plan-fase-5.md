@@ -223,6 +223,47 @@ Se probaron tres reglas sobre los seis JSON con flujo (17:47, 18:38, 18:55, 19:1
 - **Se queda el máximo del reposo**, y la calibración da un **aviso** (`warning`) cuando el máximo supera 6 veces el p95 del reposo. En los JSON, la razón es de 1,4 a 2,5 en los reposos normales y de 14 a 23 en el de la sacudida.
 - El aviso sale en la revisión y en la franja de calidad: «Umbral alto en el ojo…: lo ha fijado una sacudida suelta del párpado durante el reposo. Vale, pero detectará menos contracciones finas; si quieres más sensibilidad, repite el reposo».
 
+### 2–5. Métricas por fase y lado (`src/protocol/summary.js`, `src/protocol/spectrum.js`)
+`summarizeProtocol(pasos)` da, para cada fase y lado:
+- sus métricas;
+- su asimetría, solo en las magnitudes positivas;
+- su calidad: cara detectada, cabeza en movimiento y ritmo del análisis. Por debajo de 24/s queda una nota; por debajo de 20/s, la fase es poco fiable.
+
+`node scripts/dev/summary.mjs informe.json` lo imprime.
+
+| Fase | Métricas |
+|---|---|
+| Reposo | EAR y apertura de referencia, ruido, umbral, pico espectral. Sin eventos: es la calibración. |
+| Parpadeo espontáneo | Parpadeos por minuto, duración, completitud y completitud respecto al **cierre máximo** del ojo; % de incompletos (< 80 % de ese cierre); contracciones; pico espectral. |
+| Cierre suave y forzado | Cierre (1 − EAR mínimo / reposo) y reclutamiento de la ceja y el canto (pico de energía en veces su p99 del reposo). |
+| Cejas | Cuánto se **abre** el ojo (mediana del EAR sin parpadeos), desplazamiento de la ceja hacia arriba (flujo integrado, DI) y pico de energía de la ceja. |
+| Sonrisa | Sonrisa por lado (`mouthSmile`), cierre del ojo (mediana del EAR sin parpadeos) y **co-activación**: Pearson entre la sonrisa y el cierre del ojo del mismo lado, en una rejilla de 10 Hz, con el mejor desfase en ±0,3 s y sin los parpadeos. |
+
+**Decisiones con el JSON del protocolo (13:38):**
+- **Cierre máximo = el mayor del suave y del forzado.** Al apretar, la malla se deforma y el EAR baja menos: 0,89 en el forzado frente a 0,93–0,96 en el suave.
+- **Cejas y sonrisa: mediana del EAR sin parpadeos, no el mínimo.** Con el mínimo, un parpadeo dentro de la ventana daba un «cierre» del 60 % en las cejas.
+- **Co-activación sin parpadeos:** con ellos, r valía 0,63 y 0,47; sin ellos, 0,93 y 0,83.
+- **Pico espectral:** método de Welch, a 20 Hz, sobre la velocidad vertical del párpado superior, con ventanas de 4 s y la banda de 0,5 a 8 Hz. Los pares congelados valen 0. Marca «rítmica» con prominencia ≥ 10 dB y el pico en la mitad de las ventanas, como mínimo. En el reposo y el parpadeo del protocolo, la prominencia es de 1–2 dB: sin actividad rítmica. Una oscilación sintética de 3 Hz sí sale. **Umbrales provisionales:** no hay pacientes con mioquimias.
+- **Eventos de ceja y canto:** no se resumen; salen decenas por paso con los parpadeos y los gestos. En su lugar, el reclutamiento (energía) de los cierres y de las cejas.
+
+**Resultado con el protocolo de las 13:38** (sujeto sano, gestos simétricos):
+
+| Métrica | I | D | Asimetría |
+|---|---|---|---|
+| Parpadeos por minuto | 19 | 20 | −0,03 |
+| Parpadeo / cierre máximo | 0,61 | 0,63 | −0,02 |
+| Cierre suave | 0,93 | 0,96 | −0,02 |
+| Cierre forzado | 0,89 | 0,90 | −0,01 |
+| Apertura del ojo con las cejas | 0,20 | 0,19 | 0,01 |
+| Sonrisa (boca) | 0,97 | 0,97 | −0,01 |
+| Cierre del ojo con la sonrisa | 0,18 | 0,22 | −0,10 |
+| Co-activación | 0,93 | 0,83 | — |
+
+**Límite:** el % de parpadeos incompletos sale alto (70–84 %). A unos 27 análisis/s, el mínimo de un parpadeo de unos 180 ms cae a menudo entre dos frames, así que la completitud sale por debajo de la real. Esta métrica es orientativa: sirve para comparar lados y sesiones, y el vídeo grabado (fase 6) la mejorará.
+
+### 6. Pantalla del resumen
+Pendiente, con Sonnet.
+
 ## Pruebas
 - **Tests unitarios:**
   - que la subida causal equivale al estadístico por ventanas;

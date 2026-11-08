@@ -8,6 +8,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - **Aviso de umbral alto:** si el máximo de la subida en el reposo supera 6 veces su p95, una sacudida suelta del párpado ha fijado el umbral. La calibración lo dice (`warning`) y propone repetir el reposo si se quiere más sensibilidad.
   - El umbral sigue siendo el máximo del reposo.
   - Las reglas que ignoran los picos se probaron con los seis JSON y traían falsas alarmas en los controles (`docs/plan-fase-5.md`).
+- **Métricas por fase y lado, con su asimetría** (`src/protocol/summary.js`):
+  - **Parpadeo espontáneo:** frecuencia, duración, completitud y completitud respecto al cierre máximo del propio ojo.
+  - **Cierres:** cierre de cada ojo y reclutamiento de la ceja y el canto.
+  - **Cejas:** apertura del ojo y desplazamiento de la ceja.
+  - **Sonrisa:** sonrisa por lado, cierre del ojo y co-activación ojo–boca.
+  - **Calidad de cada fase.**
+- **Pico espectral** (`src/protocol/spectrum.js`, método de Welch) para la actividad rítmica de los párpados (mioquimias). Los umbrales son provisionales.
+- `scripts/dev/summary.mjs`: imprime el resumen de un JSON del protocolo.
+- 14 tests nuevos.
 
 ### Añadido (fase 5b: protocolo guiado)
 - **Tarjeta «Protocolo clínico»**, encima del asistente de pruebas (que se queda como herramienta de desarrollo). Seis fases con voz y pitidos, en modo seguido por defecto:
