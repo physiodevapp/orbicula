@@ -1,0 +1,118 @@
+# Plan de la fase 6: vídeo grabado
+
+**Borrador, pendiente de que lo apruebe el autor.** Se lee junto con `CLAUDE.md`, la conclusión de `docs/plan-fase-5.md` y `docs/desarrollo.md`. La rama sale de `feat/fase-5-protocolo` (PR #5); cuando se fusione, se rebasa sobre `main`.
+
+## Qué tiene que hacer
+De `CLAUDE.md`:
+- **Entrada:** un archivo grabado con la **app de cámara nativa**.
+- **Procesado:** **frame a frame, en modo IMAGE**, sin el suavizado del seguimiento. Es el modo de **máxima sensibilidad**.
+- **Criterio de aceptación 1:** si en directo no se llega a 24 análisis/s, la app lo dice y **propone este modo**.
+
+**Por qué es más sensible que el directo:**
+
+| | En directo | Vídeo grabado |
+|---|---|---|
+| Frames analizados | ~25 por segundo, con el resto perdidos | **todos** (30 o 60 por segundo) |
+| Modo del modelo | VIDEO: suaviza entre frames | **IMAGE**: cada frame por separado |
+| Presión de tiempo | sí: con calor, el flujo se rebaja a 20 pares/s | **ninguna** |
+| Resolución | 720p (prioridad «fps») | la del archivo, hasta 4K |
+
+Además, el parpadeo: a 60 fps, el mínimo de un parpadeo de 0,18 s ya no se pierde entre frames. Esto debería arreglar la subestimación de la completitud de la fase 5.
+
+## Cómo se lee el archivo (decisión técnica)
+- **Lectura del MP4:** se usa **WebCodecs** (`VideoDecoder`, disponible en Chrome para Android) más un lector de MP4 que separa los fotogramas comprimidos: `mp4box`, versión fija 2.4.1, de junio de 2026. Va en el propio bundle, sin red.
+  - **Tiempos exactos:** los de cada muestra del archivo, aunque el fps sea variable (los móviles lo hacen).
+  - **Decodificación en orden:** cada fotograma una vez. Saltar con `video.currentTime` obligaría a decodificar desde el último fotograma clave en cada paso, unas 30–60 veces más lento.
+  - **Control del ritmo:** no se pide el siguiente fotograma hasta procesar el anterior.
+- **Orientación:** los móviles guardan el vídeo en horizontal con una marca de giro (matriz del `tkhd`). Se lee y se gira cada fotograma antes de analizarlo.
+- **Espejo:** el archivo no dice si la imagen va en espejo (depende del móvil y de la cámara). El usuario elige «grabado con la frontal / trasera» y «en espejo: sí / no» (por defecto, no). Se comprueba con un guiño, que es el criterio 2.
+- **Códec:** H.264 o HEVC según el móvil. Antes de empezar se pregunta al navegador si lo puede decodificar (`VideoDecoder.isConfigSupported`); si no puede, la app lo dice y explica cómo cambiarlo en la app de cámara («Más compatible» / H.264).
+- **El resto, igual que en directo:**
+  - el análisis de la cara (worker, con un segundo modelo en modo IMAGE);
+  - el flujo (worker, todos los pares de fotogramas, sin rebaja);
+  - `FlowProcessor`, `BlinkDetector`, `calibrate`, `EventDetector` y `summarizeProtocol`.
+
+  Los dos workers ya aceptan un `VideoFrame` en lugar del `<video>`: el cambio es pequeño.
+- **Privacidad:**
+  - El archivo se lee en el móvil y no sale de él.
+  - No se guarda copia del vídeo.
+  - La CSP y la barrera de privacidad no cambian.
+
+**Tiempo de procesado:** el análisis tarda unos 35 ms por fotograma y el flujo unos 20 ms, en paralelo, así que se procesarían ~25 fotogramas por segundo. Un vídeo de 4 min a 60 fps son 14 400 fotogramas: **unos 10 minutos**, con barra de progreso, tiempo restante, pantalla encendida y botón de cancelar.
+- Opción: «procesar a 30 fps», un fotograma de cada dos, para tardar la mitad.
+- El paso 6a mide el tiempo real.
+
+## Decisión clave para el autor: cómo se relaciona el vídeo con el protocolo
+El vídeo de la app de cámara no sabe en qué fase está cada momento. Hay tres opciones, y no son excluyentes.
+
+**A. Análisis libre del vídeo** (se necesita en cualquier caso).
+- Los primeros N segundos son el reposo de calibración (por defecto 30 s; configurable).
+- El resto se analiza entero: parpadeos, contracciones, cierres, actividad rítmica, curvas.
+- Sirve para cualquier vídeo, por ejemplo uno de una consulta. No da el resumen por fases del protocolo.
+
+**B. Protocolo sincronizado por sonido.**
+- Mientras la app de cámara graba, el protocolo de orbicula suena: la voz y los pitidos. La grabación recoge ese sonido.
+- Al cargar el vídeo, orbicula **reconoce sus propios pitidos** en el audio (frecuencias conocidas: 880 Hz «empieza», 1175 Hz «ahora», 392 Hz «suelta»…) y sitúa cada fase y cada repetición. Así da el mismo resumen por fases que en directo.
+- **Problema:** el protocolo tiene que sonar desde **otro dispositivo** (otro móvil, una tableta, el ordenador de la consulta), o desde el mismo móvil en pantalla dividida, que es frágil: Android puede pausar la pestaña. Contigo solo y un móvil, no es práctico.
+
+**C. orbicula graba su propio vídeo durante el protocolo** y luego lo procesa fotograma a fotograma.
+- Durante el protocolo en directo, la app guarda el vídeo de la cámara en la memoria (`MediaRecorder`). Al acabar, lo procesa entero en modo IMAGE, con las fases y las repeticiones exactas, y **lo borra**.
+- **Ventajas:** un solo móvil y sin sincronizar nada. Además, cada fotograma (60 por segundo) en vez de los ~25 que da tiempo a analizar.
+- **Inconvenientes:**
+  - El vídeo no es el de la app de cámara nativa: es el de `getUserMedia` (720p a 60 fps con la trasera), algo menos de calidad que la nativa a 4K.
+  - `CLAUDE.md` dice que el vídeo no se guarda «por defecto». Aquí sería una casilla que hay que marcar, el vídeo solo existiría en la memoria mientras se procesa, nunca se exporta y se borra al terminar.
+
+**Recomendación:** empezar por **A**, porque es la base de las otras dos y cumple `CLAUDE.md` tal cual. Después, **C**, que es la que puedes usar tú solo con un móvil y da el resumen por fases a máxima sensibilidad. **B** queda para cuando haya un segundo dispositivo en la consulta.
+
+## Pasos (me detengo al final de cada uno para que lo pruebes en el móvil)
+1. **6a. Leer el archivo, sin analizar.**
+   - Tarjeta «Vídeo grabado»: elegir un archivo y ver su ficha (códec, resolución, giro, duración, fps reales según los tiempos de las muestras, si el fps es variable).
+   - Prueba de decodificación: cuántos fotogramas por segundo decodifica el móvil, con el giro aplicado.
+   - **Tu prueba:** grabar 10–20 s con la app de cámara (trasera, la configuración que usarías: 1080p a 60 fps si la tienes) y cargarlo. Si puedes, otro a 4K y otro con la frontal. Me pasas el JSON con la ficha y los tiempos.
+2. **6b. Procesado fotograma a fotograma (opción A).**
+   - Análisis en modo IMAGE y flujo en todos los pares.
+   - Calibración con los primeros N segundos, eventos, resumen de un solo tramo, curvas del vídeo entero y JSON.
+   - **Tu prueba:**
+     - un vídeo con reposo y guiños de un solo ojo, con la trasera y con la frontal, para el criterio 2 con vídeo grabado;
+     - el mismo gesto en directo y en vídeo, para comparar la sensibilidad.
+3. **6c. Las fases del protocolo en el vídeo** (C, o B si lo prefieres). Protocolo completo con el resumen por fases a máxima sensibilidad.
+4. **6d. Cierre.**
+   - En directo, cuando el análisis se queda por debajo de 24/s, el aviso propone el vídeo grabado (criterio 1).
+   - README, CHANGELOG y la conclusión.
+
+## Pruebas
+- **Vídeos de prueba fabricados con `ffmpeg`** a partir de los vídeos sintéticos de `make-face-videos.py`:
+  - MP4 H.264 y VP9;
+  - 30 y 60 fps;
+  - con marca de giro de 90° y 270°;
+  - en espejo;
+  - con fps variable.
+
+  La respuesta es conocida: el párpado de 1,5 px, el cabeceo, el guiño de un lado.
+- **Tests unitarios:**
+  - lectura del giro de la matriz del `tkhd`;
+  - tiempos de las muestras (escala de tiempo, fps variable);
+  - el paso de lado con espejo en el vídeo;
+  - el planificador fotograma a fotograma (con decodificador simulado);
+  - si se hace B, la detección de pitidos en un audio sintético.
+- **De punta a punta en la nube** con Playwright, sin cámara: cargar el MP4 y comprobar el resultado.
+- **Riesgo:** el Chromium de Playwright quizá no decodifique H.264 (códec propietario). Si es así, las pruebas en la nube usarán VP9, y el H.264 se comprueba en el móvil.
+
+## Riesgos
+- **HEVC:** si el móvil graba en HEVC y Chrome no lo decodifica, la app lo dirá, y habrá que grabar en H.264 («Más compatible» en la app de cámara).
+- **Memoria con 4K:** cada fotograma decodificado ocupa ~12 MB. Hay que cerrar cada `VideoFrame` en cuanto se use y no adelantar más de 2–3 en la cola.
+- **Duración del procesado:** unos 10 minutos para 4 min a 60 fps. Puede calentar el móvil, aunque sin presión de tiempo eso solo alarga el procesado.
+- **Modo IMAGE:** sin el suavizado entre frames, los landmarks tiemblan más. Esto puede subir el ruido del EAR y de la compensación por postura. Se medirá en el 6b comparando el reposo grabado con el directo.
+- **Espejo:** se elige a mano. Un error invierte los lados, así que el guiño de prueba lo tiene que comprobar.
+
+## Modelo recomendado
+- **Plan:** Opus, esfuerzo alto (este documento).
+- **6a y 6b** (decodificación, giro, tiempos, modo IMAGE, lateralidad): Opus, esfuerzo medio.
+- **6c:** Opus para la parte de sincronización si se hace B; Sonnet si es C.
+- **6d:** Sonnet.
+
+## Decisiones que necesito del autor
+1. **Opción para las fases:** empezar por A y después C (recomendado), solo A, o A y después B.
+2. Si en C te parece bien que el vídeo exista **temporalmente en memoria**, solo con una casilla marcada, y se borre al procesarlo.
+3. **Duración del reposo** en el análisis libre (A): 30 s por defecto.
+4. **La configuración de tu app de cámara:** resolución y fps con que sueles grabar, y si tiene la opción de códec «Más compatible» (H.264) o «Alta eficiencia» (HEVC).
