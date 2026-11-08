@@ -17,6 +17,7 @@ export async function probeDecode(mp4, { seconds = 15, signal, onProgress = () =
   let rotateMs = 0;
   let outSize = null;
   const t0 = performance.now();
+  const read0 = { ...mp4.readStats };
   for await (const { frame, t } of decodeFrames(mp4, { signal, toMs })) {
     try {
       if (t < lastT) disorder++;
@@ -36,6 +37,7 @@ export async function probeDecode(mp4, { seconds = 15, signal, onProgress = () =
     if (decoded % 10 === 0) onProgress(Math.min(1, t / toMs));
   }
   const wallMs = performance.now() - t0;
+  const readMs = mp4.readStats.ms - read0.ms;
   onProgress(1);
   return {
     seconds: Math.round(toMs) / 1000,
@@ -49,5 +51,9 @@ export async function probeDecode(mp4, { seconds = 15, signal, onProgress = () =
     // Cuánto más rápido que el tiempo real (1 = tan rápido como se grabó).
     realtimeFactor: Math.round(((toMs / wallMs) * 100)) / 100,
     outputSize: outSize,
+    // Desglose por fotograma: leer del archivo, girar y el resto (sobre todo, esperar al decodificador).
+    readMsPerFrame: decoded ? Math.round((readMs / decoded) * 100) / 100 : null,
+    fileReads: mp4.readStats.reads - read0.reads,
+    otherMsPerFrame: decoded ? Math.round(((wallMs - readMs - rotateMs) / decoded) * 100) / 100 : null,
   };
 }

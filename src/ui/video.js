@@ -82,7 +82,8 @@ export function createVideoCard({ getContext }) {
       const p = probe;
       el.result.textContent = [
         `${p.decodedFrames} de ${p.expectedFrames} fotogramas de los primeros ${nf(p.seconds, 1)} s${p.outOfOrder ? ` · ${p.outOfOrder} fuera de orden` : ''}`,
-        `${nf(p.framesPerSecond, 1)} fotogramas/s decodificando y girando (${nf(p.realtimeFactor, 2)} × tiempo real) · girar: ${nf(p.rotateMsPerFrame, 1)} ms por fotograma`,
+        `${nf(p.framesPerSecond, 1)} fotogramas/s decodificando y girando (${nf(p.realtimeFactor, 2)} × tiempo real)`,
+        `Por fotograma: leer ${nf(p.readMsPerFrame, 1)} ms (${p.fileReads} lecturas del archivo) · girar ${nf(p.rotateMsPerFrame, 1)} ms · decodificar y esperar ${nf(p.otherMsPerFrame, 1)} ms`,
         `Imagen ya girada: ${p.outputSize ? `${p.outputSize.width}×${p.outputSize.height}` : '—'}. Comprueba en la miniatura que la cara está derecha.`,
       ].join('\n');
     } catch (err) {

@@ -107,6 +107,12 @@ El vídeo de la app de cámara no sabe en qué fase está cada momento. Hay tres
 
   El giro coincide con el que aplica `ffmpeg`: los cuadrantes de la miniatura son 110, 97, 141 y 143, y los de la referencia, 113, 99, 138 y 141.
 
+### Primera prueba en el móvil (2026-11-08 22:04, commit 3d11b52)
+- **Ficha:** trasera, H.264 (`avc1.640028`), 1920×1080 girado 90° (1080×1920 al verlo), 30 fps constantes, 36,6 s, 8,7 Mb/s, con audio y el índice al principio. **Sin espejo**, comprobado por el autor con el brazo.
+- **Lectura:** 449/449 fotogramas en orden, pero **solo a 7,1 fotogramas/s** (0,24 × tiempo real): ~140 ms por fotograma, de los que girar es 3,8 ms.
+- **Sospecha:** la lectura del archivo muestra a muestra. En Android, cada lectura de un archivo del selector pasa por el sistema. Ahora se lee en **bloques de 8 MB**, y la prueba da el desglose: leer, girar y decodificar.
+- **En la nube, con un vídeo parecido** (1080p, 30 fps, girado, 8 Mb/s): 2 lecturas del archivo en 15 s y 59 fotogramas/s. Ahí el giro manda (16 ms, sin GPU).
+
 ## Pruebas
 - **Vídeos de prueba fabricados con `ffmpeg`** a partir de los vídeos sintéticos de `make-face-videos.py`:
   - MP4 H.264 y VP9;

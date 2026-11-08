@@ -78,6 +78,38 @@ function descriptionOf(entry) {
   return new Uint8Array(stream.buffer, 8); // sin la cabecera de la caja
 }
 
+/** Tamaño de los bloques que se leen del archivo. */
+export const CHUNK_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Lector de muestras por bloques: en Android, cada lectura de un archivo elegido con el selector pasa por
+ * el sistema y tarda decenas de ms (primera prueba en el móvil: ~140 ms por fotograma leyendo uno a uno).
+ * Las muestras están casi seguidas en el archivo, así que se lee un bloque de CHUNK_BYTES y se sirven de
+ * él las que caben. `stats` cuenta las lecturas y su tiempo.
+ */
+export function chunkReader(file, chunkBytes = CHUNK_BYTES) {
+  let start = -1;
+  let buf = null;
+  const stats = { reads: 0, bytes: 0, ms: 0 };
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  return {
+    stats,
+    async read(s) {
+      if (!buf || s.offset < start || s.offset + s.size > start + buf.byteLength) {
+        const t0 = now();
+        start = s.offset;
+        const end = Math.min(file.size, s.offset + Math.max(chunkBytes, s.size));
+        buf = new Uint8Array(await file.slice(start, end).arrayBuffer());
+        stats.reads++;
+        stats.bytes += buf.byteLength;
+        stats.ms += now() - t0;
+      }
+      // Copia: el decodificador puede quedarse con los datos después de cambiar de bloque.
+      return buf.slice(s.offset - start, s.offset - start + s.size);
+    },
+  };
+}
+
 /**
  * Abre un MP4 y devuelve su ficha y la lista de muestras de vídeo (en orden de decodificación).
  * @param {{size:number, slice:(a:number,b:number)=>{arrayBuffer:()=>Promise<ArrayBuffer>}}} file
@@ -111,6 +143,7 @@ export async function openMp4(file) {
     t: ((s.cts - cts0) * 1000) / ts, // ms de presentación desde el primer fotograma
     durationMs: (s.duration * 1000) / ts,
   }));
+  const reader = chunkReader(file);
   const rotation = rotationOf(track.matrix);
   const codedWidth = track.video?.width ?? track.track_width;
   const codedHeight = track.video?.height ?? track.track_height;
@@ -133,7 +166,8 @@ export async function openMp4(file) {
     timing: frameStats(samples.map((s) => s.t)),
     decoderConfig: { codec: track.codec, codedWidth, codedHeight, description: descriptionOf(entry), optimizeForLatency: false },
     samples,
-    /** Datos comprimidos de una muestra, leídos del archivo. */
-    read: async (s) => new Uint8Array(await file.slice(s.offset, s.offset + s.size).arrayBuffer()),
+    /** Datos comprimidos de una muestra, leídos del archivo por bloques. */
+    read: reader.read,
+    readStats: reader.stats,
   };
 }

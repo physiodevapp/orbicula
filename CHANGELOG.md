@@ -15,6 +15,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
   «Probar la lectura» decodifica los primeros 15 s y mide cuántos fotogramas por segundo da el móvil con el giro aplicado. Muestra una miniatura del primer fotograma ya girado.
 - **Lectura sin cargar el archivo en memoria:** solo el índice (`moov`) con `mp4box` 2.4.1, y cada fotograma comprimido desde su posición en el archivo. Se decodifica con WebCodecs, sin adelantar más de 3 fotogramas.
 - JSON `orbicula-video-probe/1`: ficha y prueba de lectura, sin el nombre del archivo ni imágenes.
+- **Lectura del archivo en bloques de 8 MB:** en el móvil, leer muestra a muestra dejaba la lectura en 7 fotogramas/s. La prueba da ahora el desglose por fotograma: leer, girar y decodificar.
 - `scripts/dev/check-video.cjs` y tres MP4 diminutos en `tests/fixtures/`.
 - 12 tests nuevos.
 

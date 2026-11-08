@@ -58,6 +58,16 @@ describe('lectura del MP4 (fixtures hechos con ffmpeg)', () => {
     expect(first.byteLength).toBe(v.samples[0].size);
   });
 
+  it('lee el archivo por bloques: muchas muestras con una sola lectura, y los datos son los de cada muestra', async () => {
+    const { chunkReader } = await import('../src/video/mp4.js');
+    const f = fakeFile('moov-start.mp4');
+    const v = await openMp4(f);
+    const r = chunkReader(f, 1024);
+    const direct = await Promise.all(v.samples.map(async (s) => new Uint8Array(await f.slice(s.offset, s.offset + s.size).arrayBuffer())));
+    for (let i = 0; i < v.samples.length; i++) expect(await r.read(v.samples[i])).toEqual(direct[i]);
+    expect(r.stats.reads).toBeLessThan(v.samples.length / 2);
+  });
+
   it('índice al principio (faststart): el mismo vídeo sin giro', async () => {
     const v = await openMp4(fakeFile('moov-start.mp4'));
     expect(v.container.moovAtEnd).toBe(false);
