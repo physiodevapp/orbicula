@@ -98,7 +98,8 @@ let calNotice = null; // { text, until }: aviso de la calibración en la franja 
 function setCalibration(cal) {
   calibration = cal;
   eventDetector = cal ? new EventDetector(cal, { isClosing: (side) => detectors[side].closing }) : null;
-  calNotice = cal && !cal.valid ? { text: `Reposo no válido: ${cal.reason}. Los eventos pueden no ser fiables.`, until: performance.now() + 10000 } : null;
+  calNotice = cal && !cal.valid ? { text: `Reposo no válido: ${cal.reason}. Los eventos pueden no ser fiables.`, until: performance.now() + 10000 }
+    : cal?.warning ? { text: cal.warning, until: performance.now() + 10000 } : null;
   curves?.requestDraw();
 }
 const flowProcessor = new FlowProcessor(onFlowSample);

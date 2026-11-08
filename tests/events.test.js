@@ -109,6 +109,19 @@ describe('calibración sobre el reposo', () => {
     expect(cal.headStill).toBe(0.1); // 3 × 0,02 < suelo
   });
 
+  it('avisa si el umbral lo fija un pico suelto (sacudida) y no si la subida es pareja', () => {
+    const r = rng(9);
+    const memo = new Map();
+    const noise = (t, side) => { const k = `${t}:${side}`; if (!memo.has(k)) memo.set(k, (r() - 0.5) * 0.01); return memo.get(k); };
+    expect(calibrate(fakeStep(20000, { closure: noise })).warning).toBeNull();
+    // Sacudida de 0,1 s del ojo izquierdo, 0,1 DI, a los 12 s: valor alto, pero el reposo sigue valiendo.
+    const spike = (t, side) => noise(t, side) + (side === 'left' && t > 12000 && t < 12100 ? 0.1 : 0);
+    const cal = calibrate(fakeStep(20000, { closure: spike }));
+    expect(cal.valid).toBe(true);
+    expect(cal.warning).toMatch(/ojo izquierdo/);
+    expect(cal.warning).not.toMatch(/derecho/);
+  });
+
   it('el suelo manda si el reposo es muy quieto', () => {
     const cal = calibrate(fakeStep(20000));
     expect(cal.rise.left).toBe(EVENT_DEFAULTS.riseFloor);

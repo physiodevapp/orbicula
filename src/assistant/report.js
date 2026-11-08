@@ -101,7 +101,7 @@ export function describeSummary(step) {
   if (step.calibration) {
     const c = step.calibration;
     lines.push(c.valid
-      ? `Calibración válida: umbral del cierre I ${c.rise.left} · D ${c.rise.right} DI.`
+      ? `Calibración válida: umbral del cierre I ${c.rise.left} · D ${c.rise.right} DI.${c.warning ? ` ${c.warning}` : ''}`
       : `Calibración NO válida: ${c.reason}. Repite el reposo, con la cabeza apoyada.`);
   }
   const ok = (step.detections ?? []).filter((e) => e.kind === 'contraction' && e.status === 'ok');

@@ -4,6 +4,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (fase 5c)
+- **Aviso de umbral alto:** si el máximo de la subida en el reposo supera 6 veces su p95, una sacudida suelta del párpado ha fijado el umbral. La calibración lo dice (`warning`) y propone repetir el reposo si se quiere más sensibilidad.
+  - El umbral sigue siendo el máximo del reposo.
+  - Las reglas que ignoran los picos se probaron con los seis JSON y traían falsas alarmas en los controles (`docs/plan-fase-5.md`).
+
 ### Añadido (fase 5b: protocolo guiado)
 - **Tarjeta «Protocolo clínico»**, encima del asistente de pruebas (que se queda como herramienta de desarrollo). Seis fases con voz y pitidos, en modo seguido por defecto:
   1. **reposo (calibración)**, 30 s;

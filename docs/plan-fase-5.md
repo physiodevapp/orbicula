@@ -205,11 +205,23 @@ Por eso una contracción de **menos de 0,5 s queda como `brief`** («breve»). S
 - **Sonrisa:** el blendshape de sonrisa llega a 0,96–0,98 en los dos lados, simétrico. En las repeticiones 1 y 2 el EAR baja un 67–69 % en los dos ojos (sonrisa de Duchenne), y en la 3 casi cierra el ojo.
 - **Elevación de cejas:** la repetición 3 da una subida del cierre de 0,09–0,10 DI sin que cambie el EAR. Es la ceja moviendo el párpado superior.
 
-**Para el 5c: el umbral del reposo.** Salió de 0,063 DI en los dos ojos, el más alto de todas las pruebas (las anteriores, de 0,020 a 0,057).
-- Lo fija un solo pico a los 25,7 s: el cierre sube 0,06 DI en un par de frames, el EAR baja un 13 % y vuelve enseguida. Es una micro-sacudida del párpado, de menos de 0,2 s. El percentil 95 del reposo es 0,0045 DI.
-- Esas sacudidas no cuentan nunca como eventos (duran menos de 0,5 s), pero suben el umbral y le quitan sensibilidad.
-- **No se ha cambiado.** Probé fijar el umbral como «lo mínimo para que el propio reposo no dé un evento de 0,5 s o más», y no funciona: las colas lentas tras los parpadeos hacen que sea más alto que el máximo.
-- Hay que buscar otra forma, por ejemplo un percentil alto de las subidas sostenidas, y validarla contra los JSON de la fase 4 y de las pruebas de la 5a.
+**El umbral del reposo.** Salió de 0,063 DI en los dos ojos, el más alto de todas las pruebas (las anteriores, de 0,020 a 0,057). Lo fija un solo pico a los 25,7 s: el cierre sube 0,06 DI en un par de frames y el EAR baja un 13 %. Es una sacudida del párpado de menos de 0,2 s. El percentil 95 del reposo es 0,0045 DI.
+
+## Paso 5c
+
+### 1. Umbral del reposo (decidido: se queda el máximo, con un aviso)
+Se probaron tres reglas sobre los seis JSON con flujo (17:47, 18:38, 18:55, 19:14, 19:57 y el protocolo de las 13:38):
+
+| Regla | Contracciones (controles) | Falsas alarmas (controles) | Reposos y parpadeo espontáneo |
+|---|---|---|---|
+| **Máximo del reposo** (la aprobada) | 25/29 · 26/29 | **0/26 · 0/26** | 0 eventos, salvo en el protocolo de las 13:38 |
+| Máximo tras mediana móvil de 200 ms | 27/29 · 27/29 | 2/26 · 1/26 | eventos en tres sesiones |
+| Máximo tras mediana móvil de 300–400 ms | 27/29 · 27/29 | 2/26 · 2/26 | más eventos |
+| «Sostenida»: lo mínimo para que el reposo no dé un evento de 0,5 s | 27/29 · 27/29 | 4/26 · 6/26 | más eventos |
+
+- Las reglas que quitan los picos bajan el umbral **en todas las sesiones**, no solo en la de la sacudida, y traen falsas alarmas.
+- **Se queda el máximo del reposo**, y la calibración da un **aviso** (`warning`) cuando el máximo supera 6 veces el p95 del reposo. En los JSON, la razón es de 1,4 a 2,5 en los reposos normales y de 14 a 23 en el de la sacudida.
+- El aviso sale en la revisión y en la franja de calidad: «Umbral alto en el ojo…: lo ha fijado una sacudida suelta del párpado durante el reposo. Vale, pero detectará menos contracciones finas; si quieres más sensibilidad, repite el reposo».
 
 ## Pruebas
 - **Tests unitarios:**

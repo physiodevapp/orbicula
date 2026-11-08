@@ -21,6 +21,12 @@ export const EVENT_DEFAULTS = {
   endRatio: 0.5, // un evento acaba cuando la subida baja de esta fracción del umbral
   minDurationMs: 500, // una contracción más corta es «breve» (parpadeo incompleto, sacudida): no cuenta
   riseMargin: 1, // umbral = margen × máximo de la subida en el reposo válido
+  // Si el máximo supera spikyRatio × el p95 del reposo, lo ha fijado un pico suelto (una sacudida del
+  // párpado): se avisa (`warning`) para que, si se quiere más sensibilidad, se repita el reposo. En los
+  // JSON reales, la razón es 1,5–3,7 salvo en el reposo con una sacudida (14–23). Las reglas que quitan los
+  // picos (mediana móvil, «sostenida») bajan el umbral en TODAS las sesiones y traen falsas alarmas en
+  // los controles (docs/plan-fase-5.md, 5c): no se usan.
+  spikyRatio: 6,
   riseFloor: 0.001, // suelo del umbral (DI), provisional hasta repetirlo con los JSON reales: que un reposo muy quieto no dé un umbral ridículo
   headK: 3, // cabeza quieta: velocidad del dorso nasal < headK × su mediana en el reposo…
   headFloor: 0.1, // …y nunca menos de esto (DI/s); la misma regla que analyze-flow.mjs…
@@ -160,12 +166,17 @@ export function calibrate(step, options = {}) {
   const n = v.st.length;
   out.faceFraction = n ? r4(v.st.filter((_, i) => Number.isFinite(v.ear.left[i]) || Number.isFinite(v.ear.right[i])).length / n) : 0;
 
+  const spiky = [];
   for (const side of SIDES) {
     const tr = new RiseTracker(o);
-    const rises = v.ft.map((t, i) => tr.push(t, v.closure[side][i])).filter((r, i) => clean[i] && Number.isFinite(r));
+    const all = v.ft.map((t, i) => tr.push(t, v.closure[side][i]));
+    const rises = all.filter((r, i) => clean[i] && Number.isFinite(r));
     const max = rises.length ? Math.max(...rises) : NaN;
-    out.riseNull[side] = { n: rises.length, p95: r4(percentile(rises, 0.95)), max: r4(max) };
+    const p95 = percentile(rises, 0.95);
+    out.riseNull[side] = { n: rises.length, p95: r4(p95), max: r4(max) };
     out.rise[side] = r4(Math.max(o.riseFloor, Number.isFinite(max) ? o.riseMargin * max : o.riseFloor));
+    // Umbral fijado por un pico suelto (sacudida del párpado): el reposo vale, pero se pierde sensibilidad.
+    if (Number.isFinite(max) && p95 > 0 && max / p95 > o.spikyRatio) spiky.push(side);
 
     const restEar = v.st.map((t, i) => (overlaps(blinkWins, t, t) ? NaN : v.ear[side][i])).filter(Number.isFinite);
     const restAp = v.st.map((t, i) => (overlaps(blinkWins, t, t) ? NaN : v.aperture[side][i])).filter(Number.isFinite);
@@ -181,6 +192,9 @@ export function calibrate(step, options = {}) {
     }));
   }
 
+  out.warning = spiky.length
+    ? `Umbral alto en ${spiky.map((x) => (x === 'left' ? 'el ojo izquierdo' : 'el ojo derecho')).join(' y ')}: lo ha fijado una sacudida suelta del párpado durante el reposo. Vale, pero detectará menos contracciones finas; si quieres más sensibilidad, repite el reposo.`
+    : null;
   const reasons = [];
   if (out.faceFraction < 1 - o.maxFaceLoss) reasons.push('se ha perdido la cara demasiado tiempo');
   if (validMs < o.minValidMs) reasons.push('la cabeza se ha movido o ha habido demasiados parpadeos');
