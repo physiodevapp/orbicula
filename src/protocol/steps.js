@@ -49,7 +49,10 @@ export function protocolSteps(settings = {}) {
       hint: 'De este reposo salen los umbrales: cuanto más quieto, mejor. Si la cabeza se mueve, se repite.',
       calibrates: true,
       requireValid: true, // sin un reposo válido no se sigue
-      calibrateOptions: { minValidFraction: 0.5 }, // mitad del reposo, como mínimo, sin parpadeos y con la cabeza quieta
+      // Tiempo útil mínimo (sin parpadeos y con la cabeza quieta): un tercio del reposo (10 s de 30). Con la
+      // mitad (15 s) un reposo normal quedaba en el límite: el de las 17:24 dio 16,6 s con la cabeza quieta
+      // en el 87 %. Con 13,6 s útiles y 4,4 s de tramos tranquilos, la prueba de las 19:57 dio 0/9 falsas alarmas.
+      calibrateOptions: { minValidFraction: 1 / 3 },
     },
     {
       id: 'natural',

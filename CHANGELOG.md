@@ -23,6 +23,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
   Las asimetrías de 0,20 o más se destacan, de forma orientativa. Los recuentos de contracciones no llevan asimetría.
 - El JSON del protocolo lleva el resumen (`summary`) además de las series.
+- **El reposo del protocolo exige un tercio de tiempo útil (10 s de 30) en vez de la mitad.** El reposo de las 17:24 dio 16,6 s: justo por encima de los 15 s anteriores. Los tramos tranquilos mínimos siguen siendo 3 s seguidos, que es lo que fija el umbral.
 - **Cuando el reposo no vale, dice por qué, con números.**
   - Motivos: cara perdida, cabeza movida, demasiados parpadeos o sin tramos tranquilos seguidos. Se ve en la revisión y en el JSON (`calibration.reason`, `reasonCode`, `diagnosis`).
   - La voz da el motivo en lugar de un «no ha valido» genérico.

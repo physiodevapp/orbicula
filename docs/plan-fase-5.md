@@ -190,7 +190,7 @@ Por eso una contracción de **menos de 0,5 s queda como `brief`** («breve»). S
 ## Paso 5b (hecho; pendiente de la prueba en el móvil)
 - Tarjeta «Protocolo clínico» (`index.html`, `src/protocol/steps.js`) sobre el mismo motor del asistente (`createAssistant` con prefijo de ids). Aparte del asistente de pruebas, como se aprobó.
 - El reposo exige `requireValid`: la tarjeta repite el reposo si la calibración no vale, también en modo seguido (a los 7 s, con aviso de voz).
-- **Tiempo válido mínimo:** la mitad del reposo. Con 30 s son 15 s, como en el plan. Los tramos limpios mínimos para el umbral siguen siendo 3 s.
+- **Tiempo válido mínimo:** un tercio del reposo (10 s de 30). Se bajó de la mitad (15 s) tras la prueba de las 17:24, que dio 16,6 s. Los tramos limpios mínimos para el umbral siguen siendo 3 s.
 - **Cámara simulada:**
   - `lid.y4m`: las seis fases se completan solas, sin errores ni peticiones externas.
   - `nod.y4m` (la cabeza se mueve): el reposo sale «no válido» y se repite solo.
@@ -268,6 +268,13 @@ Se probaron tres reglas sobre los seis JSON con flujo (17:47, 18:38, 18:55, 19:1
 - **El reposo no lista eventos:** es la calibración.
 - El mismo resumen va en el JSON (`summary`).
 - **Comprobado en la nube:** con la cámara simulada, el protocolo termina solo y saca las seis tarjetas y la lista de contracciones. Sin errores y sin desbordar a 380 px.
+
+### Segunda prueba del protocolo (2026-11-08 17:24, commit a15d6dc)
+- **Completo a la primera:** reposo válido al primer intento y sin intentos rechazados. Análisis de 25,5 a 28,3/s y sin rebaja del flujo.
+- **El reposo, justo:** 16,6 s de tiempo útil de 30. La cabeza se movió un 13 % del tiempo (6,7 s apartados) y los parpadeos apartaron 5 s. Por eso se baja el mínimo a un tercio.
+- **Umbral de nuevo alto** (0,061 y 0,059 DI) sin aviso: no es una sacudida suelta, el flujo del reposo es más ruidoso (la cabeza se movía más).
+- **Parpadeo:** 13–14 por minuto; el cierre de los parpadeos es de solo un 40 % del cierre máximo (92 % incompletos). Menos que a las 13:38 (61 %): parpadeos más suaves o más breves, con el límite de siempre de ~27 fps.
+- **Sonrisa:** el blendshape de sonrisa **satura** a 0,97–0,98 en los dos lados, y el cierre del ojo con la sonrisa es de 31 % y 29 %. Con una sonrisa amplia no se distingue qué lado sonríe más. Sin datos de que se hiciera asimétrica.
 
 ## Pruebas
 - **Tests unitarios:**
