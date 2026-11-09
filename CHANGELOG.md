@@ -4,6 +4,17 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (fase 6b: análisis de un vídeo grabado)
+- **«Analizar el vídeo»**, en la tarjeta «Vídeo grabado», analiza **todos** los fotogramas, de uno en uno: la cara en modo IMAGE (sin el suavizado del directo) y el flujo en todos los pares (sin límite de ritmo).
+  - Los primeros segundos (20, 30 o 45; por defecto, 30) son el reposo de calibración.
+  - Del resto salen los eventos, las curvas y el resumen. Tramo nuevo, «Resto del vídeo»: parpadeos, cierre, contracciones y actividad rítmica.
+  - Progreso con el tiempo restante, cancelar, y opción de procesar como mucho 30 fotogramas/s.
+- **Espejo:** la casilla «El vídeo está en espejo» corrige los lados, igual que en directo. Comprobado con un vídeo sintético: los parpadeos de cada ojo salen en su lado y se intercambian con la casilla.
+- **La cámara se apaga** al empezar a analizar un vídeo.
+- **JSON:** el mismo formato que el protocolo (`orbicula-test-session/3`, `plan: "video"`), con la ficha del vídeo y cómo se procesó.
+- `scripts/dev/check-video-analysis.cjs`.
+- 7 tests nuevos.
+
 ### Añadido (fase 6a: lectura de vídeo grabado)
 - **Tarjeta «Vídeo grabado».** Se elige un MP4 de la app de cámara y se ve su ficha:
   - códec y resolución;

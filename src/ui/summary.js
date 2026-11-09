@@ -33,6 +33,13 @@ export const ROWS = {
     ['contractions', 'Contracciones finas', 'count', 'Subidas del cierre por flujo por encima del umbral del reposo.'],
     ['spectrum', 'Actividad rítmica (pico)', 'spectrum'],
   ],
+  free: [
+    ['blinksPerMin', 'Parpadeos por minuto', 'perMin'],
+    ['blinkMs', 'Duración del parpadeo', 'ms'],
+    ['blinkCompleteness', 'Cierre del parpadeo', 'pct', '1 − EAR mínimo / EAR en reposo.'],
+    ['contractions', 'Contracciones finas', 'count', 'Subidas del cierre por flujo por encima del umbral del reposo.'],
+    ['spectrum', 'Actividad rítmica (pico)', 'spectrum'],
+  ],
   soft: [
     ['closure', 'Cierre', 'pct', '1 − EAR mínimo / EAR en reposo.'],
     ['browRecruit', 'Ceja (reclutamiento)', 'times', 'Pico de movimiento de la ceja, en veces su reposo.'],

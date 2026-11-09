@@ -26,7 +26,7 @@
 
     <section class="card" id="videoCard">
       <div class="card-title">Vídeo grabado</div>
-      <p class="card-text">Analiza un vídeo grabado con la app de cámara del móvil, fotograma a fotograma: es el modo más sensible. El vídeo se lee en el móvil y no sale de él. <b>De momento (paso 6a)</b> solo lee el archivo y mide cuánto tarda en decodificarlo.</p>
+      <p class="card-text">Analiza un vídeo grabado con la app de cámara del móvil, fotograma a fotograma: es el modo más sensible. El vídeo se lee en el móvil y no sale de él. <b>Los primeros segundos tienen que ser de reposo</b> (quieto, mirando al frente): de ellos salen los umbrales.</p>
       <label class="field">
         <span class="control-label">Archivo de vídeo (MP4)</span>
         <input class="input" id="vidFile" type="file" accept="video/mp4,video/quicktime,video/*">
@@ -45,6 +45,18 @@
         <div class="coach-bar" id="vidBarWrap" hidden><i id="vidBar"></i></div>
         <pre class="summary" id="vidResult"></pre>
         <canvas class="vid-thumb" id="vidThumb" hidden aria-label="Primer fotograma, ya girado"></canvas>
+        <div class="control-row wrap">
+          <label class="field"><span class="control-label">Reposo al principio</span>
+            <select class="select" id="vidRest" aria-label="Segundos de reposo al principio del vídeo"><option value="20">20 s</option><option value="30" selected>30 s</option><option value="45">45 s</option></select></label>
+          <label class="check"><input type="checkbox" id="vidCap"> Como mucho 30 fotogramas/s (tarda la mitad)</label>
+        </div>
+        <div class="control-row wrap">
+          <button class="btn btn-primary" id="vidAnalyze" type="button">Analizar el vídeo</button>
+          <button class="btn btn-quiet" id="vidACancel" type="button" hidden>Cancelar</button>
+        </div>
+        <div class="coach-bar" id="vidABarWrap" hidden><i id="vidABar"></i></div>
+        <p class="hint" id="vidProgress"></p>
+        <div class="proto-summary" id="vidSummary" hidden></div>
         <div class="control-row wrap">
           <button class="btn" id="vidDownload" type="button">Descargar JSON</button>
           <button class="btn" id="vidCopy" type="button">Copiar ficha</button>

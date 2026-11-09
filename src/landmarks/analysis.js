@@ -3,6 +3,7 @@
 import { createLandmarker, assetUrls } from './landmarker.js';
 import { processResult } from './process.js';
 import { FpsMeter } from '../capture/camera-logic.js';
+import { sourceSize } from '../capture/source.js';
 
 export class Analysis {
   constructor() {
@@ -52,13 +53,19 @@ export class Analysis {
     this._loading = null;
   }
 
-  /** Analiza el frame actual del vídeo y entrega el resultado por `onResult`. */
+  /** Modo IMAGE (vídeo grabado, fase 6): cada fotograma por separado. */
+  async setImageMode(on) {
+    await this.landmarker?.setOptions({ runningMode: on ? 'IMAGE' : 'VIDEO' });
+    this.imageMode = !!on;
+  }
+
+  /** Analiza el frame actual del vídeo (o un VideoFrame) y entrega el resultado por `onResult`. */
   submit(video, t) {
-    if (!this.landmarker || video.readyState < 2 || !video.videoWidth) return;
-    const frame = { width: video.videoWidth, height: video.videoHeight };
+    const frame = sourceSize(video);
+    if (!this.landmarker || !frame) return;
     this.analysisSize = frame;
     const t0 = performance.now();
-    const res = this.landmarker.detectForVideo(video, t0);
+    const res = this.imageMode ? this.landmarker.detect(video) : this.landmarker.detectForVideo(video, t0);
     const t1 = performance.now();
     this.ms = this.ms ? this.ms * 0.9 + (t1 - t0) * 0.1 : t1 - t0;
     this.meter.push(t1);

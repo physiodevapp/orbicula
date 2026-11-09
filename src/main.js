@@ -17,6 +17,7 @@ import { sampleOf } from './landmarks/process.js';
 import { BlinkDetector } from './metrics/blinks.js';
 import { createAssistant } from './ui/assistant.js';
 import { createVideoCard } from './ui/video.js';
+import { createVideoSession, videoSteps, processVideo } from './video/offline.js';
 import { PROTOCOL_PLAN } from './assistant/steps.js';
 import { createBenchmark } from './ui/benchmark.js';
 import { Series } from './metrics/series.js';
@@ -157,8 +158,6 @@ function captureContext() {
   };
 }
 
-// Vídeo grabado (fase 6): solo la build y el dispositivo, no hace falta la cámara.
-createVideoCard({ getContext: () => { const c = captureContext(); return { build: c.build, device: c.device }; } });
 
 /** Lo que comparten el asistente de pruebas y el protocolo clínico: las mismas medidas y la misma calibración. */
 const sessionDeps = {
@@ -191,6 +190,47 @@ const sessionDeps = {
   },
 };
 const assistant = createAssistant(sessionDeps);
+
+/**
+ * Vídeo grabado (fase 6b): procesa el archivo fotograma a fotograma con el análisis en modo IMAGE y el
+ * flujo sin límite de ritmo, y registra las medidas con el reloj del vídeo (src/video/offline.js). La
+ * cámara se apaga mientras tanto (si no, sus frames se mezclarían con los del vídeo).
+ */
+async function analyzeVideoFile({ mp4, mirrored, restSec, maxFps, signal, onProgress }) {
+  const busy = document.body.dataset.busy;
+  if (busy) throw new Error(busy === 'video' ? 'ya hay un vídeo analizándose' : 'hay otra prueba en marcha');
+  document.body.dataset.busy = 'video';
+  const video = createVideoSession(videoSteps(mp4.timing.durationMs, restSec), { onStepEnd: sessionDeps.onStepEnd, onStepStart: sessionDeps.onStepStart });
+  try {
+    if (camera.stream) {
+      for (const a of recorders) a.interrupt('se ha empezado a analizar un vídeo grabado');
+      camera.stop();
+      state.running = false;
+    }
+    await loadModel();
+    if (!analysis) throw new Error('no se pudo cargar el modelo de la cara');
+    await sessionDeps.onStart({ flow: true }); // medidas a cero y flujo encendido
+    flow.resetStrip();
+    flow.setUnlimited(true);
+    analysis.frameMirrored = !!mirrored;
+    await analysis.setImageMode(true);
+    els.curvesView.hidden = false;
+    recorders.push(video.recorder);
+    const stats = await processVideo({ mp4, analysis, flow, video, maxFps, signal, onProgress });
+    return { results: video.session.results, stats, context: captureContext() };
+  } finally {
+    const k = recorders.indexOf(video.recorder);
+    if (k >= 0) recorders.splice(k, 1);
+    flow?.setUnlimited(false);
+    flow?.resetStrip();
+    if (analysis) {
+      analysis.frameMirrored = false;
+      try { await analysis.setImageMode(false); } catch { /* se recarga al volver a la cámara */ }
+    }
+    if (document.body.dataset.busy === 'video') document.body.dataset.busy = '';
+  }
+}
+createVideoCard({ getContext: () => { const c = captureContext(); return { build: c.build, device: c.device }; }, analyzeVideoFile });
 const protocol = createAssistant({ ...sessionDeps, prefix: 'pr', rootId: 'protocol', busyKey: 'protocol', plan: PROTOCOL_PLAN });
 /** Las dos tarjetas reciben todas las medidas; solo la que está grabando un paso las guarda. */
 const recorders = [assistant, protocol];
@@ -503,8 +543,8 @@ async function createAnalysis() {
 // ── Ritmo del flujo: se rebaja solo si el análisis de la cara no llega a 24/s ─────────────
 const governor = new RateGovernor();
 setInterval(() => {
-  // La prueba de rendimiento mide configuraciones fijas: ahí no se toca.
-  if (!flow || !state.showFlow || !analysis || document.body.dataset.busy === 'bench') return;
+  // La prueba de rendimiento mide configuraciones fijas y el vídeo grabado procesa todos los pares.
+  if (!flow || !state.showFlow || !analysis || ['bench', 'video'].includes(document.body.dataset.busy)) return;
   const cap = governor.update(performance.now(), analysis.fps);
   if (cap !== flow.rateCap) {
     flow.setRateCap(cap);

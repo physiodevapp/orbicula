@@ -5,6 +5,7 @@ import { processResult } from './process.js';
 
 let landmarker = null;
 let lastTs = 0; // MediaPipe exige marcas de tiempo estrictamente crecientes
+let imageMode = false; // vídeo grabado (fase 6): cada fotograma por separado, sin suavizado
 
 self.onmessage = async ({ data: m }) => {
   if (m.type === 'init') {
@@ -27,6 +28,17 @@ self.onmessage = async ({ data: m }) => {
     return;
   }
 
+  if (m.type === 'mode') {
+    try {
+      await landmarker?.setOptions({ runningMode: m.image ? 'IMAGE' : 'VIDEO' });
+      imageMode = !!m.image;
+    } catch (err) {
+      self.postMessage({ type: 'warning', message: String(err?.message ?? err) });
+    }
+    self.postMessage({ type: 'modeSet', image: imageMode });
+    return;
+  }
+
   if (m.type === 'frame') {
     if (!landmarker) {
       m.bitmap.close();
@@ -36,7 +48,7 @@ self.onmessage = async ({ data: m }) => {
     try {
       const t0 = performance.now();
       lastTs = Math.max(lastTs + 1, t0);
-      const res = landmarker.detectForVideo(m.bitmap, lastTs);
+      const res = imageMode ? landmarker.detect(m.bitmap) : landmarker.detectForVideo(m.bitmap, lastTs);
       const ms = performance.now() - t0;
       const out = processResult(res, m.frame, { frameMirrored: m.frameMirrored, swapNames: m.swapNames });
       self.postMessage({ type: 'result', id: m.id, t: m.t, ms, ...out });

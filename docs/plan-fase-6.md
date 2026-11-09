@@ -130,6 +130,21 @@ El vídeo de la app de cámara no sabe en qué fase está cada momento. Hay tres
   La lentitud de la primera prueba (7 fotogramas/s) era leer muestra a muestra.
 - **Conclusión del 6a:** leer, decodificar y girar no son el cuello de botella. Lo será el análisis de la cara (~35 ms por fotograma) junto con el flujo, así que el procesado completo irá a unos 25 fotogramas/s. Un vídeo de 4 min a 30 fps son 7200 fotogramas: **unos 5 minutos**.
 
+## Paso 6b (hecho; pendiente de la prueba en el móvil)
+- **`src/video/offline.js`:** cada fotograma, decodificado y girado, va al análisis de la cara y al flujo. No se pide el siguiente hasta tener los dos resultados, así que se procesan **todos**.
+  - **Registro:** con el mismo motor que el protocolo (`GuidedSession`), con el **tiempo del vídeo** como reloj, en dos tramos: el reposo de calibración (por defecto, los primeros 30 s) y el resto del vídeo.
+  - La calibración, los eventos, el resumen y el JSON son los de siempre: `plan: "video"`, con `video` (ficha y procesado) y `settings`.
+- **Análisis en modo IMAGE:** se cambia el modelo del worker con `setOptions({ runningMode })` y se vuelve a VIDEO al acabar.
+- **Flujo sin límite de ritmo:** `FlowClient.setUnlimited`, y el ajuste por calor no actúa mientras se procesa un vídeo.
+- **Espejo:** la casilla de la tarjeta pasa a `frameMirrored`, la misma corrección que en directo.
+- **La cámara se apaga** al empezar a analizar un vídeo; si no, sus frames se mezclarían con los del archivo.
+- **Los dos workers** aceptan un `VideoFrame` además del `<video>` (`src/capture/source.js`).
+- **Tarjeta:** reposo inicial (20, 30 o 45 s), «como mucho 30 fotogramas/s» (marcado si el vídeo va a más de 40), progreso con el tiempo restante, cancelar, el resumen (con la fase «Resto del vídeo») y el JSON.
+- **En la nube** (vídeo sintético de parpadeos de 48 s, 720×720 a 30 fps, guardado tumbado con la marca de giro del móvil):
+  - se procesan los 1440 fotogramas, con flujo en todos los pares (33 ms), sin errores ni peticiones externas;
+  - **lateralidad:** en el resto del vídeo, ojo derecho 11 parpadeos/min e izquierdo 4, lo esperado (3 y 1 por cada vuelta de 16 s). Con «en espejo», 4 y 11: se intercambian.
+  - Unos 6 fotogramas/s en la nube, sin GPU.
+
 ## Pruebas
 - **Vídeos de prueba fabricados con `ffmpeg`** a partir de los vídeos sintéticos de `make-face-videos.py`:
   - MP4 H.264 y VP9;

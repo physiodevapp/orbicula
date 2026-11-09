@@ -4,18 +4,29 @@ import { openMp4 } from '../video/mp4.js';
 import { canDecode } from '../video/decode.js';
 import { probeDecode } from '../video/probe.js';
 import { downloadJson, copyJson, stamp } from './share.js';
+import { buildReport } from '../assistant/report.js';
+import { summarizeProtocol } from '../protocol/summary.js';
+import { renderSummary } from './summary.js';
 
 export const VIDEO_PROBE_SCHEMA = 'orbicula-video-probe/1';
 const $ = (id) => document.getElementById(id);
 const nf = (v, d = 0) => (Number.isFinite(v) ? v.toFixed(d).replace('.', ',') : '—');
 
-/** @param {{getContext: () => {build: object, device: object}}} deps */
-export function createVideoCard({ getContext }) {
+const mmss = (ms) => `${Math.floor(ms / 60000)}:${String(Math.round((ms % 60000) / 1000)).padStart(2, '0')}`;
+
+/**
+ * @param {{getContext: () => {build: object, device: object},
+ *          analyzeVideoFile?: (o: object) => Promise<{results: object[], stats: object, context: object}>}} deps
+ */
+export function createVideoCard({ getContext, analyzeVideoFile = null }) {
   const el = {
     file: $('vidFile'), info: $('vidInfo'), probe: $('vidProbe'), cancel: $('vidCancel'), bar: $('vidBar'), barWrap: $('vidBarWrap'),
     result: $('vidResult'), thumb: $('vidThumb'), out: $('vidOut'), download: $('vidDownload'), copy: $('vidCopy'), msg: $('vidMsg'),
     facing: $('vidFacing'), mirror: $('vidMirror'),
+    rest: $('vidRest'), cap: $('vidCap'), analyze: $('vidAnalyze'), aCancel: $('vidACancel'), aBar: $('vidABar'), aBarWrap: $('vidABarWrap'),
+    progress: $('vidProgress'), summary: $('vidSummary'),
   };
+  let analysis = null; // { results, stats, context, settings, startedAt }
   // Un archivo elegido antes de recargar la página puede seguir en el selector sin permiso para leerlo.
   el.file.value = '';
   let mp4 = null;
@@ -47,7 +58,8 @@ export function createVideoCard({ getContext }) {
 
   el.file.addEventListener('change', async () => {
     const file = el.file.files?.[0];
-    mp4 = null; probe = null; support = null;
+    mp4 = null; probe = null; support = null; analysis = null;
+    el.summary.hidden = true; el.progress.textContent = '';
     el.result.textContent = ''; el.msg.textContent = ''; el.out.hidden = true; el.probe.disabled = true;
     el.thumb.hidden = true;
     if (!file) return;
@@ -58,6 +70,8 @@ export function createVideoCard({ getContext }) {
       support = await canDecode(mp4.decoderConfig);
       showInfo();
       el.probe.disabled = !support.supported;
+      el.analyze.disabled = !support.supported || !analyzeVideoFile;
+      el.cap.checked = (mp4.timing.fps ?? 0) > 40;
       el.out.hidden = false;
     } catch (err) {
       el.info.textContent = err?.name === 'NotReadableError'
@@ -103,12 +117,61 @@ export function createVideoCard({ getContext }) {
   });
   el.cancel.addEventListener('click', () => abort?.abort());
 
+  /** Informe del análisis: el mismo formato que el protocolo (orbicula-test-session/3), con la ficha del vídeo. */
+  const analysisReport = (includeSeries = true) => {
+    const a = analysis;
+    return buildReport({
+      results: a.results, startedAt: a.startedAt, plan: 'video', settings: a.settings,
+      summary: summarizeProtocol(a.results), includeSeries,
+      video: { file: fileMeta, recordedWith: { facing: el.facing.value, mirrored: el.mirror.checked }, container: mp4.container, track: mp4.track, timing: mp4.timing, processing: a.stats },
+      ...a.context,
+    });
+  };
+
+  el.analyze.addEventListener('click', async () => {
+    if (!mp4 || !analyzeVideoFile) return;
+    abort = new AbortController();
+    const settings = { restSec: Number(el.rest.value) || 30, maxFps: el.cap.checked ? 30 : 0, facing: el.facing.value, mirrored: el.mirror.checked };
+    el.analyze.disabled = true; el.probe.disabled = true; el.aCancel.hidden = false; el.aBarWrap.hidden = false;
+    el.summary.hidden = true; el.msg.textContent = '';
+    el.progress.textContent = 'Preparando el análisis (modelo de la cara y flujo óptico)…';
+    let wake = null;
+    try { wake = await navigator.wakeLock?.request('screen'); } catch { /* sin bloqueo de pantalla */ }
+    const startedAt = new Date().toISOString();
+    try {
+      const out = await analyzeVideoFile({
+        mp4, mirrored: el.mirror.checked, restSec: settings.restSec, maxFps: settings.maxFps, signal: abort.signal,
+        onProgress: (p) => {
+          el.aBar.style.width = `${Math.round((p.done / p.total) * 100)}%`;
+          el.progress.textContent = `Fotograma ${p.done} de ${p.total} · ${mmss(p.t)} de ${mmss(p.durationMs)} del vídeo${p.etaMs != null ? ` · quedan unos ${mmss(p.etaMs)}` : ''}`;
+        },
+      });
+      analysis = { ...out, settings, startedAt };
+      const s = out.stats;
+      el.progress.textContent = `Hecho: ${s.frames} fotogramas en ${mmss(s.elapsedMs)} (${nf(s.framesPerSecond, 1)}/s)${s.every > 1 ? `, uno de cada ${s.every}` : ''}.`;
+      renderSummary(el.summary, summarizeProtocol(out.results), out.results);
+    } catch (err) {
+      el.progress.textContent = err?.name === 'AbortError' ? 'Cancelado.'
+        : err?.name === 'NotReadableError' ? 'El móvil no deja leer el archivo. Vuelve a elegirlo y analiza enseguida.'
+        : `No se pudo analizar: ${err?.message ?? err}`;
+    } finally {
+      wake?.release?.().catch(() => {});
+      el.analyze.disabled = false; el.probe.disabled = !support?.supported; el.aCancel.hidden = true; el.aBarWrap.hidden = true;
+    }
+  });
+  el.aCancel.addEventListener('click', () => abort?.abort());
+
   el.download.addEventListener('click', () => {
+    if (analysis) {
+      const { name, size } = downloadJson(analysisReport(true), `orbicula-video-analisis-${stamp()}.json`);
+      el.msg.textContent = `Descargado: ${name} (${Math.round(size / 1024)} KB).`;
+      return;
+    }
     const { name, size } = downloadJson(report(), `orbicula-video-${stamp()}.json`);
     el.msg.textContent = `Descargado: ${name} (${Math.round(size / 1024)} KB).`;
   });
   el.copy.addEventListener('click', async () => {
-    try { await copyJson(report()); el.msg.textContent = 'Copiado. Pégalo en la conversación.'; } catch (err) { el.msg.textContent = `No se pudo copiar (${err?.message ?? err}).`; }
+    try { await copyJson(analysis ? analysisReport(false) : report()); el.msg.textContent = 'Copiado. Pégalo en la conversación.'; } catch (err) { el.msg.textContent = `No se pudo copiar (${err?.message ?? err}).`; }
   });
 
   return { report };

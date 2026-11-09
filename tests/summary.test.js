@@ -144,6 +144,15 @@ describe('resumen del protocolo', () => {
     expect(slow.phases.natural.quality.reliable).toBe(false);
   });
 
+  it('vídeo grabado: el resto del vídeo se resume como el parpadeo (frecuencia, cierre, actividad rítmica)', () => {
+    const free = { ...step('free', 30000, { events: { left: [blink(5000, 0.3)], right: [blink(5000, 0.6), blink(9000, 0.6)] } }), title: 'Resto del vídeo' };
+    const s = summarizeProtocol([steps[0], free]);
+    expect(s.phases.free.left.blinksPerMin).toBe(2);
+    expect(s.phases.free.right.blinksPerMin).toBe(4);
+    expect(s.phases.free.asymmetry.blinksPerMin).toBeLessThan(0);
+    expect(s.phases.free.left.spectrum).toBeDefined();
+  });
+
   it('avisa si falta la calibración o no vale', () => {
     expect(summarizeProtocol([steps[1]]).warnings[0]).toMatch(/Sin calibración/);
     expect(summarizeProtocol([{ ...steps[0], calibration: { ...CAL, valid: false, reason: 'x' } }]).warnings[0]).toMatch(/no válido/);
