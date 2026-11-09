@@ -72,7 +72,7 @@ describe('lectura del MP4 (fixtures hechos con ffmpeg)', () => {
     const { chunkReader } = await import('../src/video/mp4.js');
     const f = fakeFile('moov-start.mp4');
     const v = await openMp4(f);
-    const picky = { size: f.size, slice: (a, b) => (b - a > 4096 ? { arrayBuffer: async () => { throw Object.assign(new Error('no'), { name: 'NotReadableError' }); } } : f.slice(a, b)) };
+    const picky = { size: f.size, slice: (a, b) => (b - a > 1000 ? { arrayBuffer: async () => { throw Object.assign(new Error('no'), { name: 'NotReadableError' }); } } : f.slice(a, b)) };
     const r = chunkReader(picky, 1 << 20);
     for (const s of v.samples) expect((await r.read(s)).byteLength).toBe(s.size);
     expect(r.stats.fallbacks).toBe(1);
