@@ -117,6 +117,19 @@ El vídeo de la app de cámara no sabe en qué fase está cada momento. Hay tres
 - **Miniatura:** la cara sale **derecha**. El giro es correcto con un vídeo real.
 - **Se quedaba colgado casi al final.** El decodificador de hardware (MediaCodec) solo puede tener unos pocos fotogramas sin devolver, y al final se esperaba a `flush()` sin recogerlos, así que los dos se quedaban esperándose. En la nube no pasaba: el decodificador es de software. Reproducido con un test (cupo de 2 fotogramas) y corregido: se pide el vaciado y se siguen entregando fotogramas.
 
+### Tercera y cuarta prueba en el móvil (2026-11-09, commits 8e123fb y anterior)
+- **Commit b0f6b15:** `NotReadableError` al leer los fotogramas, aunque el índice sí se había leído. Lo más probable es un archivo que se quedó elegido de antes de recargar la página, ya sin permiso. Ahora el selector se vacía al cargar, y si un bloque no se puede leer se sigue muestra a muestra y se anota.
+- **Commit 8e123fb: funciona.** 449/449 fotogramas en orden, a **132 fotogramas/s (4,4 × tiempo real)**.
+
+  | Por fotograma | Tiempo |
+  |---|---|
+  | Leer | 0,8 ms (3 lecturas en 15 s, sin respaldo) |
+  | Girar | 0,7 ms |
+  | Decodificar | 6,1 ms |
+
+  La lentitud de la primera prueba (7 fotogramas/s) era leer muestra a muestra.
+- **Conclusión del 6a:** leer, decodificar y girar no son el cuello de botella. Lo será el análisis de la cara (~35 ms por fotograma) junto con el flujo, así que el procesado completo irá a unos 25 fotogramas/s. Un vídeo de 4 min a 30 fps son 7200 fotogramas: **unos 5 minutos**.
+
 ## Pruebas
 - **Vídeos de prueba fabricados con `ffmpeg`** a partir de los vídeos sintéticos de `make-face-videos.py`:
   - MP4 H.264 y VP9;
