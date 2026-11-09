@@ -54,6 +54,7 @@ export async function probeDecode(mp4, { seconds = 15, signal, onProgress = () =
     // Desglose por fotograma: leer del archivo, girar y el resto (sobre todo, esperar al decodificador).
     readMsPerFrame: decoded ? Math.round((readMs / decoded) * 100) / 100 : null,
     fileReads: mp4.readStats.reads - read0.reads,
+    readFallback: mp4.readStats.chunkError, // si se tuvo que leer muestra a muestra, por qué
     otherMsPerFrame: decoded ? Math.round(((wallMs - readMs - rotateMs) / decoded) * 100) / 100 : null,
   };
 }

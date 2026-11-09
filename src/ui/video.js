@@ -16,6 +16,8 @@ export function createVideoCard({ getContext }) {
     result: $('vidResult'), thumb: $('vidThumb'), out: $('vidOut'), download: $('vidDownload'), copy: $('vidCopy'), msg: $('vidMsg'),
     facing: $('vidFacing'), mirror: $('vidMirror'),
   };
+  // Un archivo elegido antes de recargar la página puede seguir en el selector sin permiso para leerlo.
+  el.file.value = '';
   let mp4 = null;
   let fileMeta = null;
   let support = null;
@@ -58,7 +60,9 @@ export function createVideoCard({ getContext }) {
       el.probe.disabled = !support.supported;
       el.out.hidden = false;
     } catch (err) {
-      el.info.textContent = `No se pudo leer: ${err?.message ?? err}. ¿Es un vídeo MP4 de la app de cámara?`;
+      el.info.textContent = err?.name === 'NotReadableError'
+        ? 'El móvil no deja leer el archivo. Vuelve a elegirlo; si sigue, elígelo desde la app «Archivos».'
+        : `No se pudo leer: ${err?.message ?? err}. ¿Es un vídeo MP4 de la app de cámara?`;
     }
   });
 
@@ -83,12 +87,15 @@ export function createVideoCard({ getContext }) {
       el.result.textContent = [
         `${p.decodedFrames} de ${p.expectedFrames} fotogramas de los primeros ${nf(p.seconds, 1)} s${p.outOfOrder ? ` · ${p.outOfOrder} fuera de orden` : ''}`,
         `${nf(p.framesPerSecond, 1)} fotogramas/s decodificando y girando (${nf(p.realtimeFactor, 2)} × tiempo real)`,
-        `Por fotograma: leer ${nf(p.readMsPerFrame, 1)} ms (${p.fileReads} lecturas del archivo) · girar ${nf(p.rotateMsPerFrame, 1)} ms · decodificar y esperar ${nf(p.otherMsPerFrame, 1)} ms`,
+        `Por fotograma: leer ${nf(p.readMsPerFrame, 1)} ms (${p.fileReads} lecturas del archivo${p.readFallback ? `; bloques grandes fallaron: ${p.readFallback}` : ''}) · girar ${nf(p.rotateMsPerFrame, 1)} ms · decodificar y esperar ${nf(p.otherMsPerFrame, 1)} ms`,
         `Imagen ya girada: ${p.outputSize ? `${p.outputSize.width}×${p.outputSize.height}` : '—'}. Comprueba en la miniatura que la cara está derecha.`,
       ].join('\n');
     } catch (err) {
-      el.result.textContent = err?.name === 'AbortError' ? 'Cancelado.' : `Error al decodificar: ${err?.message ?? err}`;
-      if (err?.name !== 'AbortError') probe = { error: String(err?.message ?? err) };
+      const unreadable = err?.name === 'NotReadableError';
+      el.result.textContent = err?.name === 'AbortError' ? 'Cancelado.'
+        : unreadable ? 'El móvil no deja leer el archivo (el permiso ha caducado o es una copia temporal). Vuelve a elegirlo con «Seleccionar archivo» y prueba enseguida; si sigue, elígelo desde la app «Archivos» en vez de desde Fotos o la Galería.'
+        : `Error al decodificar: ${err?.message ?? err}`;
+      if (err?.name !== 'AbortError') probe = { error: String(err?.message ?? err), errorName: err?.name ?? null, readStats: { ...mp4.readStats } };
     } finally {
       wake?.release?.().catch(() => {});
       el.probe.disabled = false; el.cancel.hidden = true; el.barWrap.hidden = true;

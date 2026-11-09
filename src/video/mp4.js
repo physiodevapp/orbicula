@@ -90,7 +90,8 @@ export const CHUNK_BYTES = 8 * 1024 * 1024;
 export function chunkReader(file, chunkBytes = CHUNK_BYTES) {
   let start = -1;
   let buf = null;
-  const stats = { reads: 0, bytes: 0, ms: 0 };
+  const stats = { reads: 0, bytes: 0, ms: 0, fallbacks: 0, chunkError: null };
+  let useChunks = true;
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
   return {
     stats,
@@ -98,8 +99,19 @@ export function chunkReader(file, chunkBytes = CHUNK_BYTES) {
       if (!buf || s.offset < start || s.offset + s.size > start + buf.byteLength) {
         const t0 = now();
         start = s.offset;
-        const end = Math.min(file.size, s.offset + Math.max(chunkBytes, s.size));
-        buf = new Uint8Array(await file.slice(start, end).arrayBuffer());
+        // Si un bloque grande no se puede leer (en un móvil Android dio NotReadableError), se sigue
+        // muestra a muestra, que es más lento pero funcionaba.
+        const want = useChunks ? Math.max(chunkBytes, s.size) : s.size;
+        const end = Math.min(file.size, s.offset + want);
+        try {
+          buf = new Uint8Array(await file.slice(start, end).arrayBuffer());
+        } catch (err) {
+          if (!useChunks) throw err;
+          useChunks = false;
+          stats.fallbacks++;
+          stats.chunkError = String(err?.name ?? err);
+          buf = new Uint8Array(await file.slice(start, start + s.size).arrayBuffer());
+        }
         stats.reads++;
         stats.bytes += buf.byteLength;
         stats.ms += now() - t0;
