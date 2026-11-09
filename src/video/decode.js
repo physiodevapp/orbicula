@@ -7,6 +7,9 @@
 //   fotograma). No se limita por la cola del decodificador: con fotogramas B (H.264, HEVC) retiene varias
 //   muestras antes de dar el primer fotograma, y esperarle con la entrada cortada lo bloquea. Solo un
 //   tope amplio de muestras en vuelo (maxInFlight) por si algo va mal.
+// - Al final no se espera a flush() sin recoger fotogramas: el decodificador de hardware (MediaCodec en
+//   Android) solo puede tener unos pocos fotogramas sin devolver, y con el cupo lleno flush() no termina
+//   (se quedaba colgado al final en el móvil del autor). Se pide el vaciado y se siguen entregando.
 // - Quien recibe un fotograma lo tiene que cerrar (frame.close()).
 
 /** ¿Puede este navegador decodificar el vídeo? */
@@ -41,6 +44,7 @@ export async function* decodeFrames(mp4, { maxAhead = 3, maxInFlight = 40, signa
   decoder.configure(mp4.decoderConfig);
   const samples = mp4.samples;
   let next = 0; // siguiente muestra a decodificar
+  let flushing = false;
   let flushed = false;
   const usMs = 1000;
   try {
@@ -63,9 +67,10 @@ export async function* decodeFrames(mp4, { maxAhead = 3, maxInFlight = 40, signa
       }
       if (next >= samples.length || samples[next].t > toMs + 1000) {
         if (flushed) break;
-        await decoder.flush();
-        flushed = true;
-        continue;
+        if (!flushing) {
+          flushing = true;
+          decoder.flush().then(() => { flushed = true; notify(); }, (e) => { if (!flushed) failure = e; notify(); });
+        }
       }
       // Esperar a un fotograma (o a que el decodificador avance); con un respaldo por si no avisa.
       await new Promise((r) => { wake = r; setTimeout(r, 20); });

@@ -113,6 +113,10 @@ El vídeo de la app de cámara no sabe en qué fase está cada momento. Hay tres
 - **Sospecha:** la lectura del archivo muestra a muestra. En Android, cada lectura de un archivo del selector pasa por el sistema. Ahora se lee en **bloques de 8 MB**, y la prueba da el desglose: leer, girar y decodificar.
 - **En la nube, con un vídeo parecido** (1080p, 30 fps, girado, 8 Mb/s): 2 lecturas del archivo en 15 s y 59 fotogramas/s. Ahí el giro manda (16 ms, sin GPU).
 
+### Segunda prueba en el móvil (commit e70a567)
+- **Miniatura:** la cara sale **derecha**. El giro es correcto con un vídeo real.
+- **Se quedaba colgado casi al final.** El decodificador de hardware (MediaCodec) solo puede tener unos pocos fotogramas sin devolver, y al final se esperaba a `flush()` sin recogerlos, así que los dos se quedaban esperándose. En la nube no pasaba: el decodificador es de software. Reproducido con un test (cupo de 2 fotogramas) y corregido: se pide el vaciado y se siguen entregando fotogramas.
+
 ## Pruebas
 - **Vídeos de prueba fabricados con `ffmpeg`** a partir de los vídeos sintéticos de `make-face-videos.py`:
   - MP4 H.264 y VP9;

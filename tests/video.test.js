@@ -141,6 +141,47 @@ describe('decodificación fotograma a fotograma (decodificador simulado)', () =>
     expect(made[0].state).toBe('closed');
   });
 
+  it('no se bloquea al final con un decodificador de hardware (pocos fotogramas sin devolver a la vez)', async () => {
+    // Como MediaCodec en Android: solo puede tener `pool` fotogramas sin cerrar; con el cupo lleno no da
+    // más, y flush() no termina hasta darlos todos. Esperar a flush() sin recoger fotogramas lo bloquea.
+    const pool = 2;
+    let open = 0;
+    const pending = [];
+    let flushWaiter = null;
+    globalThis.EncodedVideoChunk = class { constructor(o) { Object.assign(this, o); } };
+    globalThis.VideoDecoder = class {
+      constructor({ output }) { this.output = output; this.state = 'configured'; this.decodeQueueSize = 0; this.flushing = false; }
+      addEventListener() {}
+      configure() {}
+      pump() {
+        const keep = this.flushing ? 0 : 3; // retiene 3 por los fotogramas B, salvo al vaciarse
+        while (open < pool && pending.length > keep) {
+          pending.sort((a, b) => a.timestamp - b.timestamp);
+          const c = pending.shift();
+          open++;
+          const dec = this;
+          this.output({ timestamp: c.timestamp, close() { open--; queueMicrotask(() => dec.pump()); } });
+        }
+        if (this.flushing && !pending.length && flushWaiter) { flushWaiter(); flushWaiter = null; }
+      }
+      decode(c) { pending.push(c); this.pump(); }
+      flush() { this.flushing = true; return new Promise((r) => { flushWaiter = r; this.pump(); }); }
+      close() { this.state = 'closed'; }
+    };
+    const { decodeFrames } = await import('../src/video/decode.js');
+    let n = 0;
+    const done = (async () => {
+      for await (const { frame } of decodeFrames(mp4, { maxAhead: 3 })) {
+        await new Promise((r) => setTimeout(r, 1)); // el consumidor tarda algo (girar, analizar)
+        frame.close();
+        n++;
+      }
+      return n;
+    })();
+    const res = await Promise.race([done, new Promise((r) => setTimeout(() => r('bloqueado'), 2000))]);
+    expect(res).toBe(30);
+  });
+
   it('para en toMs y cierra lo que quede sin recoger', async () => {
     const { decodeFrames } = await import('../src/video/decode.js');
     const made = installFakeDecoder(2);
