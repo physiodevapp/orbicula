@@ -154,6 +154,16 @@ El vídeo de la app de cámara no sabe en qué fase está cada momento. Hay tres
   - **Guiños del ojo derecho** (20,7 s, 25,7 s y 30,4 s): **cierres largos en D** (85 %, 69 % y 78 %, 1,8–2,6 s). En I, entornados del 33–35 %, y un cierre del 57 % a los 23,1 s, justo después del primero.
 - **Contracciones:** las cuatro que pasaron el umbral coinciden con los guiños y quedan como «era un parpadeo». No hay ninguna que cuente.
 
+### Prueba del 6b en el móvil: trasera (2026-11-10, commit b3ddebe)
+- **Vídeo:** trasera, H.264 1080p a 30 fps, girado 90°, 68 s. Sin espejo.
+- **Procesado:** los 2051 fotogramas en 4:04, a **8,4 fotogramas/s** (0,30 × tiempo real). Más lento que el de la frontal (12,7/s). Quizá el calor, porque fue después del de la frontal: **pendiente de mirar en el 6d**. A ese ritmo, un protocolo de 4 min tardaría ~14 min.
+- **Reposo válido:** 25 s útiles. Aviso de umbral alto.
+- **Lateralidad: correcta.**
+  - **Guiños izquierdos** (3,5 s, 9,2 s y 15,0 s): **cierres en I** del 70 %, 77 % y 87 %, de 2,0–2,3 s. En D, parpadeos cortos y entornados del 30–41 %.
+  - **Guiños derechos** (21,5 s, 26,7 s y 33,2 s): **cierres en D** del 92 %, 88 % y 96 %, de 1,6–2,5 s. En I, parpadeos cortos y entornados del 28–33 %.
+  - Un cierre suelto en D (54 %, 17,1 s) entre las dos tandas.
+- **Criterio de aceptación 2, cumplido también en el vídeo grabado, con las dos cámaras.** El directo con la trasera ya estaba probado en fases anteriores.
+
 ## Pruebas
 - **Vídeos de prueba fabricados con `ffmpeg`** a partir de los vídeos sintéticos de `make-face-videos.py`:
   - MP4 H.264 y VP9;
