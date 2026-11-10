@@ -10,13 +10,20 @@ export function idbAdapter(name = 'orbicula') {
         r.result.createObjectStore('sessions', { keyPath: 'id' });
         r.result.createObjectStore('data', { keyPath: 'id' });
       };
-      r.onsuccess = () => resolve(r.result);
+      r.onsuccess = () => {
+        const db = r.result;
+        // Otra pestaña con una versión más nueva quiere actualizar la base; o el navegador cierra la conexión
+        // por su cuenta (en Android, con la app en segundo plano o al liberar espacio): la siguiente operación abre otra.
+        db.onversionchange = () => { db.close(); opening = null; };
+        db.onclose = () => { opening = null; };
+        resolve(db);
+      };
       r.onerror = () => reject(r.error);
       r.onblocked = () => reject(new Error('la base de datos está bloqueada por otra pestaña'));
     }).catch((err) => { opening = null; throw err; });
     return opening;
   };
-  const run = async (store, mode, fn) => {
+  const once = async (store, mode, fn) => {
     const db = await open();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(store, mode);
@@ -25,6 +32,16 @@ export function idbAdapter(name = 'orbicula') {
       tx.onerror = () => reject(tx.error);
       tx.onabort = () => reject(tx.error ?? new Error('transacción cancelada'));
     });
+  };
+  // Una conexión cerrada por debajo (InvalidStateError) se repite una vez con una nueva, como dualkinema.
+  const run = async (store, mode, fn) => {
+    try {
+      return await once(store, mode, fn);
+    } catch (err) {
+      if (err?.name !== 'InvalidStateError') throw err;
+      opening = null;
+      return once(store, mode, fn);
+    }
   };
   return {
     get: (s, k) => run(s, 'readonly', (st) => st.get(k)),
