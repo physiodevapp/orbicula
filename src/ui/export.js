@@ -1,20 +1,22 @@
 // Descarga del JSON público y del CSV (fase 7). Todo local: sin red.
-import { buildPublicResult, medianCameraFps } from '../export/result.js';
+import { buildPublicResult, medianCameraFps, isValidCode } from '../export/result.js';
 import { faceCsv, flowCsv } from '../export/csv.js';
 import { downloadJson, downloadText, stamp } from './share.js';
 
-const safeCode = (code) => (code ?? '').trim().replace(/[^\w-]/g, '');
-const suffix = (code) => (safeCode(code) ? `-${safeCode(code)}` : '');
+const BAD_CODE = 'El código del participante solo admite letras sin tilde, números, «-» y «_» (hasta 24). No se ha descargado nada: corrígelo y vuelve a pulsar.';
+const suffix = (code) => ((code ?? '').trim() ? `-${code.trim()}` : '');
 
 /** Descarga el JSON público. Devuelve el texto de confirmación. */
-export function exportJson({ results, capture, code, appVersion }) {
-  const doc = buildPublicResult({ results, capture, appVersion, participantCode: safeCode(code) || null });
+export function exportJson({ results, capture, code, appVersion, flowConfig }) {
+  if (!isValidCode(code)) return BAD_CODE;
+  const doc = buildPublicResult({ results, capture, appVersion, participantCode: code, flowConfig });
   const { name, size } = downloadJson(doc, `orbicula-resultados-${stamp()}${suffix(code)}.json`);
   return `Descargado: ${name} (${Math.round(size / 1024)} KB).`;
 }
 
 /** Descarga los dos CSV (cara y flujo). */
 export function exportCsv({ results, code }) {
+  if (!isValidCode(code)) return BAD_CODE;
   const s = stamp();
   const a = downloadText(faceCsv(results), `orbicula-cara-${s}${suffix(code)}.csv`);
   // Dos descargas seguidas: Chrome puede pedir permiso para la segunda.

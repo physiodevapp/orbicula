@@ -4,6 +4,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Cambiado (fase 7a: revisión del esquema antes de fijar `"1"`)
+- **Compatibilidad hacia delante:** el esquema admite campos nuevos; añadirlos no cambia `schemaVersion`.
+- **Nombres de las métricas** definidos en el esquema, con un test que los compara con el código y con `docs/schema.md`.
+- **Bloque `analysis`:** versiones de MediaPipe, del modelo y de OpenCV, configuración del flujo y parámetros del detector. Sin datos del dispositivo.
+- **`timeseries.frozen`** (y columna `closure_frozen` en el CSV de la cara): dónde el cierre por flujo estaba congelado.
+- **Códigos estables** (`reasonCode`, y `{ code, text }` en avisos y notas) para poder traducirlos en el hub.
+- **`tPeak`** en las contracciones.
+- **`participantCode`** solo con letras sin tilde, números, `-` y `_` (hasta 24). Si no cumple, no se descarga nada y se avisa.
+- 7 tests nuevos.
+
 ### Añadido (fase 7a: resultados en JSON y CSV)
 - **JSON público de resultados** (`schemaVersion: "1"`; `src/export/result.js`). Es el formato estable de orbicula, distinto del de diagnóstico:
   - **Contenido:** captura, fases con su inicio y fin, calibración, métricas por lado y fase con su asimetría, calidad de cada fase, eventos y las series de la cara.

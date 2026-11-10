@@ -7,11 +7,23 @@
 //  - Ningún dato que identifique al paciente: solo `participantCode`, que escribe el clínico.
 //  - No se rompe la compatibilidad sin subir `schemaVersion`.
 import { summarizeProtocol } from '../protocol/summary.js';
+import { provenance } from './provenance.js';
 
 export const SCHEMA_VERSION = '1';
 export const SIDES = ['left', 'right'];
 /** Señales de la cara que van en `timeseries` (por lado), y de dónde salen en los pasos grabados. */
 export const SERIES = { ear: 'ear', aperture: 'aperture', blink: 'blink', smile: 'smile' };
+
+/** Código del participante: letras sin tilde, números, «-» y «_», hasta 24. Cualquier otra cosa se rechaza. */
+export const CODE_PATTERN = /^[A-Za-z0-9_-]{1,24}$/;
+export const isValidCode = (code) => !code || CODE_PATTERN.test(String(code).trim());
+export const cleanCode = (code) => {
+  const c = (code ?? '').toString().trim();
+  if (!c) return null;
+  // No se «limpia» en silencio: «Juan Pérez» no debe convertirse en «JuanPrez».
+  if (!CODE_PATTERN.test(c)) throw new Error('participantCode no válido: solo letras sin tilde, números, «-» y «_» (hasta 24).');
+  return c;
+};
 
 const r3 = (v) => (Number.isFinite(v) ? Math.round(v * 1000) / 1000 : null);
 const r4 = (v) => (Number.isFinite(v) ? Number(v.toPrecision(4)) : null);
@@ -59,10 +71,10 @@ function nearest(flowT, flowV, t, maxGap = 40) {
 
 /**
  * Series de la cara y del flujo de todas las fases, en un solo eje de tiempo.
- * @returns {{face: {t:number[], phase:string[], left:object, right:object}, flow: {t:number[], phase:string[], closure:{left:number[],right:number[]}, frozen:number[], head:{u:number[],v:number[]}}}}
+ * @returns {{face: {t:number[], phase:string[], frozen:(0|1|null)[], left:object, right:object}, flow: {t:number[], phase:string[], closure:{left:number[],right:number[]}, frozen:number[], head:{u:number[],v:number[]}}}}
  */
 export function collectSeries(windows) {
-  const face = { t: [], phase: [], left: { ear: [], aperture: [], blink: [], smile: [], closure: [] }, right: { ear: [], aperture: [], blink: [], smile: [], closure: [] } };
+  const face = { t: [], phase: [], frozen: [], left: { ear: [], aperture: [], blink: [], smile: [], closure: [] }, right: { ear: [], aperture: [], blink: [], smile: [], closure: [] } };
   const flow = { t: [], phase: [], closure: { left: [], right: [] }, frozen: [], head: { u: [], v: [] } };
   for (const w of windows) {
     const s = w.step;
@@ -76,6 +88,7 @@ export function collectSeries(windows) {
       for (const [key, src] of Object.entries(SERIES)) face[side][key].push(...rel.map((_, i) => r3(s.series?.[side]?.[src]?.[i])));
       face[side].closure.push(...closure.map(r4));
     }
+    face.frozen.push(...nearest(ft, frel.map((_, i) => (f.frozen?.[i] ? 1 : 0)), t));
     face.t.push(...t);
     face.phase.push(...t.map(() => w.id));
     flow.t.push(...ft);
@@ -95,7 +108,7 @@ export function collectEvents(windows) {
     const s = w.step;
     for (const e of s.detections ?? []) {
       if (e.kind !== 'contraction') continue; // los de ceja y canto son experimentales y no se exportan
-      out.push({ phase: w.id, side: e.side, kind: 'contraction', status: e.status, t: w.start + e.t, duration: e.duration, peak: r3(e.peak) });
+      out.push({ phase: w.id, side: e.side, kind: 'contraction', status: e.status, t: w.start + e.t, tPeak: e.tPeak == null ? null : w.start + e.tPeak, duration: e.duration, peak: r3(e.peak) });
     }
     for (const side of SIDES) {
       for (const e of s.events?.[side] ?? []) {
@@ -115,9 +128,10 @@ export function collectEvents(windows) {
  *   appVersion: string,
  *   participantCode?: string|null,
  *   createdAt?: string,
+ *   flowConfig?: string,                  clave de la configuración del flujo usada (FLOW_CONFIGS)
  * }} o
  */
-export function buildPublicResult({ results, capture, appVersion, participantCode = null, createdAt = new Date().toISOString() }) {
+export function buildPublicResult({ results, capture, appVersion, participantCode = null, createdAt = new Date().toISOString(), flowConfig }) {
   const windows = phaseWindows(results);
   const summary = summarizeProtocol(windows.map((w) => w.step));
   const cal = summary.calibration;
@@ -127,16 +141,16 @@ export function buildPublicResult({ results, capture, appVersion, participantCod
     metrics.left[id] = flat(p.left);
     metrics.right[id] = flat(p.right);
     metrics.asymmetry[id] = flat(p.asymmetry);
-    quality[id] = { reliable: p.quality.reliable, faceFraction: p.quality.face, headMoving: p.quality.headMoving, analysisFps: p.quality.analysisFps, notes: p.quality.notes };
+    quality[id] = { reliable: p.quality.reliable, faceFraction: p.quality.face, headMoving: p.quality.headMoving, analysisFps: p.quality.analysisFps, notes: p.quality.notes.map((text, i) => ({ code: p.quality.noteCodes?.[i] ?? 'other', text })) };
   }
   const { face, flow } = collectSeries(windows);
-  const timeseries = { t: face.t, phase: face.phase, left: face.left, right: face.right };
+  const timeseries = { t: face.t, phase: face.phase, frozen: face.frozen, left: face.left, right: face.right };
   return {
     app: 'orbicula',
     appVersion,
     schemaVersion: SCHEMA_VERSION,
     createdAt,
-    participantCode: participantCode || null,
+    participantCode: cleanCode(participantCode),
     capture: {
       source: capture.source,
       analysis: capture.analysis,
@@ -146,15 +160,17 @@ export function buildPublicResult({ results, capture, appVersion, participantCod
       height: capture.height ?? null,
       mirrored: !!capture.mirrored,
     },
+    analysis: provenance({ flowConfig }),
     protocol: windows.map((w) => ({ phase: w.id, start: w.start, end: w.end })),
     calibration: cal
       ? {
           valid: !!cal.valid,
           reason: cal.reason ?? null,
+          reasonCode: cal.valid ? null : (cal.reasonCode ?? null),
           thresholds: { left: r4(cal.rise?.left), right: r4(cal.rise?.right) },
           earBaseline: { left: r4(cal.ear?.left?.baseline), right: r4(cal.ear?.right?.baseline) },
           headStill: r4(cal.headStill),
-          warnings: summary.warnings,
+          warnings: summary.warnings.map((text, i) => ({ code: summary.warningCodes?.[i] ?? 'other', text })),
         }
       : null,
     metrics,

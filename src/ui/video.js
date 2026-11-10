@@ -163,7 +163,7 @@ export function createVideoCard({ getContext, analyzeVideoFile = null }) {
     }
   });
   const exportInput = () => ({ results: analysis.results, code: el.code.value, capture: fileCapture({ mp4, facing: el.facing.value, mirrored: el.mirror.checked }) });
-  el.exportJson.addEventListener('click', () => { if (analysis) el.msg.textContent = exportJson({ ...exportInput(), appVersion: analysis.context?.build?.version ?? '' }); });
+  el.exportJson.addEventListener('click', () => { if (analysis) el.msg.textContent = exportJson({ ...exportInput(), appVersion: analysis.context?.build?.version ?? '', flowConfig: analysis.context?.flow?.config }); });
   el.exportCsv.addEventListener('click', () => { if (analysis) el.msg.textContent = exportCsv(exportInput()); });
   el.aCancel.addEventListener('click', () => abort?.abort());
 

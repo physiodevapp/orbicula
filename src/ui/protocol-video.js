@@ -128,7 +128,7 @@ export function createProtocolVideo({ getStream, analyzeVideoFile }) {
   el.cancel?.addEventListener('click', () => abort?.abort());
   // Resultados (fase 7): la captura es la del vídeo que se grabó en directo (no hay archivo ni espejo).
   const exportInput = () => ({ results: analysis.results, code: el.code?.value, capture: fileCapture({ mp4: { timing: analysis.video.timing, track: analysis.video.track }, facing: analysis.context?.capture?.facing, mirrored: false, source: 'live' }) });
-  el.exportJson?.addEventListener('click', () => { if (analysis) show(exportJson({ ...exportInput(), appVersion: analysis.context?.build?.version ?? '' })); });
+  el.exportJson?.addEventListener('click', () => { if (analysis) show(exportJson({ ...exportInput(), appVersion: analysis.context?.build?.version ?? '', flowConfig: analysis.context?.flow?.config })); });
   el.exportCsv?.addEventListener('click', () => { if (analysis) show(exportCsv(exportInput())); });
   el.discard?.addEventListener('click', () => { forget(); show('Vídeo descartado.'); });
   el.download?.addEventListener('click', () => {

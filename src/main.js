@@ -248,7 +248,7 @@ const protocol = createAssistant({
   onStart: async (plan) => { await sessionDeps.onStart(plan); await protocolVideo.beforeStart(); },
   onState: (state, session, extra) => protocolVideo.onState(state, session, extra),
   exporter: {
-    json: (results, code) => exportJson({ results, code, capture: liveCapture({ camera, results }), appVersion: __APP_VERSION__ }),
+    json: (results, code) => exportJson({ results, code, capture: liveCapture({ camera, results }), appVersion: __APP_VERSION__, flowConfig: flow?.config.key }),
     csv: (results, code) => exportCsv({ results, code }),
   },
 });

@@ -57,6 +57,17 @@ El esquema de `CLAUDE.md`, rellenado así:
 - Un test que exporta un resultado real (de los JSON de las fases 5 y 6) y lo valida contra el esquema. Para validar uso `ajv`, **solo como dependencia de desarrollo**, con versión fija y de más de dos semanas.
 - **Antes de fijar `schemaVersion: "1"`, revisión del esquema con Opus**, como indica `docs/modelos.md`.
 
+### Revisión del esquema con Opus (hecha)
+Se aprobaron los ocho cambios y se aplicaron antes de fijar `"1"`:
+1. **Compatibilidad hacia delante:** el esquema ya no prohíbe campos de más. Añadir un campo o una métrica no cambia la versión; quitar o cambiar el significado, sí. Un test comprueba que el JSON lleva justo los campos conocidos.
+2. **Nombres de las métricas** en el esquema (`$defs.metricSet`), con un test que los compara con los que produce `summary.js` y con `docs/schema.md`.
+3. **Bloque `analysis`** con la procedencia: versiones de MediaPipe (y modelo) y OpenCV, configuración del flujo, parámetros del detector y del congelado. Nada del dispositivo.
+4. **`timeseries.frozen`:** marca las muestras con el cierre por flujo congelado, que antes solo estaban en el CSV de flujo. También va como columna `closure_frozen` en el CSV de la cara.
+5. **Códigos además de textos:** `calibration.reasonCode`, y `{ code, text }` en los avisos y en las notas de calidad.
+6. **`tPeak`** en las contracciones.
+7. **`participantCode` restringido** (`^[A-Za-z0-9_-]{1,24}$`): un nombre con espacios o tildes se rechaza, no se «limpia» (si no, «Juan Pérez» saldría como «JuanPrez»). La app no descarga nada y lo dice.
+8. **Correcciones de `docs/schema.md`:** signo de la asimetría y significado de `closure` en la sonrisa.
+
 ## El CSV
 Dos archivos, porque las series de la cara y las del flujo no comparten instantes:
 - `orbicula-cara-….csv`: `t_ms, phase, left_ear, right_ear, left_aperture, right_aperture, left_smile, right_smile`.

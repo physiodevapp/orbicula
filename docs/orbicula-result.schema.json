@@ -2,28 +2,104 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://orbicula.invalid/schema/result/1",
   "title": "orbicula · resultado (schemaVersion 1)",
-  "description": "JSON público de resultados de orbicula. Tiempos en milisegundos desde el inicio de la grabación. Lados siempre del paciente. Documentado en docs/schema.md.",
+  "description": "JSON público de resultados de orbicula. Tiempos en milisegundos desde el inicio de la grabación. Lados siempre del paciente. Compatibilidad: añadir campos NO cambia schemaVersion (quien lee debe ignorar los que no conozca); quitar un campo o cambiar su significado, sí. Documentado en docs/schema.md.",
   "type": "object",
-  "required": ["app", "appVersion", "schemaVersion", "createdAt", "participantCode", "capture", "protocol", "calibration", "metrics", "quality", "events", "timeseries"],
-  "additionalProperties": false,
+  "required": [
+    "app",
+    "appVersion",
+    "schemaVersion",
+    "createdAt",
+    "participantCode",
+    "analysis",
+    "capture",
+    "protocol",
+    "calibration",
+    "metrics",
+    "quality",
+    "events",
+    "timeseries"
+  ],
   "properties": {
-    "app": { "const": "orbicula" },
-    "appVersion": { "type": "string", "minLength": 1 },
-    "schemaVersion": { "const": "1" },
-    "createdAt": { "type": "string", "format": "date-time" },
-    "participantCode": { "type": ["string", "null"], "maxLength": 24 },
+    "app": {
+      "const": "orbicula"
+    },
+    "appVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schemaVersion": {
+      "const": "1"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "participantCode": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[A-Za-z0-9_-]{1,24}$",
+      "description": "Código anónimo que escribe el clínico: letras sin tilde, números, «-» y «_» (hasta 24). Nunca un nombre."
+    },
     "capture": {
       "type": "object",
-      "required": ["source", "analysis", "camera", "fps", "width", "height", "mirrored"],
-      "additionalProperties": false,
+      "required": [
+        "source",
+        "analysis",
+        "camera",
+        "fps",
+        "width",
+        "height",
+        "mirrored"
+      ],
       "properties": {
-        "source": { "enum": ["live", "file"], "description": "live: la cámara de la app; file: un vídeo grabado con otra app." },
-        "analysis": { "enum": ["live", "frame-by-frame"], "description": "live: en directo; frame-by-frame: vídeo analizado fotograma a fotograma." },
-        "camera": { "enum": ["rear", "front", null] },
-        "fps": { "type": ["number", "null"], "minimum": 0 },
-        "width": { "type": ["integer", "null"], "minimum": 1 },
-        "height": { "type": ["integer", "null"], "minimum": 1 },
-        "mirrored": { "type": "boolean", "description": "La imagen analizada iba en espejo (y los lados ya están corregidos)." }
+        "source": {
+          "enum": [
+            "live",
+            "file"
+          ],
+          "description": "live: la cámara de la app; file: un vídeo grabado con otra app."
+        },
+        "analysis": {
+          "enum": [
+            "live",
+            "frame-by-frame"
+          ],
+          "description": "live: en directo; frame-by-frame: vídeo analizado fotograma a fotograma."
+        },
+        "camera": {
+          "enum": [
+            "rear",
+            "front",
+            null
+          ]
+        },
+        "fps": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "mirrored": {
+          "type": "boolean",
+          "description": "La imagen analizada iba en espejo (y los lados ya están corregidos)."
+        }
       }
     },
     "protocol": {
@@ -31,58 +107,159 @@
       "description": "Fases hechas, con su inicio y fin en ms.",
       "items": {
         "type": "object",
-        "required": ["phase", "start", "end"],
-        "additionalProperties": false,
+        "required": [
+          "phase",
+          "start",
+          "end"
+        ],
         "properties": {
-          "phase": { "$ref": "#/$defs/phase" },
-          "start": { "type": "integer", "minimum": 0 },
-          "end": { "type": "integer", "minimum": 0 }
+          "phase": {
+            "$ref": "#/$defs/phase"
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end": {
+            "type": "integer",
+            "minimum": 0
+          }
         }
       }
     },
     "calibration": {
       "description": "Calibración sobre el reposo, o null si no hubo reposo.",
       "oneOf": [
-        { "type": "null" },
+        {
+          "type": "null"
+        },
         {
           "type": "object",
-          "required": ["valid", "reason", "thresholds", "earBaseline", "headStill", "warnings"],
-          "additionalProperties": false,
+          "required": [
+            "valid",
+            "reason",
+            "reasonCode",
+            "thresholds",
+            "earBaseline",
+            "headStill",
+            "warnings"
+          ],
           "properties": {
-            "valid": { "type": "boolean" },
-            "reason": { "type": ["string", "null"] },
-            "thresholds": { "$ref": "#/$defs/perSideNumber", "description": "Umbral de los eventos: subida del cierre por flujo, en distancias intercantales (DI)." },
-            "earBaseline": { "$ref": "#/$defs/perSideNumber", "description": "EAR en reposo." },
-            "headStill": { "type": ["number", "null"], "description": "Velocidad del dorso nasal por debajo de la cual la cabeza está quieta, en DI/s." },
-            "warnings": { "type": "array", "items": { "type": "string" } }
+            "valid": {
+              "type": "boolean"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "thresholds": {
+              "$ref": "#/$defs/perSideNumber",
+              "description": "Umbral de los eventos: subida del cierre por flujo, en distancias intercantales (DI)."
+            },
+            "earBaseline": {
+              "$ref": "#/$defs/perSideNumber",
+              "description": "EAR en reposo."
+            },
+            "headStill": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "Velocidad del dorso nasal por debajo de la cual la cabeza está quieta, en DI/s."
+            },
+            "warnings": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/coded"
+              },
+              "description": "Avisos: código estable (no-calibration, invalid-rest, high-threshold) y texto en español."
+            },
+            "reasonCode": {
+              "enum": [
+                "face",
+                "head",
+                "blinks",
+                "clean",
+                "noflow",
+                null
+              ],
+              "description": "Motivo principal por el que el reposo no vale (null si vale)."
+            }
           }
         }
       ]
     },
     "metrics": {
       "type": "object",
-      "required": ["left", "right", "asymmetry"],
-      "additionalProperties": false,
+      "required": [
+        "left",
+        "right",
+        "asymmetry"
+      ],
       "properties": {
-        "left": { "$ref": "#/$defs/metricsBySide" },
-        "right": { "$ref": "#/$defs/metricsBySide" },
-        "asymmetry": { "$ref": "#/$defs/metricsBySide", "description": "(I − D) / (I + D), solo de las magnitudes positivas." }
+        "left": {
+          "$ref": "#/$defs/metricsBySide"
+        },
+        "right": {
+          "$ref": "#/$defs/metricsBySide"
+        },
+        "asymmetry": {
+          "$ref": "#/$defs/metricsBySide",
+          "description": "(I − D) / (I + D), solo de las magnitudes positivas."
+        }
       }
     },
     "quality": {
       "type": "object",
       "description": "Calidad de cada fase.",
-      "propertyNames": { "$ref": "#/$defs/phase" },
+      "propertyNames": {
+        "$ref": "#/$defs/phase"
+      },
       "additionalProperties": {
         "type": "object",
-        "required": ["reliable", "faceFraction", "headMoving", "analysisFps", "notes"],
-        "additionalProperties": false,
+        "required": [
+          "reliable",
+          "faceFraction",
+          "headMoving",
+          "analysisFps",
+          "notes"
+        ],
         "properties": {
-          "reliable": { "type": "boolean" },
-          "faceFraction": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
-          "headMoving": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
-          "analysisFps": { "type": ["number", "null"], "minimum": 0 },
-          "notes": { "type": "array", "items": { "type": "string" } }
+          "reliable": {
+            "type": "boolean"
+          },
+          "faceFraction": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "headMoving": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "analysisFps": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/coded"
+            },
+            "description": "Notas de calidad: código (face-lost, head-moving, low-fps) y texto."
+          }
         }
       }
     },
@@ -91,61 +268,519 @@
       "description": "Contracciones finas (con su estado) y parpadeos / cierres, en orden de tiempo.",
       "items": {
         "type": "object",
-        "required": ["phase", "side", "kind", "status", "t", "duration"],
-        "additionalProperties": false,
+        "required": [
+          "phase",
+          "side",
+          "kind",
+          "status",
+          "t",
+          "duration"
+        ],
         "properties": {
-          "phase": { "$ref": "#/$defs/phase" },
-          "side": { "enum": ["left", "right"] },
-          "kind": { "enum": ["contraction", "blink", "closure", "narrowing"] },
-          "status": { "enum": ["ok", "head", "blink", "brief"], "description": "ok: cuenta; head: descartada por mover la cabeza; blink: era un parpadeo; brief: dura menos de 0,5 s." },
-          "t": { "type": "integer", "minimum": 0 },
-          "duration": { "type": "number", "minimum": 0 },
-          "peak": { "type": ["number", "null"], "description": "Solo contracciones: pico, en veces el umbral." },
-          "completeness": { "type": ["number", "null"], "description": "Solo parpadeos y cierres: cierre respecto al reposo, de 0 a 1." }
+          "phase": {
+            "$ref": "#/$defs/phase"
+          },
+          "side": {
+            "enum": [
+              "left",
+              "right"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "contraction",
+              "blink",
+              "closure",
+              "narrowing"
+            ]
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "head",
+              "blink",
+              "brief"
+            ],
+            "description": "ok: cuenta; head: descartada por mover la cabeza; blink: era un parpadeo; brief: dura menos de 0,5 s."
+          },
+          "t": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "duration": {
+            "type": "number",
+            "minimum": 0
+          },
+          "peak": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Solo contracciones: pico, en veces el umbral."
+          },
+          "completeness": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Solo parpadeos y cierres: cierre respecto al reposo, de 0 a 1."
+          },
+          "tPeak": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Solo contracciones: instante del pico, en ms desde el inicio de la grabación."
+          }
         }
       }
     },
     "timeseries": {
       "type": "object",
       "description": "Señales de la cara de todas las fases, en un solo eje de tiempo (con huecos entre fases). Todos los arrays tienen la longitud de `t`.",
-      "required": ["t", "phase", "left", "right"],
-      "additionalProperties": false,
+      "required": [
+        "t",
+        "phase",
+        "frozen",
+        "left",
+        "right"
+      ],
       "properties": {
-        "t": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
-        "phase": { "type": "array", "items": { "$ref": "#/$defs/phase" } },
-        "left": { "$ref": "#/$defs/seriesBySide" },
-        "right": { "$ref": "#/$defs/seriesBySide" }
+        "t": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "phase": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/phase"
+          }
+        },
+        "left": {
+          "$ref": "#/$defs/seriesBySide"
+        },
+        "right": {
+          "$ref": "#/$defs/seriesBySide"
+        },
+        "frozen": {
+          "type": "array",
+          "items": {
+            "enum": [
+              0,
+              1,
+              null
+            ]
+          },
+          "description": "1: el cierre por flujo estaba congelado (un ojo más de medio cerrado, más margen); 0: no; null: sin muestra de flujo cercana."
+        }
+      }
+    },
+    "analysis": {
+      "type": "object",
+      "description": "Procedencia del análisis: versiones y parámetros con que se calcularon las métricas. No lleva nada del dispositivo.",
+      "required": [
+        "mediapipe",
+        "opencv",
+        "flow",
+        "detector",
+        "closureFreeze",
+        "summary"
+      ],
+      "properties": {
+        "mediapipe": {
+          "type": "object",
+          "required": [
+            "version",
+            "model"
+          ],
+          "properties": {
+            "version": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "model": {
+              "type": "string"
+            }
+          }
+        },
+        "opencv": {
+          "type": "object",
+          "required": [
+            "version"
+          ],
+          "properties": {
+            "version": {
+              "type": "string"
+            }
+          }
+        },
+        "flow": {
+          "type": "object",
+          "required": [
+            "config",
+            "method",
+            "maxWidth",
+            "maxRate",
+            "params"
+          ],
+          "properties": {
+            "config": {
+              "type": "string",
+              "description": "Clave de la configuración del flujo (p. ej. farneback-320-vf-30)."
+            },
+            "method": {
+              "enum": [
+                "farneback",
+                "lk",
+                "none"
+              ]
+            },
+            "maxWidth": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Ancho máximo de la franja de trabajo, en px (null: sin reducir)."
+            },
+            "maxRate": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "Pares de flujo por segundo como máximo (null: sin límite)."
+            },
+            "params": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "description": "Parámetros de Farnebäck.",
+              "properties": {
+                "pyrScale": {
+                  "type": "number"
+                },
+                "levels": {
+                  "type": "integer"
+                },
+                "winsize": {
+                  "type": "integer"
+                },
+                "iterations": {
+                  "type": "integer"
+                },
+                "polyN": {
+                  "type": "integer"
+                },
+                "polySigma": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        },
+        "detector": {
+          "type": "object",
+          "description": "Parámetros del detector de eventos (valores de EVENT_DEFAULTS).",
+          "additionalProperties": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "closureFreeze": {
+          "type": "object",
+          "required": [
+            "earFraction",
+            "padMs"
+          ],
+          "properties": {
+            "earFraction": {
+              "type": "number",
+              "description": "El cierre por flujo se congela mientras el EAR de un ojo baja de esta fracción de su reposo."
+            },
+            "padMs": {
+              "type": "number",
+              "description": "Margen añadido antes y después, en ms."
+            }
+          }
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        }
       }
     }
   },
   "$defs": {
-    "phase": { "enum": ["rest", "natural", "soft", "forced", "brows", "smile", "free"], "description": "rest: reposo; natural: parpadeo espontáneo; soft: cierre suave; forced: cierre forzado; brows: elevación de cejas; smile: sonrisa amplia; free: resto de un vídeo grabado." },
-    "nullableNumber": { "type": ["number", "null"] },
+    "phase": {
+      "enum": [
+        "rest",
+        "natural",
+        "soft",
+        "forced",
+        "brows",
+        "smile",
+        "free"
+      ],
+      "description": "rest: reposo; natural: parpadeo espontáneo; soft: cierre suave; forced: cierre forzado; brows: elevación de cejas; smile: sonrisa amplia; free: resto de un vídeo grabado."
+    },
+    "nullableNumber": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
     "perSideNumber": {
       "type": "object",
-      "required": ["left", "right"],
-      "additionalProperties": false,
-      "properties": { "left": { "type": ["number", "null"] }, "right": { "type": ["number", "null"] } }
+      "required": [
+        "left",
+        "right"
+      ],
+      "properties": {
+        "left": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "right": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
     },
     "metricsBySide": {
       "type": "object",
-      "propertyNames": { "$ref": "#/$defs/phase" },
+      "propertyNames": {
+        "$ref": "#/$defs/phase"
+      },
       "additionalProperties": {
-        "type": "object",
-        "description": "Métricas de una fase. Los nombres y unidades están en docs/schema.md; puede faltar cualquiera.",
-        "additionalProperties": { "type": ["number", "boolean", "null"] }
+        "$ref": "#/$defs/metricSet"
       }
     },
     "seriesBySide": {
       "type": "object",
-      "required": ["ear", "aperture", "blink", "smile", "closure"],
-      "additionalProperties": false,
+      "required": [
+        "ear",
+        "aperture",
+        "blink",
+        "smile",
+        "closure"
+      ],
       "properties": {
-        "ear": { "type": "array", "items": { "$ref": "#/$defs/nullableNumber" }, "description": "EAR." },
-        "aperture": { "type": "array", "items": { "$ref": "#/$defs/nullableNumber" }, "description": "Apertura palpebral / distancia intercantal." },
-        "blink": { "type": "array", "items": { "$ref": "#/$defs/nullableNumber" }, "description": "Blendshape de parpadeo (0 abierto, 1 cerrado)." },
-        "smile": { "type": "array", "items": { "$ref": "#/$defs/nullableNumber" }, "description": "Blendshape de sonrisa de ese lado (0–1)." },
-        "closure": { "type": "array", "items": { "$ref": "#/$defs/nullableNumber" }, "description": "Cierre por flujo (DI, + = se cierra), de la muestra de flujo más cercana (≤ 40 ms), o null." }
+        "ear": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nullableNumber"
+          },
+          "description": "EAR."
+        },
+        "aperture": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nullableNumber"
+          },
+          "description": "Apertura palpebral / distancia intercantal."
+        },
+        "blink": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nullableNumber"
+          },
+          "description": "Blendshape de parpadeo (0 abierto, 1 cerrado)."
+        },
+        "smile": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nullableNumber"
+          },
+          "description": "Blendshape de sonrisa de ese lado (0–1)."
+        },
+        "closure": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nullableNumber"
+          },
+          "description": "Cierre por flujo (DI, + = se cierra), de la muestra de flujo más cercana (≤ 40 ms), o null."
+        }
+      }
+    },
+    "coded": {
+      "type": "object",
+      "required": [
+        "code",
+        "text"
+      ],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string",
+          "description": "Texto en español, para mostrar."
+        }
+      }
+    },
+    "metricSet": {
+      "type": "object",
+      "description": "Métricas de una fase. Los nombres conocidos y sus unidades están en docs/schema.md; puede faltar cualquiera y pueden añadirse nombres nuevos sin cambiar schemaVersion.",
+      "properties": {
+        "ear": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "earNoise": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "aperture": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "threshold": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "spectrumFreqHz": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "spectrumProminenceDb": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "spectrumRhythmic": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "blinksPerMin": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "blinkMs": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "blinkCompleteness": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "blinkVsMax": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "incompletePct": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "closure": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "browRecruit": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "canthusRecruit": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "eyeOpening": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "browLift": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "browPeak": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "smile": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "coactivation": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "coactivationLagMs": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "contractions": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "brief": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": {
+        "type": [
+          "number",
+          "boolean",
+          "null"
+        ]
       }
     }
   }
