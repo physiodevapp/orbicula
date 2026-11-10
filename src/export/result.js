@@ -129,9 +129,10 @@ export function collectEvents(windows) {
  *   participantCode?: string|null,
  *   createdAt?: string,
  *   flowConfig?: string,                  clave de la configuración del flujo usada (FLOW_CONFIGS)
+ *   analysis?: object,                    procedencia guardada con la sesión (si se exporta una sesión recuperada de otra versión)
  * }} o
  */
-export function buildPublicResult({ results, capture, appVersion, participantCode = null, createdAt = new Date().toISOString(), flowConfig }) {
+export function buildPublicResult({ results, capture, appVersion, participantCode = null, createdAt = new Date().toISOString(), flowConfig, analysis: analysisAtSave = null }) {
   const windows = phaseWindows(results);
   const summary = summarizeProtocol(windows.map((w) => w.step));
   const cal = summary.calibration;
@@ -160,7 +161,7 @@ export function buildPublicResult({ results, capture, appVersion, participantCod
       height: capture.height ?? null,
       mirrored: !!capture.mirrored,
     },
-    analysis: provenance({ flowConfig }),
+    analysis: provenance({ flowConfig, snapshot: analysisAtSave }),
     protocol: windows.map((w) => ({ phase: w.id, start: w.start, end: w.end })),
     calibration: cal
       ? {

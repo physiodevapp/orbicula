@@ -63,6 +63,13 @@ node scripts/dev/check-protocol-video.cjs --video /tmp/caras/lid.y4m --live en-d
 ```
 Hace el protocolo en directo con la casilla «Grabar el vídeo…» marcada (MediaRecorder; el Chromium de Playwright graba MP4 H.264), descarga el JSON del directo, analiza el vídeo grabado y descarga el JSON del análisis. Con `--full` procesa todos los fotogramas y no uno de cada dos. Tarda unos 10 min con `escala=0.4` (análisis sin GPU).
 
+## Sesiones guardadas (fase 7a bis)
+```bash
+npm run build && npx vite preview --port 4173 --host 127.0.0.1 &
+node scripts/dev/check-saved.cjs --video /tmp/caras/lid.y4m
+```
+Hace el protocolo con la cámara simulada, recarga la página, abre la sesión guardada y comprueba que el JSON es idéntico al de antes. Después inyecta una sesión de vídeo con la huella de un MP4 de `tests/fixtures/` (con otro nombre) y comprueba «Recuperar el análisis», el borrado, el modo alojado y que no hay peticiones externas. Tarda unos 2 min. La lógica sin navegador está en `tests/persistence.test.js` (almacén en memoria con la misma interfaz que IndexedDB).
+
 ## Exportar y validar los resultados (fase 7)
 ```bash
 node scripts/dev/check-export.cjs --video /tmp/caras/lid.y4m --out /tmp/export --query '?escala=0.2'

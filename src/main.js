@@ -18,6 +18,9 @@ import { BlinkDetector } from './metrics/blinks.js';
 import { createAssistant } from './ui/assistant.js';
 import { createVideoCard } from './ui/video.js';
 import { createProtocolVideo } from './ui/protocol-video.js';
+import { createSavedCard } from './ui/saved.js';
+import { createStore } from './persistence/store.js';
+import { idbAdapter } from './persistence/idb.js';
 import { exportJson, exportCsv, liveCapture, fileCapture } from './ui/export.js';
 import { createVideoSession, videoSteps, processVideo } from './video/offline.js';
 import { PROTOCOL_PLAN } from './assistant/steps.js';
@@ -239,17 +242,33 @@ async function analyzeVideoFile({ mp4, mirrored, restSec, maxFps, steps = null, 
     if (document.body.dataset.busy === 'video') document.body.dataset.busy = '';
   }
 }
-createVideoCard({ getContext: () => { const c = captureContext(); return { build: c.build, device: c.device }; }, analyzeVideoFile });
+// Sesiones guardadas en el dispositivo (IndexedDB). En modo alojado (?host=physiq) no se guarda nada: el hub
+// recibe el resultado por postMessage y no debe quedar una copia en el almacenamiento del iframe.
+const hosted = new URLSearchParams(location.search).get('host') === 'physiq';
+const saved = createSavedCard({ store: !hosted && typeof indexedDB !== 'undefined' ? createStore(idbAdapter()) : null, build: __COMMIT__ });
+saved.refresh();
+createVideoCard({ getContext: () => { const c = captureContext(); return { build: c.build, device: c.device }; }, analyzeVideoFile, saved });
 // Grabación del vídeo durante el protocolo y análisis posterior (fase 6c); `analyzeVideoFile` se define más abajo.
-const protocolVideo = createProtocolVideo({ getStream: () => camera.stream, analyzeVideoFile: (o) => analyzeVideoFile(o) });
+const protocolVideo = createProtocolVideo({ getStream: () => camera.stream, analyzeVideoFile: (o) => analyzeVideoFile(o), saved });
+let protocolSavedId = null; // sesión guardada del protocolo en directo
 const protocol = createAssistant({
   ...sessionDeps,
   prefix: 'pr', rootId: 'protocol', busyKey: 'protocol', plan: PROTOCOL_PLAN,
   onStart: async (plan) => { await sessionDeps.onStart(plan); await protocolVideo.beforeStart(); },
-  onState: (state, session, extra) => protocolVideo.onState(state, session, extra),
+  onState: (state, session, extra) => {
+    protocolVideo.onState(state, session, extra);
+    // Al terminar el protocolo, sus medidas se guardan en el móvil (id por inicio de la sesión: «rehacer el último paso» reemplaza).
+    if (state === 'done' && session.results.some((r) => r.status === 'completed')) {
+      saved.save({
+        id: `protocol-${session.startedAt}`, kind: 'protocol', code: extra.code || null, appVersion: __APP_VERSION__, flowConfig: flow?.config.key,
+        capture: liveCapture({ camera, results: session.results }), results: session.results,
+        meta: { phases: session.results.filter((r) => r.status === 'completed').length, durationMs: session.results.filter((r) => r.status === 'completed').reduce((a, r) => a + (r.durationMs ?? 0), 0) },
+      }).then((h) => { protocolSavedId = h?.id ?? null; });
+    }
+  },
   exporter: {
-    json: (results, code) => exportJson({ results, code, capture: liveCapture({ camera, results }), appVersion: __APP_VERSION__, flowConfig: flow?.config.key }),
-    csv: (results, code) => exportCsv({ results, code }),
+    json: (results, code) => { saved.patchCode(protocolSavedId, code); return exportJson({ results, code, capture: liveCapture({ camera, results }), appVersion: __APP_VERSION__, flowConfig: flow?.config.key }); },
+    csv: (results, code) => { saved.patchCode(protocolSavedId, code); return exportCsv({ results, code }); },
   },
 });
 /** Las dos tarjetas reciben todas las medidas; solo la que está grabando un paso las guarda. */

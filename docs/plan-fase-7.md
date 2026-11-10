@@ -83,6 +83,13 @@ En los **tres resultados** que ya hay, con un botón «Resultados (JSON público
 
 El JSON de diagnóstico se queda como está, para el desarrollo.
 
+## 7a bis. Sesiones guardadas (petición del autor, tras probar 7a)
+Recargar la página perdía un protocolo o 2 minutos de análisis de vídeo. Se copió el diseño de `dualkinema` (IndexedDB, sin el vídeo, huella del archivo sin el nombre, cabecera y datos en dos almacenes, esquema con versión) y se adaptó a que el análisis de orbicula es de una sola pasada.
+- **Cuándo se guarda:** al terminar, no de forma continua. Un análisis a medias no se reanuda (la calibración depende de un reposo continuo).
+- **Privacidad (decidido por el autor):** se guarda por defecto, con aviso visible en la tarjeta; 5 sesiones como máximo; caducan a los 30 días; «Borrar» y «Borrar todo»; nada en modo alojado; solo el código anónimo (un nombre se rechaza).
+- **Procedencia:** se guarda con la sesión el bloque `analysis` del momento del análisis; el JSON de una sesión recuperada lo usa, aunque la app se haya actualizado (el resumen sí se recalcula con la versión actual).
+- **Comprobación:** `scripts/dev/check-saved.cjs` y `tests/persistence.test.js`.
+
 ## Modo alojado (`?host=physiq`)
 - Se ocultan la cabecera y el pie; el resto de la app no cambia.
 - **Tokens:** ya están todos en `src/styles/tokens.css`, con tema claro y oscuro. Para que adopte los del hub:

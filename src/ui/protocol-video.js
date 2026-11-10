@@ -18,9 +18,10 @@ const MARGIN_MS = 1000;
 
 /**
  * @param {{getStream: () => MediaStream|null,
- *          analyzeVideoFile: (o: object) => Promise<{results: object[], stats: object, context: object}>}} deps
+ *          analyzeVideoFile: (o: object) => Promise<{results: object[], stats: object, context: object}>,
+ *          saved?: ReturnType<import('./saved.js').createSavedCard>|null}} deps
  */
-export function createProtocolVideo({ getStream, analyzeVideoFile }) {
+export function createProtocolVideo({ getStream, analyzeVideoFile, saved = null }) {
   const el = {
     record: $('prRecord'), recordRow: $('prRecordRow'), block: $('prRecBlock'), info: $('prRecInfo'), analyze: $('prRecAnalyze'),
     cancel: $('prRecCancel'), discard: $('prRecDiscard'), cap: $('prRecCap'), barWrap: $('prRecBarWrap'), bar: $('prRecBar'),
@@ -32,6 +33,7 @@ export function createProtocolVideo({ getStream, analyzeVideoFile }) {
   let recorded = null; // { blob, windows, steps, settings, startedAt, durationMs }
   let abort = null;
   let analysis = null; // resultado del análisis (para el JSON)
+  let savedId = null; // sesión guardada de este análisis
 
   // Sin soporte, la casilla no se ofrece.
   if (el.recordRow) el.recordRow.hidden = !supported;
@@ -41,6 +43,7 @@ export function createProtocolVideo({ getStream, analyzeVideoFile }) {
     recorder.discard();
     recorded = null;
     analysis = null;
+    savedId = null;
     if (el.block) el.block.hidden = true;
     if (el.summary) el.summary.hidden = true;
   }
@@ -112,6 +115,14 @@ export function createProtocolVideo({ getStream, analyzeVideoFile }) {
       el.download.hidden = false;
       el.exportRow.hidden = false;
       const keep = recorded;
+      const header = await saved?.save({
+        id: `protocol-video-${keep.startedAt}`, kind: 'protocol-video', code: el.code?.value.trim() || null,
+        appVersion: out.context?.build?.version ?? '', flowConfig: out.context?.flow?.config,
+        capture: fileCapture({ mp4: { timing: mp4.timing, track: mp4.track }, facing: out.context?.capture?.facing, mirrored: false, source: 'live' }),
+        results: out.results, extra: { stats: s },
+        meta: { phases: out.results.filter((r) => r.status === 'completed').length, durationMs: keep.durationMs },
+      });
+      savedId = header?.id ?? null;
       recorder.discard(); // el vídeo ya no hace falta
       recorded = null;
       keep.blob = null;
@@ -128,8 +139,16 @@ export function createProtocolVideo({ getStream, analyzeVideoFile }) {
   el.cancel?.addEventListener('click', () => abort?.abort());
   // Resultados (fase 7): la captura es la del vídeo que se grabó en directo (no hay archivo ni espejo).
   const exportInput = () => ({ results: analysis.results, code: el.code?.value, capture: fileCapture({ mp4: { timing: analysis.video.timing, track: analysis.video.track }, facing: analysis.context?.capture?.facing, mirrored: false, source: 'live' }) });
-  el.exportJson?.addEventListener('click', () => { if (analysis) show(exportJson({ ...exportInput(), appVersion: analysis.context?.build?.version ?? '', flowConfig: analysis.context?.flow?.config })); });
-  el.exportCsv?.addEventListener('click', () => { if (analysis) show(exportCsv(exportInput())); });
+  el.exportJson?.addEventListener('click', () => {
+    if (!analysis) return;
+    show(exportJson({ ...exportInput(), appVersion: analysis.context?.build?.version ?? '', flowConfig: analysis.context?.flow?.config }));
+    saved?.patchCode(savedId, el.code?.value);
+  });
+  el.exportCsv?.addEventListener('click', () => {
+    if (!analysis) return;
+    show(exportCsv(exportInput()));
+    saved?.patchCode(savedId, el.code?.value);
+  });
   el.discard?.addEventListener('click', () => { forget(); show('Vídeo descartado.'); });
   el.download?.addEventListener('click', () => {
     if (!analysis) return;

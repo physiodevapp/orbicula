@@ -4,6 +4,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (fase 7a bis: sesiones guardadas en el dispositivo)
+- **Recuperar el trabajo tras recargar la página.** Al terminar un protocolo (en directo o grabado) o el análisis de un vídeo, las medidas se guardan en IndexedDB (`src/persistence/`), sin el vídeo ni imágenes ni el nombre del archivo.
+- **Tarjeta «Sesiones guardadas en este dispositivo»:** abrir una sesión (resumen, JSON y CSV), borrarla o borrar todo. Se conservan 5 y caducan a los 30 días.
+- **Un vídeo ya analizado se reconoce al volver a elegirlo** («Recuperar el análisis»), por su huella (tamaño, fotogramas y duración, sin el nombre). Mismo criterio que `dualkinema`.
+- **La procedencia (`analysis`) del JSON de una sesión recuperada es la de cuando se analizó**, aunque la app se haya actualizado después.
+- Modo alojado (`?host=physiq`): no se guarda nada.
+- `scripts/dev/check-saved.cjs`: protocolo → recarga → abrir → mismo JSON; huella con otro nombre; borrado; modo alojado.
+- 14 tests nuevos.
+
 ### Cambiado (fase 7a: revisión del esquema antes de fijar `"1"`)
 - **Compatibilidad hacia delante:** el esquema admite campos nuevos; añadirlos no cambia `schemaVersion`.
 - **Nombres de las métricas** definidos en el esquema, con un test que los compara con el código y con `docs/schema.md`.

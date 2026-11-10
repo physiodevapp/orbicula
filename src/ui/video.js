@@ -8,6 +8,7 @@ import { buildReport } from '../assistant/report.js';
 import { summarizeProtocol } from '../protocol/summary.js';
 import { renderSummary } from './summary.js';
 import { exportJson, exportCsv, fileCapture } from './export.js';
+import { fingerprintOf } from '../persistence/fingerprint.js';
 
 export const VIDEO_PROBE_SCHEMA = 'orbicula-video-probe/1';
 const $ = (id) => document.getElementById(id);
@@ -17,15 +18,17 @@ const mmss = (ms) => `${Math.floor(ms / 60000)}:${String(Math.round((ms % 60000)
 
 /**
  * @param {{getContext: () => {build: object, device: object},
- *          analyzeVideoFile?: (o: object) => Promise<{results: object[], stats: object, context: object}>}} deps
+ *          analyzeVideoFile?: (o: object) => Promise<{results: object[], stats: object, context: object}>,
+ *          saved?: ReturnType<import('./saved.js').createSavedCard>|null}} deps
  */
-export function createVideoCard({ getContext, analyzeVideoFile = null }) {
+export function createVideoCard({ getContext, analyzeVideoFile = null, saved = null }) {
   const el = {
     file: $('vidFile'), info: $('vidInfo'), probe: $('vidProbe'), cancel: $('vidCancel'), bar: $('vidBar'), barWrap: $('vidBarWrap'),
     result: $('vidResult'), thumb: $('vidThumb'), out: $('vidOut'), download: $('vidDownload'), copy: $('vidCopy'), msg: $('vidMsg'),
     facing: $('vidFacing'), mirror: $('vidMirror'),
     rest: $('vidRest'), cap: $('vidCap'), analyze: $('vidAnalyze'), aCancel: $('vidACancel'), aBar: $('vidABar'), aBarWrap: $('vidABarWrap'),
     progress: $('vidProgress'), summary: $('vidSummary'),
+    saved: $('vidSaved'), savedText: $('vidSavedText'), savedRestore: $('vidSavedRestore'), savedDismiss: $('vidSavedDismiss'),
     exportRow: $('vidExport'), exportJson: $('vidExportJson'), exportCsv: $('vidExportCsv'), code: $('vidCode'),
   };
   let analysis = null; // { results, stats, context, settings, startedAt }
@@ -36,6 +39,10 @@ export function createVideoCard({ getContext, analyzeVideoFile = null }) {
   let support = null;
   let probe = null;
   let abort = null;
+  let fpKey = null; // huella del vídeo elegido (tamaño, fotogramas, duración: sin el nombre)
+  let savedId = null; // sesión guardada de este vídeo
+  let foundSaved = null;
+  let restoredProv = null; // procedencia guardada con un análisis recuperado
 
   const report = () => ({
     app: 'orbicula', kind: 'video-probe', schema: VIDEO_PROBE_SCHEMA, createdAt: new Date().toISOString(),
@@ -60,7 +67,8 @@ export function createVideoCard({ getContext, analyzeVideoFile = null }) {
 
   el.file.addEventListener('change', async () => {
     const file = el.file.files?.[0];
-    mp4 = null; probe = null; support = null; analysis = null;
+    mp4 = null; probe = null; support = null; analysis = null; fpKey = null; savedId = null; foundSaved = null; restoredProv = null;
+    el.saved.hidden = true;
     el.summary.hidden = true; el.progress.textContent = ''; el.exportRow.hidden = true;
     el.result.textContent = ''; el.msg.textContent = ''; el.out.hidden = true; el.probe.disabled = true;
     el.thumb.hidden = true;
@@ -71,6 +79,8 @@ export function createVideoCard({ getContext, analyzeVideoFile = null }) {
       mp4 = await openMp4(file);
       support = await canDecode(mp4.decoderConfig);
       showInfo();
+      fpKey = fingerprintOf(file, mp4);
+      offerSaved();
       el.probe.disabled = !support.supported;
       el.analyze.disabled = !support.supported || !analyzeVideoFile;
       el.cap.checked = (mp4.timing.fps ?? 0) > 40;
@@ -80,6 +90,37 @@ export function createVideoCard({ getContext, analyzeVideoFile = null }) {
         ? 'El móvil no deja leer el archivo. Vuelve a elegirlo; si sigue, elígelo desde la app «Archivos».'
         : `No se pudo leer: ${err?.message ?? err}. ¿Es un vídeo MP4 de la app de cámara?`;
     }
+  });
+
+  /** Si ya hay un análisis guardado de este mismo vídeo (misma huella), ofrece recuperarlo. */
+  async function offerSaved() {
+    const key = fpKey;
+    foundSaved = saved ? await saved.find(key) : null;
+    if (!foundSaved || key !== fpKey) return;
+    const d = new Date(foundSaved.savedAt).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    el.savedText.textContent = `Ya analizaste este vídeo (${d}${foundSaved.code ? `, código ${foundSaved.code}` : ''}). Recuperar el análisis te ahorra volver a hacerlo: se guardó en este móvil, sin el vídeo.`;
+    el.saved.hidden = false;
+  }
+  el.savedDismiss.addEventListener('click', () => { el.saved.hidden = true; });
+  el.savedRestore.addEventListener('click', async () => {
+    const loaded = foundSaved ? await saved.load(foundSaved.id) : null;
+    if (!loaded || !mp4) { el.progress.textContent = 'No se pudo leer el análisis guardado. Analiza el vídeo de nuevo.'; el.saved.hidden = true; return; }
+    const { header, data } = loaded;
+    const x = data.extra ?? {};
+    const st = x.settings ?? {};
+    if (st.facing) el.facing.value = st.facing;
+    el.mirror.checked = !!st.mirrored;
+    if (st.restSec) el.rest.value = String(st.restSec);
+    el.cap.checked = !!st.maxFps;
+    el.code.value = header.code ?? '';
+    analysis = { results: data.results, stats: x.stats ?? {}, context: x.context ?? {}, settings: st, startedAt: x.startedAt ?? null };
+    savedId = header.id;
+    restoredProv = data.analysis ?? null;
+    el.saved.hidden = true; el.msg.textContent = '';
+    const s = analysis.stats;
+    el.progress.textContent = `Análisis recuperado (${new Date(header.savedAt).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${s.frames ? `, ${s.frames} fotogramas` : ''}).`;
+    renderSummary(el.summary, summarizeProtocol(data.results), data.results);
+    el.exportRow.hidden = false;
   });
 
   el.probe.addEventListener('click', async () => {
@@ -135,7 +176,7 @@ export function createVideoCard({ getContext, analyzeVideoFile = null }) {
     abort = new AbortController();
     const settings = { restSec: Number(el.rest.value) || 30, maxFps: el.cap.checked ? 30 : 0, facing: el.facing.value, mirrored: el.mirror.checked };
     el.analyze.disabled = true; el.probe.disabled = true; el.aCancel.hidden = false; el.aBarWrap.hidden = false;
-    el.summary.hidden = true; el.exportRow.hidden = true; el.msg.textContent = '';
+    el.summary.hidden = true; el.exportRow.hidden = true; el.msg.textContent = ''; el.saved.hidden = true; restoredProv = null; savedId = null;
     el.progress.textContent = 'Preparando el análisis (modelo de la cara y flujo óptico)…';
     let wake = null;
     try { wake = await navigator.wakeLock?.request('screen'); } catch { /* sin bloqueo de pantalla */ }
@@ -153,6 +194,14 @@ export function createVideoCard({ getContext, analyzeVideoFile = null }) {
       el.progress.textContent = `Hecho: ${s.frames} fotogramas en ${mmss(s.elapsedMs)} (${nf(s.framesPerSecond, 1)}/s)${s.every > 1 ? `, uno de cada ${s.every}` : ''}.`;
       renderSummary(el.summary, summarizeProtocol(out.results), out.results);
       el.exportRow.hidden = false;
+      const header = await saved?.save({
+        id: `video-${fpKey}`, kind: 'video', fingerprintKey: fpKey, code: el.code.value.trim() || null,
+        appVersion: out.context?.build?.version ?? '', flowConfig: out.context?.flow?.config,
+        capture: fileCapture({ mp4, facing: el.facing.value, mirrored: el.mirror.checked }),
+        results: out.results, extra: { stats: out.stats, context: out.context, settings, startedAt },
+        meta: { phases: out.results.filter((r) => r.status === 'completed').length, durationMs: Math.round(mp4.timing.durationMs) },
+      });
+      savedId = header?.id ?? null;
     } catch (err) {
       el.progress.textContent = err?.name === 'AbortError' ? 'Cancelado.'
         : err?.name === 'NotReadableError' ? 'El móvil no deja leer el archivo. Vuelve a elegirlo y analiza enseguida.'
@@ -163,8 +212,16 @@ export function createVideoCard({ getContext, analyzeVideoFile = null }) {
     }
   });
   const exportInput = () => ({ results: analysis.results, code: el.code.value, capture: fileCapture({ mp4, facing: el.facing.value, mirrored: el.mirror.checked }) });
-  el.exportJson.addEventListener('click', () => { if (analysis) el.msg.textContent = exportJson({ ...exportInput(), appVersion: analysis.context?.build?.version ?? '', flowConfig: analysis.context?.flow?.config }); });
-  el.exportCsv.addEventListener('click', () => { if (analysis) el.msg.textContent = exportCsv(exportInput()); });
+  el.exportJson.addEventListener('click', () => {
+    if (!analysis) return;
+    el.msg.textContent = exportJson({ ...exportInput(), appVersion: analysis.context?.build?.version ?? '', flowConfig: analysis.context?.flow?.config, analysis: restoredProv });
+    saved?.patchCode(savedId, el.code.value);
+  });
+  el.exportCsv.addEventListener('click', () => {
+    if (!analysis) return;
+    el.msg.textContent = exportCsv(exportInput());
+    saved?.patchCode(savedId, el.code.value);
+  });
   el.aCancel.addEventListener('click', () => abort?.abort());
 
   el.download.addEventListener('click', () => {

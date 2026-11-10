@@ -84,6 +84,15 @@ La tarjeta **«Vídeo grabado»** (arriba de todo, sin necesidad de activar la c
 
 **Si el directo va lento:** cuando el análisis en directo baja de 24 por segundo, la app lo avisa y propone este modo.
 
+## Sesiones guardadas
+Al terminar un protocolo (en directo o grabado) o el análisis de un vídeo, orbicula **guarda sus medidas en el propio móvil** (IndexedDB), para que recargar la página no las pierda. Aparecen en la tarjeta «Sesiones guardadas en este dispositivo», donde se pueden abrir para ver el resumen y descargar el JSON y los CSV.
+- **Qué se guarda:** solo medidas numéricas, la ficha de la captura y el código anónimo. **Nunca el vídeo, imágenes ni el nombre del archivo.**
+- **Cuánto:** las últimas 5 sesiones, y se borran solas a los 30 días. «Borrar» y «Borrar todo lo guardado» las quitan en el acto.
+- **Recuperar un análisis de vídeo:** al elegir de nuevo el mismo vídeo, la tarjeta «Vídeo grabado» ofrece «Recuperar el análisis», que ahorra volver a hacerlo (unos 2 minutos por cada minuto de vídeo). Se reconoce por tamaño, número de fotogramas y duración, **no por el nombre**: Android le da otro nombre al mismo vídeo según se elija desde Fotos o desde Archivos.
+- **Qué no se recupera:** un análisis o un protocolo a medias. Si recargas durante el análisis, hay que repetirlo.
+- **Modo alojado (`?host=physiq`):** no se guarda nada; el hub recibe el resultado por `postMessage`.
+- **Móvil compartido:** las sesiones solo llevan el código anónimo, pero si el móvil lo usa más gente, pulsa «Borrar todo lo guardado» al terminar.
+
 ## Parpadeos y curvas
 
 - **EAR** (eye aspect ratio): apertura vertical media del ojo dividida por su ancho. Ronda 0,25–0,35 con el ojo abierto. Es la señal del detector de parpadeos.

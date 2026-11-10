@@ -15,12 +15,15 @@ export const DETECTOR_KEYS = ['riseMargin', 'riseFloor', 'spikyRatio', 'endRatio
 const num = (v) => (Number.isFinite(v) ? v : null);
 
 /**
- * @param {{flowConfig?: string|null}} [o] flowConfig: clave de FLOW_CONFIGS con que se calculó el flujo.
+ * @param {{flowConfig?: string|null, snapshot?: object|null}} [o] flowConfig: clave de FLOW_CONFIGS con que se calculó el flujo.
  *   El detector de eventos usa siempre EVENT_DEFAULTS (la app no lo deja cambiar).
+ *   snapshot: la procedencia que se guardó con una sesión recuperada. Lo que se calculó EN ESE MOMENTO
+ *   (modelo, flujo, detector, congelado) sale de ahí, aunque la app se haya actualizado desde entonces;
+ *   el resumen se recalcula al exportar, así que sus parámetros son los actuales.
  */
-export function provenance({ flowConfig = DEFAULT_FLOW } = {}) {
+export function provenance({ flowConfig = DEFAULT_FLOW, snapshot = null } = {}) {
   const cfg = FLOW_CONFIGS[flowConfig] ?? FLOW_CONFIGS[DEFAULT_FLOW];
-  return {
+  const now = {
     mediapipe: { version: typeof __MEDIAPIPE_VERSION__ !== 'undefined' ? __MEDIAPIPE_VERSION__ : null, model: MODEL_NAME },
     opencv: { version: OPENCV_VERSION },
     flow: {
@@ -34,4 +37,7 @@ export function provenance({ flowConfig = DEFAULT_FLOW } = {}) {
     closureFreeze: { earFraction: SHUT_FRACTION, padMs: SHUT_PAD_MS },
     summary: { incompleteRatio: SUMMARY.incompleteRatio, coactLagMs: SUMMARY.coactLagMs, minAnalysisFps: SUMMARY.minAnalysisFps },
   };
+  if (!snapshot) return now;
+  const kept = Object.fromEntries(['mediapipe', 'opencv', 'flow', 'detector', 'closureFreeze'].filter((k) => snapshot[k]).map((k) => [k, snapshot[k]]));
+  return { ...now, ...kept };
 }

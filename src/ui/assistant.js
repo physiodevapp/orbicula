@@ -190,7 +190,7 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
     if (s.state !== lastState) {
       lastState = s.state;
       // Aviso a quien lo use (la grabación del vídeo del protocolo): estado nuevo, sesión y configuración.
-      queueMicrotask(() => onState(s.state, session, { settings: readSettings() }));
+      queueMicrotask(() => onState(s.state, session, { settings: readSettings(), code: el.code.value.trim() }));
     }
     const busy = s.state === 'prep' || s.state === 'running' || s.state === 'review';
     if (busy) document.body.dataset.busy = busyKey;

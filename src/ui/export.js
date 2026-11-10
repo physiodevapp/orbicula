@@ -7,9 +7,9 @@ const BAD_CODE = 'El código del participante solo admite letras sin tilde, núm
 const suffix = (code) => ((code ?? '').trim() ? `-${code.trim()}` : '');
 
 /** Descarga el JSON público. Devuelve el texto de confirmación. */
-export function exportJson({ results, capture, code, appVersion, flowConfig }) {
+export function exportJson({ results, capture, code, appVersion, flowConfig, analysis }) {
   if (!isValidCode(code)) return BAD_CODE;
-  const doc = buildPublicResult({ results, capture, appVersion, participantCode: code, flowConfig });
+  const doc = buildPublicResult({ results, capture, appVersion, participantCode: code, flowConfig, analysis });
   const { name, size } = downloadJson(doc, `orbicula-resultados-${stamp()}${suffix(code)}.json`);
   return `Descargado: ${name} (${Math.round(size / 1024)} KB).`;
 }

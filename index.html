@@ -50,6 +50,13 @@
             <select class="select" id="vidRest" aria-label="Segundos de reposo al principio del vídeo"><option value="20">20 s</option><option value="30" selected>30 s</option><option value="45">45 s</option></select></label>
           <label class="check"><input type="checkbox" id="vidCap"> Como mucho 30 fotogramas/s (tarda la mitad)</label>
         </div>
+        <div class="sum-card" id="vidSaved" hidden>
+          <p class="hint" id="vidSavedText"></p>
+          <div class="control-row wrap">
+            <button class="btn btn-primary" id="vidSavedRestore" type="button">Recuperar el análisis</button>
+            <button class="btn btn-quiet" id="vidSavedDismiss" type="button">Analizar de nuevo</button>
+          </div>
+        </div>
         <div class="control-row wrap">
           <button class="btn btn-primary" id="vidAnalyze" type="button">Analizar el vídeo</button>
           <button class="btn btn-quiet" id="vidACancel" type="button" hidden>Cancelar</button>
@@ -71,6 +78,31 @@
         </div>
         <p class="hint" id="vidMsg"></p>
       </div>
+    </section>
+
+    <section class="card" id="savedCard" hidden>
+      <div class="card-title">Sesiones guardadas en este dispositivo</div>
+      <p class="card-text" id="savedNote"></p>
+      <div id="savedList"></div>
+      <div class="sum-card" id="savedView" hidden>
+        <div class="step-title" id="savedViewTitle"></div>
+        <p class="hint" id="savedViewNote"></p>
+        <div class="proto-summary" id="savedSummary" hidden></div>
+        <label class="field">
+          <span class="control-label">Código (opcional)</span>
+          <input class="input" id="savedCode" maxlength="24" autocomplete="off" placeholder="p. ej. P01">
+        </label>
+        <div class="control-row wrap">
+          <button class="btn btn-primary" id="savedExportJson" type="button">Resultados (JSON)</button>
+          <button class="btn" id="savedExportCsv" type="button">CSV de las series</button>
+          <button class="btn btn-quiet" id="savedClose" type="button">Cerrar</button>
+        </div>
+        <p class="hint" id="savedViewMsg"></p>
+      </div>
+      <div class="control-row wrap">
+        <button class="btn btn-quiet" id="savedClear" type="button">Borrar todo lo guardado</button>
+      </div>
+      <p class="hint" id="savedMsg"></p>
     </section>
 
     <section id="liveView" hidden>
