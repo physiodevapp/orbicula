@@ -1,5 +1,7 @@
 # Plan de la fase 6: vídeo grabado
 
+**Estado: fase hecha (6a–6d).** La conclusión y lo pendiente están en «Conclusión de la fase 6».
+
 **Aprobado por el autor el 2026-11-08, con las recomendaciones:**
 - **fases:** primero A (análisis libre) y después C (orbicula graba su propio vídeo durante el protocolo);
 - en C, el vídeo **solo en memoria**, con una casilla, y borrado al procesarlo;
@@ -205,6 +207,40 @@ El vídeo de la app de cámara no sabe en qué fase está cada momento. Hay tres
   - **En la nube** (CPU, sin GPU: el análisis tarda 118 ms por fotograma y es el cuello de botella): 1440 fotogramas en 2:57 frente a 3:44, **1,28 veces más rápido**, con los mismos resultados (840 muestras, 840 pares y 2 y 5 parpadeos).
   - **Medida de dónde se va el tiempo:** el JSON de un vídeo lleva ahora `video.processing` con los ms por fotograma que se esperan al decodificador, que se tarda en preparar y mandar, y que se espera a los workers, más los ms medios del análisis y del flujo. Con tu móvil sabremos si la mejora es mayor y qué queda por optimizar.
 - **Calor:** el análisis de 11 minutos en el móvil no se notó caliente (el autor), así que se prioriza la velocidad.
+
+### Prueba del 6d en el móvil: velocidad (2026-11-10 13:21, commit cc592ac, trasera)
+- **Mismo vídeo que en el 6b** (68 s, 1080p, 2051 fotogramas): **2:20 frente a 4:04, a 14,6 fotogramas/s frente a 8,4. 1,74 veces más rápido**, con los **mismos resultados**: los guiños salen en el mismo lado y con los mismos cierres.
+- **Desglose por fotograma (68,5 ms):** decodificar 1,1, preparar y mandar 2,0 y **esperar a los workers 65,2**. El **análisis de la cara tarda 55 ms** y el flujo 23: el cuello de botella es la cara. Va más lento que en directo (35–40 ms) porque el modo IMAGE vuelve a detectar la cara en cada fotograma, en vez de seguirla como el modo VIDEO.
+- **Mejora posible no hecha:** un segundo análisis de la cara en paralelo. Los fotogramas son independientes en modo IMAGE, así que podría llegar a ~25 fotogramas/s. Hace falta reordenar los resultados (el procesador de flujo descarta los que llegan en desorden) y duplica el modelo en memoria. Se deja para más adelante si el tiempo molesta.
+
+## Conclusión de la fase 6
+
+**Qué hay:** el modo de vídeo grabado de `CLAUDE.md`.
+- **Tarjeta «Vídeo grabado»:** carga un MP4 de la app de cámara y lo analiza fotograma a fotograma. Los primeros segundos son el reposo de calibración; del resto salen los parpadeos, las contracciones finas y la actividad rítmica.
+- **Protocolo grabado:** casilla para grabar el vídeo del protocolo (solo en la memoria) y analizarlo después, con las fases exactas.
+- **Aviso del criterio 1:** si el directo no llega a 24 análisis/s, la app lo dice y propone el vídeo.
+- **Seguridad:** el vídeo se lee en el móvil, sin red, y no se guarda ni se exporta.
+
+**Qué se ha comprobado** (un solo sujeto, el móvil del autor, Chrome 156–157):
+- **Lectura:** H.264 y HEVC, con el giro y los tiempos de cada fotograma; con índice al principio o al final; fps variable. A 130 fotogramas/s decodificando.
+- **Lateralidad (criterio 2): cumplido en vídeo grabado, con la trasera y con la frontal.** Cada guiño sale en su lado, también con la cámara frontal (HEVC, girada 270°).
+- **El vídeo es más sensible que el directo:** con el mismo protocolo detecta un 40 % más de parpadeos y los mide con la duración de un parpadeo real (140–150 ms frente a 255 ms). Los cierres y las asimetrías salen iguales en los dos.
+- **Velocidad:** 14,6 fotogramas/s, o sea, un protocolo de 4 min (~9600 fotogramas a 34 fps) tarda unos 11 min, o 5–6 con un fotograma de cada dos. El móvil no se calentó.
+
+**Limitaciones:**
+- Hace falta un navegador con WebCodecs y que pueda decodificar el códec del vídeo (HEVC solo si Chrome lo decodifica; si no, grabar en H.264).
+- Un vídeo de 4 minutos tarda ~10 min en analizarse, con la pantalla encendida.
+- Las fases del protocolo grabado dependen de los tiempos de la sesión en directo; el desvío tras seis pasos es de ~0,2 s.
+- Una vez se obtuvo un análisis sin flujo en la nube y no se pudo reproducir (ahora da un error claro).
+- La subida de la ceja sale más baja en el vídeo que en directo; sin explicar.
+
+**Pendiente (no bloquea):**
+- Análisis de la cara en paralelo (ver 6d) si el tiempo molesta.
+- Entender la diferencia en la subida de la ceja entre el directo y el vídeo.
+- Probar HEVC con el protocolo grabado: `MediaRecorder` solo graba H.264 aquí.
+- Medir la sonrisa con las comisuras de la boca (decidido para después de la fase 7).
+
+**Siguiente:** fase 7 (exportación e integración). Sonnet, salvo la revisión del esquema con Opus antes de fijar `schemaVersion: "1"`.
 
 ## Pruebas
 - **Vídeos de prueba fabricados con `ffmpeg`** a partir de los vídeos sintéticos de `make-face-videos.py`:
