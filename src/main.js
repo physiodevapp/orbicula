@@ -20,6 +20,11 @@ import { createVideoCard } from './ui/video.js';
 import { createProtocolVideo } from './ui/protocol-video.js';
 import { createSavedCard } from './ui/saved.js';
 import { hostFrom } from './integration/host.js';
+import { allowedOrigins } from './integration/origins.js';
+import { createBridge } from './integration/bridge.js';
+import { parseConfig } from './integration/messages.js';
+import { featureAllowed } from './ui/wake.js';
+import { buildPublicResult, isValidCode } from './export/result.js';
 import { createStore } from './persistence/store.js';
 import { idbAdapter } from './persistence/idb.js';
 import { exportJson, exportCsv, liveCapture, fileCapture } from './ui/export.js';
@@ -250,7 +255,66 @@ const saved = createSavedCard({ store: !hosted && typeof indexedDB !== 'undefine
 saved.refresh();
 createVideoCard({ getContext: () => { const c = captureContext(); return { build: c.build, device: c.device }; }, analyzeVideoFile, saved });
 // Grabación del vídeo durante el protocolo y análisis posterior (fase 6c); `analyzeVideoFile` se define más abajo.
-const protocolVideo = createProtocolVideo({ getStream: () => camera.stream, analyzeVideoFile: (o) => analyzeVideoFile(o), saved });
+// ── Integración con el hub (iframe, postMessage; src/integration/) ─────────────────────────────────────────────
+// Los mensajes salen solo al origen del padre si está en la lista de permitidos (nunca con «*»).
+const hub = createBridge({
+  allowed: allowedOrigins({ extra: import.meta.env.VITE_ORBICULA_ORIGINS }),
+  appVersion: __APP_VERSION__,
+  permissions: () => ({ camera: featureAllowed('camera'), screenWakeLock: featureAllowed('screen-wake-lock') }),
+  handlers: { config: (payload) => applyHubConfig(payload), hidden: () => releaseForHub() },
+});
+let lastHubResult = null; // el último resultado mandado, para «Enviar al hub» tras corregir el código
+const hubStatus = (text) => { const p = document.getElementById('prHubStatus'); if (p) { p.textContent = text; p.hidden = !text; } };
+const HUB_TEXT = {
+  sent: 'Resultado enviado al hub.',
+  queued: 'Esperando a que el hub conteste para enviarle el resultado. Si no llega, descarga el JSON.',
+  blocked: 'Este origen no está autorizado a recibir resultados: descarga el JSON.',
+};
+
+/** Manda un resultado al hub (solo si orbicula va en un iframe). El código que no sea válido no se manda. */
+function sendToHub(r) {
+  if (!hub.embedded) return;
+  lastHubResult = r;
+  const doc = buildPublicResult({
+    results: r.results, capture: r.capture, appVersion: __APP_VERSION__, flowConfig: r.flowConfig,
+    participantCode: isValidCode(r.code) ? r.code || null : null,
+  });
+  hubStatus(HUB_TEXT[hub.sendResult(doc, r.sessionId)] ?? '');
+}
+
+/** `orbicula:config`: tema, idioma y valores del protocolo. Lo válido se aplica; lo demás se ignora y se avisa en la consola. */
+function applyHubConfig(payload) {
+  const { applied, rejected } = parseConfig(payload);
+  const root = document.documentElement;
+  if (applied.theme === 'auto') delete root.dataset.theme; // sigue al sistema
+  else if (applied.theme) root.dataset.theme = applied.theme;
+  if (applied.lang) root.lang = applied.lang;
+  if (applied.protocol) {
+    if (['idle', 'done'].includes(protocol.view)) {
+      const boxes = { restSec: 'prRest', naturalSec: 'prNatural', reps: 'prReps' };
+      for (const [k, v] of Object.entries(applied.protocol)) document.getElementById(boxes[k]).value = String(v);
+    } else {
+      rejected.push({ key: 'protocol', reason: 'hay un protocolo en marcha; se aplicará al empezar el siguiente si se vuelve a mandar' });
+    }
+  }
+  if (rejected.length) console.warn('[orbicula] configuración del hub: no se ha aplicado', rejected);
+}
+
+/** El hub oculta orbicula (vuelve a su portada): se suelta la cámara y se detiene el protocolo en marcha, conservando lo hecho. */
+function releaseForHub() {
+  if (!camera.stream) return; // un análisis de vídeo no usa la cámara y sigue
+  const reason = 'orbicula se ocultó en el hub';
+  for (const a of recorders) (a.halt ?? a.interrupt)?.call(a, reason);
+  bench.interrupt(reason);
+  camera.stop();
+  state.running = false;
+  els.startCard.hidden = false; // para volver a encender la cámara al regresar
+}
+
+const protocolVideo = createProtocolVideo({
+  getStream: () => camera.stream, analyzeVideoFile: (o) => analyzeVideoFile(o), saved,
+  onResult: (r) => sendToHub(r),
+});
 let protocolSavedId = null; // sesión guardada del protocolo en directo
 const protocol = createAssistant({
   ...sessionDeps,
@@ -265,6 +329,10 @@ const protocol = createAssistant({
         capture: liveCapture({ camera, results: session.results }), results: session.results,
         meta: { phases: session.results.filter((r) => r.status === 'completed').length, durationMs: session.results.filter((r) => r.status === 'completed').reduce((a, r) => a + (r.durationMs ?? 0), 0) },
       }).then((h) => { protocolSavedId = h?.id ?? null; });
+      sendToHub({
+        sessionId: session.startedAt, results: session.results, code: extra.code, flowConfig: flow?.config.key,
+        capture: liveCapture({ camera, results: session.results }),
+      });
     }
   },
   exporter: {
@@ -886,4 +954,14 @@ document.addEventListener('visibilitychange', () => {
 // Solo lectura en la propia página; no envía nada.
 if (new URLSearchParams(location.search).has('debug')) {
   window.__orbicula = { series, flowSeries, get flow() { return flow; }, get analysis() { return analysis; } };
+}
+
+// Empieza a escuchar al hub y le avisa con `orbicula:ready` (si va en un iframe). Al final: ya existe todo lo que usa.
+hub.start();
+if (hub.embedded && !hub.blocked) {
+  document.getElementById('prHubRow')?.removeAttribute('hidden');
+  document.getElementById('prSendHub')?.addEventListener('click', () => {
+    if (lastHubResult) sendToHub({ ...lastHubResult, code: document.getElementById('prExportCode')?.value.trim() ?? '' });
+    else hubStatus('Todavía no hay ningún resultado que enviar.');
+  });
 }

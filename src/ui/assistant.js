@@ -7,6 +7,7 @@ import { cleanSettings, PROTOCOL_DEFAULTS } from '../protocol/steps.js';
 import { summarizeProtocol } from '../protocol/summary.js';
 import { renderSummary } from './summary.js';
 import { bindCodeField, showMessage } from './code-field.js';
+import { requestWake } from './wake.js';
 import { buildReport, describeSummary } from '../assistant/report.js';
 import { downloadJson, shareJson, copyJson, stamp } from './share.js';
 
@@ -129,7 +130,7 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
 
   // ── Pantalla encendida mientras dura la sesión ──────────────────────────────
   let wake = null;
-  const lockScreen = async () => { try { wake = await navigator.wakeLock?.request('screen'); } catch { wake = null; } };
+  const lockScreen = async () => { wake = await requestWake(); };
   const unlockScreen = () => { wake?.release?.().catch(() => {}); wake = null; };
 
   let timer = null;
@@ -367,5 +368,9 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
     recordDetection: (e) => session.recordDetection(e),
     /** La cámara se reinició, etc.: el paso en curso queda interrumpido. */
     interrupt: (reason) => session.interrupt(reason),
+    /** El hub oculta orbicula: se detiene la sesión conservando lo ya hecho (como «Detener», con «Retomar sesión»). */
+    halt: (reason) => { session.interrupt(reason); session.abort(); },
+    /** Estado de la tarjeta: 'idle', 'active', 'review' o 'done'. */
+    get view() { return root.dataset.state; },
   };
 }

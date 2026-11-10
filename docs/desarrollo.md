@@ -63,6 +63,13 @@ node scripts/dev/check-protocol-video.cjs --video /tmp/caras/lid.y4m --live en-d
 ```
 Hace el protocolo en directo con la casilla «Grabar el vídeo…» marcada (MediaRecorder; el Chromium de Playwright graba MP4 H.264), descarga el JSON del directo, analiza el vídeo grabado y descarga el JSON del análisis. Con `--full` procesa todos los fotogramas y no uno de cada dos. Tarda unos 10 min con `escala=0.4` (análisis sin GPU).
 
+## Integración con el hub por postMessage (fase 7c)
+```bash
+npm run build && npx vite preview --port 4173 --host 127.0.0.1 &
+node scripts/dev/check-hub.cjs --video /tmp/caras/lid.y4m
+```
+Levanta un «hub» en otro puerto (`public/hub-prueba/`) y una segunda orbicula construida con `VITE_ORBICULA_ORIGINS` para permitir ese origen. Comprueba que un origen no permitido no recibe nada y que su configuración se ignora; y con el permitido, `ready`, `config`, que el hub oculte orbicula a mitad de un protocolo, el resultado del protocolo completo (valida contra el esquema), el reenvío con otro código y que un código que parece un nombre no viaja. Tarda unos 5 min. A mano: abre `/hub-prueba/` en el móvil. La lógica sin navegador está en `tests/integration.test.js`.
+
 ## Modo alojado (fase 7b)
 ```bash
 npm run build && npx vite preview --port 4173 --host 127.0.0.1 &

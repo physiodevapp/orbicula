@@ -10,6 +10,7 @@ import { renderSummary } from './summary.js';
 import { exportJson, exportCsv, fileCapture } from './export.js';
 import { fingerprintOf } from '../persistence/fingerprint.js';
 import { bindCodeField, showMessage } from './code-field.js';
+import { requestWake } from './wake.js';
 
 export const VIDEO_PROBE_SCHEMA = 'orbicula-video-probe/1';
 const $ = (id) => document.getElementById(id);
@@ -130,7 +131,7 @@ export function createVideoCard({ getContext, analyzeVideoFile = null, saved = n
     abort = new AbortController();
     el.probe.disabled = true; el.cancel.hidden = false; el.barWrap.hidden = false; el.result.textContent = 'Decodificando…';
     let wake = null;
-    try { wake = await navigator.wakeLock?.request('screen'); } catch { /* sin bloqueo de pantalla */ }
+    wake = await requestWake();
     try {
       probe = await probeDecode(mp4, {
         seconds: 15,
@@ -181,7 +182,7 @@ export function createVideoCard({ getContext, analyzeVideoFile = null, saved = n
     el.summary.hidden = true; el.exportRow.hidden = true; el.msg.textContent = ''; el.saved.hidden = true; restoredProv = null; savedId = null;
     el.progress.textContent = 'Preparando el análisis (modelo de la cara y flujo óptico)…';
     let wake = null;
-    try { wake = await navigator.wakeLock?.request('screen'); } catch { /* sin bloqueo de pantalla */ }
+    wake = await requestWake();
     const startedAt = new Date().toISOString();
     try {
       const out = await analyzeVideoFile({

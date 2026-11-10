@@ -4,6 +4,18 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (fase 7c: API postMessage)
+- **`orbicula:ready`** al cargar (con la versión de la app, la del esquema y los permisos que el hub ha concedido al iframe), **`orbicula:result`** al terminar el protocolo en directo y el análisis del protocolo grabado, y **`orbicula:config { theme, lang, protocol }`** de entrada. El resultado lleva `sessionId` fuera del JSON: el protocolo grabado manda un segundo resultado con el mismo, para que el hub reemplace el primero.
+- **Orígenes:** solo el propio y `https://physiodevapp.github.io` (`src/integration/origins.js`), ampliable al construir con `VITE_ORBICULA_ORIGINS`, **nunca por la dirección**. Los mensajes salen solo al origen del padre, **nunca con `"*"`**, y los entrantes solo se aceptan si vienen del marco padre y de un origen permitido. Con un padre no permitido, orbicula no manda ni acepta nada.
+- **Origen del padre:** `location.ancestorOrigins`; si no existe (Firefox, Safari), `document.referrer`; y si tampoco, el primer mensaje válido (lo que haya que enviar espera hasta entonces).
+- **Configuración:** lo válido se aplica y lo malo se ignora con su motivo en la consola. Las duraciones del protocolo solo se cambian si no hay uno en marcha.
+- **El hub oculta orbicula (`PHYSIQ_SAT_HIDDEN`):** se apaga la cámara y se detiene el protocolo en marcha, conservando lo hecho (como «Detener», con «Retomar sesión»). Un análisis de vídeo ya cargado sigue.
+- **Botón «Enviar al hub»** en Resultados (solo dentro de un iframe), para reenviar con el código corregido. Un código que parece un nombre no viaja: se manda sin código.
+- **Bloqueo de pantalla:** se comprueba el permiso antes de pedirlo. Dentro de un iframe sin `allow="screen-wake-lock"`, el navegador lo bloqueaba y dejaba un error en la consola.
+- **`/hub-prueba/`:** página que hace de hub para probar la integración a mano (acepta `?orbicula=<dirección>`).
+- `scripts/dev/check-hub.cjs`: un «hub» en otro origen frente a orbicula con y sin ese origen permitido; protocolo completo con resultado válido contra el esquema.
+- 19 tests nuevos.
+
 ### Añadido (fase 7b: modo alojado)
 - **`?host=physiq`:** orbicula oculta su cabecera y su pie y adopta los tokens del hub: su texto (`#e8edf2`, `#8aa4bc`) y su rojo de error (`#ef4444`). El fondo, las superficies, los bordes y las fuentes ya coincidían. El acento sigue siendo el de orbicula: cada satélite del hub tiene el suyo.
 - **Tema oscuro forzado**, como hace `assessment` dentro del hub (el hub es solo oscuro). Un tema elegido después (`orbicula:config`, en 7c) se respeta.

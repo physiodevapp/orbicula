@@ -10,6 +10,7 @@ import { renderSummary } from './summary.js';
 import { downloadJson, stamp } from './share.js';
 import { exportJson, exportCsv, fileCapture } from './export.js';
 import { showMessage } from './code-field.js';
+import { requestWake } from './wake.js';
 
 const $ = (id) => document.getElementById(id);
 const nf = (v, d = 0) => (Number.isFinite(v) ? v.toFixed(d).replace('.', ',') : '—');
@@ -20,9 +21,10 @@ const MARGIN_MS = 1000;
 /**
  * @param {{getStream: () => MediaStream|null,
  *          analyzeVideoFile: (o: object) => Promise<{results: object[], stats: object, context: object}>,
- *          saved?: ReturnType<import('./saved.js').createSavedCard>|null}} deps
+ *          saved?: ReturnType<import('./saved.js').createSavedCard>|null,
+ *          onResult?: (r: {sessionId: string, results: object[], capture: object, flowConfig?: string, code: string}) => void}} deps
  */
-export function createProtocolVideo({ getStream, analyzeVideoFile, saved = null }) {
+export function createProtocolVideo({ getStream, analyzeVideoFile, saved = null, onResult = null }) {
   const el = {
     record: $('prRecord'), recordRow: $('prRecordRow'), block: $('prRecBlock'), info: $('prRecInfo'), analyze: $('prRecAnalyze'),
     cancel: $('prRecCancel'), discard: $('prRecDiscard'), cap: $('prRecCap'), barWrap: $('prRecBarWrap'), bar: $('prRecBar'),
@@ -96,7 +98,7 @@ export function createProtocolVideo({ getStream, analyzeVideoFile, saved = null 
     el.summary.hidden = true; el.download.hidden = true; el.exportRow.hidden = true; show('');
     el.progress.textContent = 'Preparando el análisis (modelo de la cara y flujo óptico)…';
     let wake = null;
-    try { wake = await navigator.wakeLock?.request('screen'); } catch { /* sin bloqueo de pantalla */ }
+    wake = await requestWake();
     try {
       const mp4 = await openRecording(recorded.blob);
       const steps = windowedSteps(recorded.steps, recorded.windows);
@@ -124,6 +126,11 @@ export function createProtocolVideo({ getStream, analyzeVideoFile, saved = null 
         meta: { phases: out.results.filter((r) => r.status === 'completed').length, durationMs: keep.durationMs },
       });
       savedId = header?.id ?? null;
+      // Segundo resultado del mismo protocolo, ya con el análisis fotograma a fotograma: el hub lo recibe con el mismo sessionId.
+      onResult?.({
+        sessionId: keep.startedAt, results: out.results, code: el.code?.value.trim() || '', flowConfig: out.context?.flow?.config,
+        capture: fileCapture({ mp4: { timing: mp4.timing, track: mp4.track }, facing: out.context?.capture?.facing, mirrored: false, source: 'live' }),
+      });
       recorder.discard(); // el vídeo ya no hace falta
       recorded = null;
       keep.blob = null;

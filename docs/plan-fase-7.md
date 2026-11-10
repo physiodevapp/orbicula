@@ -110,8 +110,13 @@ Recargar la página perdía un protocolo o 2 minutos de análisis de vídeo. Se 
   - `theme`: `light`, `dark` o `auto`;
   - `lang`: de momento solo `es`, y se guarda para cuando haya más idiomas;
   - `protocol`: `{ restSec, naturalSec, reps }`, los valores de la tarjeta del protocolo.
-- **Orígenes permitidos:** una lista configurable en `src/integration/origins.js`, que de partida tiene el propio origen y `https://physiodevapp.github.io`. Cada mensaje entrante se valida con `event.origin`. **Los mensajes salientes van solo al origen del padre, si está en la lista:** el resultado es un dato clínico y nunca se manda con `"*"`. Como la página tiene `Referrer-Policy: no-referrer`, el origen del padre se saca de `location.ancestorOrigins`, con respaldo en el origen del primer mensaje válido.
+- **Orígenes permitidos:** una lista configurable en `src/integration/origins.js`, que de partida tiene el propio origen y `https://physiodevapp.github.io`. Cada mensaje entrante se valida con `event.origin`. **Los mensajes salientes van solo al origen del padre, si está en la lista:** el resultado es un dato clínico y nunca se manda con `"*"`. El origen del padre se saca de `location.ancestorOrigins` y, si el navegador no lo da, de `document.referrer` (la política `no-referrer` de orbicula afecta a lo que ella envía, no a lo que recibió); y si tampoco hay, del origen del primer mensaje válido (lo que haya que enviar espera hasta entonces).
 - **Independencia:** ningún módulo importa nada de PhysiQ. El hub depende de orbicula.
+
+### 7c: decisiones del autor y hallazgos
+- **El hub oculta orbicula:** se aceptan `PHYSIQ_SAT_HIDDEN` y `PHYSIQ_SAT_VISIBLE` (los que el hub ya manda a sus satélites; solo de un origen permitido y sin importar nada del hub). Al ocultarse: cámara apagada y protocolo detenido conservando lo hecho; un análisis de vídeo sigue.
+- **Qué se manda como `orbicula:result`:** solo el protocolo en directo y el protocolo grabado, con `sessionId`. El análisis de un vídeo suelto no.
+- **Hallazgo:** dentro de un iframe, el bloqueo de pantalla exige `allow="screen-wake-lock"` en el iframe del hub (ahora se comprueba antes de pedirlo, y el `ready` informa de los permisos).
 
 ## Pasos (me detengo al final de cada uno para que lo pruebes en el móvil)
 1. **7a. JSON público, esquema y CSV.** Botones en los tres resultados, el esquema en JSON Schema, `docs/schema.md`, los tests de validación y la revisión del esquema con Opus.

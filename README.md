@@ -95,7 +95,8 @@ Al terminar un protocolo (en directo o grabado) o el análisis de un vídeo, orb
 
 ## Modo alojado (dentro de PhysiQ)
 Con `?host=physiq` en la dirección, orbicula se ve como parte del hub: **sin cabecera ni pie**, con el **tema oscuro** del hub (el hub es solo oscuro, aunque el móvil esté en claro) y con sus colores de texto y de error. El acento sigue siendo el de orbicula: cada satélite del hub tiene el suyo. En este modo no se guardan sesiones en el dispositivo.
-- **Cómo cargarla en el hub:** `<iframe src="…/orbicula/?host=physiq" allow="camera">`. Sin `allow="camera"` el navegador no deja encender la cámara dentro del iframe.
+- **Cómo cargarla en el hub:** `<iframe src="…/orbicula/?host=physiq" allow="camera; screen-wake-lock">`. Sin `camera` el navegador no deja encender la cámara dentro del iframe; sin `screen-wake-lock` la pantalla puede apagarse a mitad de un protocolo (orbicula lo dice en `orbicula:ready`).
+- **Mensajes con el hub (`postMessage`):** `orbicula:ready` al cargar, `orbicula:result` con el JSON al terminar un protocolo y `orbicula:config` para elegir tema y duraciones. Solo se habla con los orígenes permitidos (`src/integration/origins.js`) y nunca con `"*"`. `/hub-prueba/` hace de hub para probarlo a mano.
 - **Versión:** al no haber pie, la versión y el commit están en «Detalle técnico de la captura» (con la cámara encendida).
 - **Cambiar los colores:** todos son variables de `src/styles/tokens.css`; el hub puede sobrescribirlas con `style.setProperty` sobre el `<html>` del iframe (misma origen en GitHub Pages).
 
