@@ -235,7 +235,7 @@ El vídeo de la app de cámara no sabe en qué fase está cada momento. Hay tres
 - La subida de la ceja sale más baja en el vídeo que en directo; sin explicar.
 
 **Pendiente (no bloquea):**
-- Análisis de la cara en paralelo (ver 6d) si el tiempo molesta.
+- **Análisis de la cara en paralelo** (ver 6d). **Decidido (2026-11-10): proponérselo al autor después de la fase 7.** Un segundo worker con el análisis de la cara, que en modo IMAGE son fotogramas independientes. Hay que reordenar los resultados por tiempo antes de pasarlos al procesador de flujo, que descarta los que llegan en desorden, y se duplica el modelo en memoria. Objetivo: de 14,6 a ~25 fotogramas/s. Opus, esfuerzo medio.
 - Entender la diferencia en la subida de la ceja entre el directo y el vídeo.
 - Probar HEVC con el protocolo grabado: `MediaRecorder` solo graba H.264 aquí.
 - Medir la sonrisa con las comisuras de la boca (decidido para después de la fase 7).
