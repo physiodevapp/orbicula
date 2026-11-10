@@ -73,7 +73,7 @@ describe('procesado fotograma a fotograma (decodificador y análisis simulados)'
   it('manda todos los fotogramas, de uno en uno, con su tiempo del vídeo', async () => {
     const { mp4, analysis, flow, seen } = setup(60, 30);
     const video = createVideoSession(videoSteps(mp4.timing.durationMs, 1));
-    const stats = await processVideo({ mp4, analysis, flow, video });
+    const stats = await processVideo({ mp4, analysis, flow, video, pipeline: 1 });
     expect(stats.frames).toBe(60);
     expect(seen.analysis).toHaveLength(60);
     expect(seen.flow).toEqual(seen.analysis);
@@ -90,6 +90,19 @@ describe('procesado fotograma a fotograma (decodificador y análisis simulados)'
     expect(stats.frames).toBe(30);
     expect(seen.analysis[1] - seen.analysis[0]).toBeCloseTo(2000 / 60, 3);
     expect(progress.at(-1)).toMatchObject({ done: 30, total: 30 });
+  });
+
+  it('con pipeline 2, los workers admiten un fotograma más en vuelo; con 1 va de uno en uno; y se espera al final', async () => {
+    const a = setup(30, 30);
+    const s2 = await processVideo({ mp4: a.mp4, analysis: a.analysis, flow: a.flow, video: createVideoSession(videoSteps(1000, 1)), pipeline: 2 });
+    expect(s2.pipeline).toBe(2);
+    expect(a.seen.maxInflight).toBeGreaterThan(2); // análisis + flujo, con dos fotogramas en vuelo
+    expect(a.analysis.inflight + a.flow.inflight).toBe(0); // todo recogido al terminar
+    expect(s2.msPerFrame).toBeGreaterThan(0);
+    const b = setup(30, 30);
+    const s1 = await processVideo({ mp4: b.mp4, analysis: b.analysis, flow: b.flow, video: createVideoSession(videoSteps(1000, 1)), pipeline: 1 });
+    expect(s1.pipeline).toBe(1);
+    expect(b.seen.maxInflight).toBeLessThanOrEqual(2);
   });
 
   it('`every` manda sobre maxFps: a ~34 fps, «como mucho 30» no salta nada pero uno de cada dos sí', async () => {

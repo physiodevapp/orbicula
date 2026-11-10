@@ -51,6 +51,7 @@ const els = {
   swapToggle: $('swapToggle'),
   blendToggle: $('blendToggle'),
   fpsWarning: $('fpsWarning'),
+  analysisWarning: $('analysisWarning'),
   controls: $('controls'),
   curvesView: $('curvesView'),
   metricHint: $('metricHint'),
@@ -465,9 +466,25 @@ function updateQuality(r, now) {
   els.quality.hidden = !msg;
 }
 
+// Criterio de aceptación 1: el análisis en directo tiene que llegar a 24/s; si no, se dice y se propone el
+// vídeo grabado. Hay que verlo bajo el mínimo 5 s seguidos (el arranque siempre va lento) y no mientras
+// se procesa un vídeo (ahí no hay prisa).
+const MIN_ANALYSIS_FPS = 24;
+let slowAnalysisSince = null;
+function updateAnalysisWarning(now) {
+  const slow = state.running && analysis && analysis.fps > 0 && analysis.fps < MIN_ANALYSIS_FPS && document.body.dataset.busy !== 'video';
+  slowAnalysisSince = slow ? (slowAnalysisSince ?? now) : null;
+  const show = slowAnalysisSince != null && now - slowAnalysisSince > 5000;
+  els.analysisWarning.hidden = !show;
+  if (show) {
+    els.analysisWarning.textContent = `El análisis de la cara va a ${analysis.fps.toFixed(0)} por segundo y el mínimo es ${MIN_ANALYSIS_FPS}: las medidas en directo pierden sensibilidad. Para medir con la máxima sensibilidad, graba con la app de cámara y analiza el vídeo (tarjeta «Vídeo grabado», arriba), o marca «Grabar el vídeo para analizarlo después» al hacer el protocolo.`;
+  }
+}
+
 function updateAnalysisUi(r, now) {
   if (now - lastAnaUi < 250) return;
   lastAnaUi = now;
+  updateAnalysisWarning(now);
 
   const level = fpsLevel(analysis.fps);
   els.anaPill.textContent = `análisis ${analysis.fps.toFixed(0)}/s · ${analysis.ms.toFixed(0)} ms`;
@@ -557,6 +574,7 @@ async function createAnalysis() {
 // ── Ritmo del flujo: se rebaja solo si el análisis de la cara no llega a 24/s ─────────────
 const governor = new RateGovernor();
 setInterval(() => {
+  updateAnalysisWarning(performance.now()); // también se quita sola si la cámara se para
   // La prueba de rendimiento mide configuraciones fijas y el vídeo grabado procesa todos los pares.
   if (!flow || !state.showFlow || !analysis || ['bench', 'video'].includes(document.body.dataset.busy)) return;
   const cap = governor.update(performance.now(), analysis.fps);

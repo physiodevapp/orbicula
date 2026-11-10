@@ -199,6 +199,13 @@ El vídeo de la app de cámara no sabe en qué fase está cada momento. Hay tres
   - **Co-activación:** más alta y más limpia en el vídeo.
   - **Subida de la ceja:** más baja en el vídeo, con distinta asimetría. Sin explicar; son medidas de flujo y no sé si cambian por la tasa de fotogramas o por el tamaño de la franja. Pendiente de mirar.
 
+## Paso 6d (en curso; pendiente de la prueba en el móvil)
+- **Criterio de aceptación 1, el aviso:** si el análisis de la cara en directo va por debajo de 24/s durante 5 s seguidos, sale un aviso con la velocidad actual que propone el vídeo grabado, o marcar «Grabar el vídeo» al hacer el protocolo. No sale mientras se procesa un vídeo (ahí no hay prisa) y se quita solo si la cámara se para. El aviso de los fps de la cámara ya no dice «llegará en una fase posterior».
+- **Más rápido: dos fotogramas en vuelo a la vez** (`pipeline: 2`, por defecto). Mientras los workers analizan un fotograma, el hilo principal decodifica y prepara el siguiente. Cada cliente admite 2 en vuelo.
+  - **En la nube** (CPU, sin GPU: el análisis tarda 118 ms por fotograma y es el cuello de botella): 1440 fotogramas en 2:57 frente a 3:44, **1,28 veces más rápido**, con los mismos resultados (840 muestras, 840 pares y 2 y 5 parpadeos).
+  - **Medida de dónde se va el tiempo:** el JSON de un vídeo lleva ahora `video.processing` con los ms por fotograma que se esperan al decodificador, que se tarda en preparar y mandar, y que se espera a los workers, más los ms medios del análisis y del flujo. Con tu móvil sabremos si la mejora es mayor y qué queda por optimizar.
+- **Calor:** el análisis de 11 minutos en el móvil no se notó caliente (el autor), así que se prioriza la velocidad.
+
 ## Pruebas
 - **Vídeos de prueba fabricados con `ffmpeg`** a partir de los vídeos sintéticos de `make-face-videos.py`:
   - MP4 H.264 y VP9;

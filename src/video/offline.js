@@ -109,12 +109,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  *   video: ReturnType<typeof createVideoSession>,
  *   maxFps?: number,            // procesar como mucho a este ritmo (salta fotogramas si el vídeo va más rápido)
  *   every?: number,             // o procesar uno de cada N fotogramas (manda sobre maxFps)
+ *   pipeline?: number,          // fotogramas en vuelo a la vez (1 = de uno en uno; 2 = se solapan el análisis y la preparación del siguiente)
  *   fromMs?: number, toMs?: number, // solo los fotogramas de este tramo del vídeo
  *   signal?: AbortSignal,
  *   onProgress?: (p: {done:number, total:number, t:number, durationMs:number, elapsedMs:number, etaMs:number|null}) => void,
  * }} o
  */
-export async function processVideo({ mp4, analysis, flow, video, maxFps = 0, every: fixedEvery = 0, fromMs = 0, toMs = Infinity, signal, onProgress = () => {} }) {
+export async function processVideo({ mp4, analysis, flow, video, maxFps = 0, every: fixedEvery = 0, pipeline = 2, fromMs = 0, toMs = Infinity, signal, onProgress = () => {} }) {
   const fps = mp4.timing.fps || 30;
   // `every` (uno de cada N) manda sobre `maxFps`: con ~34 fps reales, «como mucho 30» no salta ninguno.
   const every = fixedEvery > 1 ? fixedEvery : maxFps > 0 && fps > maxFps * 1.3 ? Math.round(fps / maxFps) : 1;
@@ -126,8 +127,19 @@ export async function processVideo({ mp4, analysis, flow, video, maxFps = 0, eve
   let done = 0;
   let lastT = 0;
   const t0 = performance.now();
+  // Dónde se va el tiempo (ms en total): esperar al decodificador, preparar y mandar el fotograma, y
+  // esperar a que los workers tengan hueco. Se guarda en el JSON para saber qué optimizar.
+  const spent = { decodeWait: 0, prepare: 0, workerWait: 0 };
+  const depth = Math.max(1, Math.min(2, pipeline)); // los dos clientes admiten 2 en vuelo
+  const full = () => analysis.inflight >= depth || (flow && flow.inflight >= depth);
   video.session.start();
-  for await (const { frame, t } of decodeFrames(mp4, { signal, toMs })) {
+  const it = decodeFrames(mp4, { signal, toMs })[Symbol.asyncIterator]();
+  while (true) {
+    const w0 = performance.now();
+    const next = await it.next();
+    spent.decodeWait += performance.now() - w0;
+    if (next.done) break;
+    const { frame, t } = next.value;
     // Antes de `fromMs` se decodifica (hace falta para llegar al fotograma clave) pero no se analiza.
     const take = t >= fromMs && index++ % every === 0;
     if (!take) {
@@ -136,6 +148,14 @@ export async function processVideo({ mp4, analysis, flow, video, maxFps = 0, eve
     }
     let upright = frame;
     try {
+      // Esperar a que los workers tengan hueco (con pipeline 1, a que terminen el anterior).
+      const q0 = performance.now();
+      while (full()) {
+        if (signal?.aborted) throw new DOMException('cancelado', 'AbortError');
+        await sleep(1);
+      }
+      spent.workerWait += performance.now() - q0;
+      const p0 = performance.now();
       video.advance(t);
       if (rotation) {
         const r = rotateFrame(frame, rotation, canvas);
@@ -144,11 +164,7 @@ export async function processVideo({ mp4, analysis, flow, video, maxFps = 0, eve
       }
       analysis.submit(upright, t);
       flow?.submit(upright, t);
-      // Esperar a los dos resultados antes del siguiente fotograma.
-      while (analysis.inflight > 0 || (flow && flow.inflight > 0)) {
-        if (signal?.aborted) throw new DOMException('cancelado', 'AbortError');
-        await sleep(1);
-      }
+      spent.prepare += performance.now() - p0;
     } finally {
       if (upright !== frame) upright.close();
       frame.close();
@@ -160,6 +176,17 @@ export async function processVideo({ mp4, analysis, flow, video, maxFps = 0, eve
       onProgress({ done, total, t, durationMs: mp4.timing.durationMs, elapsedMs, etaMs: done > 10 ? (elapsedMs / done) * (total - done) : null });
     }
   }
+  // Esperar a los últimos resultados antes de cerrar el último tramo.
+  while (analysis.inflight > 0 || (flow && flow.inflight > 0)) {
+    if (signal?.aborted) throw new DOMException('cancelado', 'AbortError');
+    await sleep(1);
+  }
   video.finish(lastT + 1);
-  return { frames: done, every, elapsedMs: Math.round(performance.now() - t0), framesPerSecond: Math.round((done / ((performance.now() - t0) / 1000)) * 10) / 10 };
+  const wall = performance.now() - t0;
+  const per = (ms) => (done ? Math.round((ms / done) * 100) / 100 : null);
+  return {
+    frames: done, every, pipeline: depth, elapsedMs: Math.round(wall), framesPerSecond: Math.round((done / (wall / 1000)) * 10) / 10,
+    msPerFrame: per(wall), decodeWaitMsPerFrame: per(spent.decodeWait), prepareMsPerFrame: per(spent.prepare), workerWaitMsPerFrame: per(spent.workerWait),
+    analysisMs: Math.round((analysis.ms ?? 0) * 10) / 10, flowMs: Math.round((flow?.ms ?? 0) * 10) / 10,
+  };
 }

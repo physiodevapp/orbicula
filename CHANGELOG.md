@@ -4,6 +4,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (fase 6d: aviso y velocidad)
+- **Aviso en directo (criterio 1):** si el análisis de la cara va por debajo de 24 por segundo durante 5 s seguidos, la app lo dice con la velocidad actual y propone el vídeo grabado.
+- **El análisis del vídeo va más rápido:** dos fotogramas en vuelo a la vez. En la nube, 1,28 veces más rápido con los mismos resultados.
+- El JSON de un vídeo analizado trae el desglose del tiempo por fotograma (decodificar, preparar, esperar a los workers, análisis y flujo).
+- La casilla «un fotograma de cada dos» del protocolo grabado es literal, va desmarcada y la tarjeta estima el tiempo antes de empezar.
+- 1 test nuevo.
+
 ### Añadido (fase 6c: protocolo grabado y analizado después)
 - **Casilla «Grabar el vídeo para analizarlo después, más sensible»** en el protocolo (desmarcada por defecto). El vídeo de la cámara se graba en la memoria del móvil mientras haces el protocolo (MP4 H.264, 4 Mb/s) y, al acabar, un botón lo analiza **fotograma a fotograma**, con las fases y las repeticiones exactas del protocolo que acabas de hacer.
   - **Privacidad:** el vídeo solo existe en la memoria. Nunca se guarda como archivo ni se exporta. Se borra al terminar el análisis, al descartarlo, al detener el protocolo o al empezar otra sesión. Tope de 300 MB.
