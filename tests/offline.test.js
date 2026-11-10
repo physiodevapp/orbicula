@@ -92,6 +92,16 @@ describe('procesado fotograma a fotograma (decodificador y análisis simulados)'
     expect(progress.at(-1)).toMatchObject({ done: 30, total: 30 });
   });
 
+  it('`every` manda sobre maxFps: a ~34 fps, «como mucho 30» no salta nada pero uno de cada dos sí', async () => {
+    const a = setup(40, 34);
+    const sA = await processVideo({ mp4: a.mp4, analysis: a.analysis, flow: a.flow, video: createVideoSession(videoSteps(1000, 1)), maxFps: 30 });
+    expect(sA.every).toBe(1);
+    const b = setup(40, 34);
+    const sB = await processVideo({ mp4: b.mp4, analysis: b.analysis, flow: b.flow, video: createVideoSession(videoSteps(1000, 1)), every: 2 });
+    expect(sB.every).toBe(2);
+    expect(sB.frames).toBe(20);
+  });
+
   it('se puede cancelar', async () => {
     const { mp4, analysis, flow } = setup(300, 30);
     const ac = new AbortController();

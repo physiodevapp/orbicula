@@ -108,14 +108,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  *   flow: {submit: Function, inflight: number} | null,
  *   video: ReturnType<typeof createVideoSession>,
  *   maxFps?: number,            // procesar como mucho a este ritmo (salta fotogramas si el vídeo va más rápido)
+ *   every?: number,             // o procesar uno de cada N fotogramas (manda sobre maxFps)
  *   fromMs?: number, toMs?: number, // solo los fotogramas de este tramo del vídeo
  *   signal?: AbortSignal,
  *   onProgress?: (p: {done:number, total:number, t:number, durationMs:number, elapsedMs:number, etaMs:number|null}) => void,
  * }} o
  */
-export async function processVideo({ mp4, analysis, flow, video, maxFps = 0, fromMs = 0, toMs = Infinity, signal, onProgress = () => {} }) {
+export async function processVideo({ mp4, analysis, flow, video, maxFps = 0, every: fixedEvery = 0, fromMs = 0, toMs = Infinity, signal, onProgress = () => {} }) {
   const fps = mp4.timing.fps || 30;
-  const every = maxFps > 0 && fps > maxFps * 1.3 ? Math.round(fps / maxFps) : 1;
+  // `every` (uno de cada N) manda sobre `maxFps`: con ~34 fps reales, «como mucho 30» no salta ninguno.
+  const every = fixedEvery > 1 ? fixedEvery : maxFps > 0 && fps > maxFps * 1.3 ? Math.round(fps / maxFps) : 1;
   const inRange = mp4.samples.filter((s) => s.t >= fromMs && s.t <= toMs).length;
   const total = Math.ceil(inRange / every);
   const rotation = mp4.track.rotation;

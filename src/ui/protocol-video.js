@@ -66,12 +66,16 @@ export function createProtocolVideo({ getStream, analyzeVideoFile }) {
       const windows = protocolWindows(session.results, recorder.startedAt);
       if (!windows.length) { forget(); return; }
       recorded = { blob, windows, steps: session.steps, settings: extra.settings, startedAt: session.startedAt, durationMs: windows.at(-1).runEnd };
-      el.info.textContent = `Vídeo grabado durante el protocolo: ${nf(blob.size / 1048576, 0)} MB, solo en la memoria del móvil (no se guarda ni se exporta). Analizarlo fotograma a fotograma es más sensible que el directo; tarda unos minutos.`;
+      // Tiempo estimado sin abrir el vídeo: ~33 fotogramas por segundo grabado y ~11 analizados por segundo
+      // en el móvil del autor (8–13 según el calor).
+      const frames = ((recorded.durationMs - recorded.windows[0].runStart + 2 * MARGIN_MS) / 1000) * 33;
+      const min = (n) => Math.max(1, Math.round(n / 11 / 60));
+      el.info.textContent = `Vídeo grabado durante el protocolo: ${nf(blob.size / 1048576, 0)} MB, solo en la memoria del móvil (no se guarda ni se exporta). Analizarlo fotograma a fotograma es más sensible que el directo. Tardará unos ${min(frames)} min con todos los fotogramas y unos ${min(frames / 2)} min con uno de cada dos.`;
       el.progress.textContent = '';
       el.summary.hidden = true;
       el.download.hidden = true;
       el.analyze.disabled = false;
-      el.cap.checked = true;
+      el.cap.checked = false; // todos los fotogramas: es lo que hace más sensible al análisis
       el.block.hidden = false;
     } else if (state === 'idle' || state === 'aborted') {
       forget();
@@ -90,7 +94,7 @@ export function createProtocolVideo({ getStream, analyzeVideoFile }) {
       const mp4 = await openRecording(recorded.blob);
       const steps = windowedSteps(recorded.steps, recorded.windows);
       const out = await analyzeVideoFile({
-        mp4, mirrored: false, steps, maxFps: el.cap.checked ? 30 : 0,
+        mp4, mirrored: false, steps, every: el.cap.checked ? 2 : 1,
         fromMs: Math.max(0, recorded.windows[0].runStart - MARGIN_MS), toMs: recorded.durationMs + MARGIN_MS,
         signal: abort.signal,
         onProgress: (p) => {

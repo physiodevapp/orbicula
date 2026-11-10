@@ -31,7 +31,7 @@ const FULL = process.argv.includes('--full');
   console.log('vídeo:', (await page.textContent('#prRecInfo')).trim());
   const [dl0] = await Promise.all([page.waitForEvent('download'), page.click('#prDownload')]);
   await dl0.saveAs(arg('live', 'en-directo.json'));
-  if (FULL) await page.uncheck('#prRecCap'); else await page.check('#prRecCap');
+  if (FULL) await page.uncheck('#prRecCap'); else await page.check('#prRecCap'); // por defecto la prueba usa uno de cada dos
   await page.click('#prRecAnalyze');
   const t0 = Date.now();
   let last = '';

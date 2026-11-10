@@ -176,6 +176,29 @@ El vídeo de la app de cámara no sabe en qué fase está cada momento. Hay tres
 - **Seguridad:** si el análisis no registra ningún par de flujo, da error en vez de entregar un resumen sin flujo. Una vez, en la nube, salió un análisis sin flujo y no se ha podido reproducir en dos repeticiones más.
 - **En la nube** (cámara simulada, `escala=0.4`): el protocolo se graba (MP4 H.264, 720×720), se analiza el vídeo entero (2669 fotogramas en 5:41, 7,8 por segundo) y sale el resumen de las seis fases. Todos los pasos tienen un par de flujo por fotograma, la calibración es válida y no hay peticiones externas.
 
+### Prueba del 6c en el móvil (2026-11-10 13:02, commit 0e5ea88, trasera)
+- **Completo a la primera:** protocolo en directo y análisis del vídeo grabado, sin errores. **Vídeo:** 152 MB, H.264 720×1280, 9592 fotogramas en 271 s (**34 fps de media y variable**: de 5,8 a 143 ms entre fotogramas).
+- **El análisis tardó 11,5 min** (8876 fotogramas, 12,9 fotogramas/s), con todos los fotogramas. El «un fotograma de cada dos» estaba marcado pero **no saltó ninguno**: la regla era «como mucho 30 fps» y con 34 no llega al umbral. Ahora la casilla es literal (uno de cada dos), va **desmarcada por defecto**, y la tarjeta estima el tiempo antes de empezar.
+- **Las ventanas** de las seis fases y las seis marcas de cada gesto coinciden con el directo.
+- **Flujo:** 6136 pares registrados, 1 por fotograma de cada fase; 127 recolocaciones de la franja y 11 fotogramas descartados por ocupación.
+- **Directo frente a vídeo** (mismo protocolo, misma persona):
+
+  | Medida | Directo | Vídeo |
+  |---|---|---|
+  | Umbral de los eventos, I / D | 0,045 / 0,062 | 0,049 / 0,064 |
+  | Parpadeos por minuto, I / D | 12 / 18 | **17 / 24** |
+  | Duración del parpadeo, I / D | 255 / 256 ms | **138 / 154 ms** |
+  | Cierre del parpadeo / cierre máximo | 0,39 / 0,42 | 0,39 / 0,44 |
+  | Cierre suave, I / D | 0,96 / 0,97 | 0,97 / 0,98 |
+  | Cierre del ojo con la sonrisa, I / D | 0,11 / 0,17 (asimetría −0,22) | 0,17 / 0,27 (asimetría −0,22) |
+  | Co-activación ojo–boca, I / D | 0,50 / 0,55 | **0,67 / 0,89** |
+  | Cejas: subida de la ceja, I / D | 0,17 / 0,22 | 0,11 / 0,12 |
+
+  - **Parpadeos:** el vídeo detecta un 40 % más y su duración es la de un parpadeo real (100–150 ms); en directo salen el doble de largos. Era lo esperado.
+  - **Cierres y asimetrías:** iguales en las dos formas.
+  - **Co-activación:** más alta y más limpia en el vídeo.
+  - **Subida de la ceja:** más baja en el vídeo, con distinta asimetría. Sin explicar; son medidas de flujo y no sé si cambian por la tasa de fotogramas o por el tamaño de la franja. Pendiente de mirar.
+
 ## Pruebas
 - **Vídeos de prueba fabricados con `ffmpeg`** a partir de los vídeos sintéticos de `make-face-videos.py`:
   - MP4 H.264 y VP9;
