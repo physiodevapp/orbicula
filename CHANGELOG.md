@@ -4,6 +4,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (fase 6c: protocolo grabado y analizado después)
+- **Casilla «Grabar el vídeo para analizarlo después, más sensible»** en el protocolo (desmarcada por defecto). El vídeo de la cámara se graba en la memoria del móvil mientras haces el protocolo (MP4 H.264, 4 Mb/s) y, al acabar, un botón lo analiza **fotograma a fotograma**, con las fases y las repeticiones exactas del protocolo que acabas de hacer.
+  - **Privacidad:** el vídeo solo existe en la memoria. Nunca se guarda como archivo ni se exporta. Se borra al terminar el análisis, al descartarlo, al detener el protocolo o al empezar otra sesión. Tope de 300 MB.
+  - Un fotograma de cada dos por defecto (tarda la mitad; casilla).
+  - Progreso con el tiempo restante y botón de cancelar. Al acabar sale el resumen por fases (el mismo formato que en directo) y un JSON con las ventanas de cada fase y el procesado.
+- Lectura del MP4 fragmentado que graba `MediaRecorder` (`openRecording`).
+- `scripts/dev/check-protocol-video.cjs`.
+- Si el análisis no llega a medir el flujo, da error en vez de entregar un resumen sin flujo.
+- 7 tests nuevos.
+
 ### Añadido (fase 6b: análisis de un vídeo grabado)
 - **«Analizar el vídeo»**, en la tarjeta «Vídeo grabado», analiza **todos** los fotogramas, de uno en uno: la cara en modo IMAGE (sin el suavizado del directo) y el flujo en todos los pares (sin límite de ritmo).
   - Los primeros segundos (20, 30 o 45; por defecto, 30) son el reposo de calibración.

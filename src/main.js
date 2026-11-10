@@ -218,6 +218,12 @@ async function analyzeVideoFile({ mp4, mirrored, restSec, maxFps, steps = null, 
     els.curvesView.hidden = false;
     recorders.push(video.recorder);
     const stats = await processVideo({ mp4, analysis, flow, video, maxFps, fromMs, toMs, signal, onProgress });
+    // Pares de flujo que llegaron a registrarse y lo que contó el cliente del flujo (para diagnosticar).
+    const pairs = video.session.results.reduce((n, r) => n + (r.flow?.rel.length ?? 0), 0);
+    stats.flow = { pairs, ...flow.counts };
+    // Una vez (en una prueba en la nube) salió un análisis sin ningún par de flujo y no se supo por qué:
+    // mejor avisar que entregar un resumen sin flujo.
+    if (!pairs) throw new Error(`no se pudo medir el flujo óptico (${JSON.stringify(flow.counts)}); vuelve a intentarlo`);
     return { results: video.session.results, stats, context: captureContext() };
   } finally {
     const k = recorders.indexOf(video.recorder);

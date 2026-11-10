@@ -164,6 +164,18 @@ El vídeo de la app de cámara no sabe en qué fase está cada momento. Hay tres
   - Un cierre suelto en D (54 %, 17,1 s) entre las dos tandas.
 - **Criterio de aceptación 2, cumplido también en el vídeo grabado, con las dos cámaras.** El directo con la trasera ya estaba probado en fases anteriores.
 
+## Paso 6c (hecho; pendiente de la prueba en el móvil)
+- **Casilla en el protocolo:** «Grabar el vídeo para analizarlo después, más sensible». Desmarcada por defecto, y solo aparece si el navegador graba MP4 (H.264).
+- **Grabación:** `MediaRecorder` sobre el stream de la cámara, 4 Mb/s, en trozos de 1 s que se guardan en memoria. Tope de 300 MB (unos 10 min). **No hay URL, ni archivo, ni exportación del vídeo.** Se borra al terminar el análisis, al descartarlo, al detener el protocolo o al empezar otra sesión.
+- **Lectura del MP4 fragmentado de MediaRecorder:** `openRecording` en `src/video/mp4.js`, con `mp4box`; saca todas las muestras con su tiempo, tipo y datos.
+- **Las fases del vídeo salen de la sesión en directo:** `protocolWindows` toma el primer fotograma de cada paso (la marca de la cámara) menos el instante de arranque de la grabación. `windowedSteps` reproduce esos tiempos en el reloj del vídeo, con el reposo sin repetición. El primer paso arranca en su ventana y cada pausa lleva hasta la ventana del siguiente.
+  - **Desvío:** cada cambio de paso se nota en el primer fotograma tras su hora; tras seis pasos son ~0,2 s, frente a gestos de 3 s y ventanas de ±1 s.
+  - **Las marcas** de «ahora»/«suelta» salen exactas en el vídeo (1000 ms tras el inicio del gesto, y 2200 ms el «suelta»). En directo salían 1000–1290 ms, por el ritmo de 10 Hz de la interfaz y el retraso de la primera muestra.
+- **Análisis:** el mismo de la 6b, solo desde 1 s antes del primer paso hasta 1 s después del último. Por defecto, un fotograma de cada dos (casilla). Al acabar, el resumen por fases, el JSON y el vídeo borrado.
+- **JSON** del análisis: `plan: "protocol"`, `video.source: "recorded-during-protocol"`, con las ventanas, el procesado y el recuento del flujo.
+- **Seguridad:** si el análisis no registra ningún par de flujo, da error en vez de entregar un resumen sin flujo. Una vez, en la nube, salió un análisis sin flujo y no se ha podido reproducir en dos repeticiones más.
+- **En la nube** (cámara simulada, `escala=0.4`): el protocolo se graba (MP4 H.264, 720×720), se analiza el vídeo entero (2669 fotogramas en 5:41, 7,8 por segundo) y sale el resumen de las seis fases. Todos los pasos tienen un par de flujo por fotograma, la calibración es válida y no hay peticiones externas.
+
 ## Pruebas
 - **Vídeos de prueba fabricados con `ffmpeg`** a partir de los vídeos sintéticos de `make-face-videos.py`:
   - MP4 H.264 y VP9;
