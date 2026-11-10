@@ -4,6 +4,88 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Documentación (fase 5d)
+- `README.md`: instrucciones de uso clínico del protocolo (preparación, fases, cómo leer el resumen y límites conocidos).
+- `docs/plan-fase-5.md`: conclusión de la fase, tabla de parámetros provisionales y lo pendiente.
+
+### Añadido (fase 5c)
+- **Aviso de umbral alto:** si el máximo de la subida en el reposo supera 6 veces su p95, una sacudida suelta del párpado ha fijado el umbral. La calibración lo dice (`warning`) y propone repetir el reposo si se quiere más sensibilidad.
+  - El umbral sigue siendo el máximo del reposo.
+  - Las reglas que ignoran los picos se probaron con los seis JSON y traían falsas alarmas en los controles (`docs/plan-fase-5.md`).
+- **Métricas por fase y lado, con su asimetría** (`src/protocol/summary.js`):
+  - **Parpadeo espontáneo:** frecuencia, duración, completitud y completitud respecto al cierre máximo del propio ojo.
+  - **Cierres:** cierre de cada ojo y reclutamiento de la ceja y el canto.
+  - **Cejas:** apertura del ojo y desplazamiento de la ceja.
+  - **Sonrisa:** sonrisa por lado, cierre del ojo y co-activación ojo–boca.
+  - **Calidad de cada fase.**
+- **Pico espectral** (`src/protocol/spectrum.js`, método de Welch) para la actividad rítmica de los párpados (mioquimias). Los umbrales son provisionales.
+- **Pantalla del resumen** al acabar el protocolo (`src/ui/summary.js`):
+  - una tarjeta por fase con izquierda, derecha y asimetría, preparada para 380 px;
+  - los avisos de la calibración y las fases marcadas como «poco fiable», con el motivo;
+  - la lista de contracciones finas, con su fase, lado, duración y pico;
+  - el aviso de que no es una herramienta de diagnóstico.
+
+  Las asimetrías de 0,20 o más se destacan, de forma orientativa. Los recuentos de contracciones no llevan asimetría.
+- El JSON del protocolo lleva el resumen (`summary`) además de las series.
+- **El reposo del protocolo exige un tercio de tiempo útil (10 s de 30) en vez de la mitad.** El reposo de las 17:24 dio 16,6 s: justo por encima de los 15 s anteriores. Los tramos tranquilos mínimos siguen siendo 3 s seguidos, que es lo que fija el umbral.
+- **Cuando el reposo no vale, dice por qué, con números.**
+  - Motivos: cara perdida, cabeza movida, demasiados parpadeos o sin tramos tranquilos seguidos. Se ve en la revisión y en el JSON (`calibration.reason`, `reasonCode`, `diagnosis`).
+  - La voz da el motivo en lugar de un «no ha valido» genérico.
+  - Los intentos no válidos se guardan en el JSON (`rejections`), también si detienes el protocolo sin haber pasado del reposo.
+- `scripts/dev/summary.mjs`: imprime el resumen de un JSON del protocolo.
+- 14 tests nuevos.
+
+### Añadido (fase 5b: protocolo guiado)
+- **Tarjeta «Protocolo clínico»**, encima del asistente de pruebas (que se queda como herramienta de desarrollo). Seis fases con voz y pitidos, en modo seguido por defecto:
+  1. **reposo (calibración)**, 30 s;
+  2. **parpadeo espontáneo**, 60 s;
+  3. **cierre suave**;
+  4. **cierre forzado**;
+  5. **elevación de cejas**;
+  6. **sonrisa amplia**.
+
+  Cada gesto va con pitido agudo = ahora y grave = relaja. La voz habla de «tú». Son unos 4 minutos.
+- **Configurable:** reposo (30/45/60 s), parpadeo (30/60/90 s) y repeticiones de cada gesto (3/4/5), más el código anónimo opcional. La configuración se guarda en el JSON (`settings`).
+- **Si el reposo no vale** (cabeza movida, demasiados parpadeos o cara perdida), el protocolo no sigue. Suenan dos pitidos graves, la voz lo explica («Apoya la cabeza y quédate quieto. Repetimos.») y el reposo se repite solo a los 7 s. En la revisión, «Siguiente» está desactivado. Se exige como tiempo válido al menos la mitad del reposo.
+- Los eventos y la calibración funcionan igual que en el asistente (misma `calibrate` y mismo `EventDetector`).
+- El JSON (`orbicula-test-session/3`) lleva ahora la serie **`smile`** (blendshape de sonrisa, por lado) y `settings`. Es lo que necesitará la co-activación ojo–boca.
+- `createAssistant` admite varias tarjetas (`prefix`, `rootId`, `busyKey`, `plan`); no se pueden grabar dos a la vez. `scripts/dev/run-assistant.cjs --card protocol` recorre el protocolo.
+- 12 tests nuevos.
+- **Sin eventos mientras se calibra:** al empezar el reposo (también al repetirlo) se quitan los umbrales del intento anterior. Antes, el reposo repetido mostraba «contracciones» calculadas con los umbrales de un reposo que no había valido.
+
+### Añadido (fase 5a: calibración y eventos)
+- **Calibración sobre el reposo** (`src/protocol/events.js`, `calibrate`). Por lado salen:
+  - el umbral de los eventos;
+  - la apertura en reposo (EAR y apertura normalizada) y el ruido del EAR;
+  - el umbral de «cabeza quieta»: 3 × la mediana de la velocidad del dorso nasal, entre 0,1 y 0,3 DI/s;
+  - el p99 de la energía de la ceja y el canto.
+
+  Dice si el reposo vale (tiempo sin parpadeos y con la cabeza quieta, cara detectada) y, si no, por qué.
+- **Eventos en directo** (`EventDetector`):
+  - **Medida:** la *subida* del cierre por flujo, es decir, cuánto se ha cerrado el ojo respecto a la mediana de los 0,6 s anteriores. Es la versión causal del estadístico del criterio 4 de la fase 4, con un test que lo comprueba.
+  - **Umbral:** el máximo de esa subida en el reposo válido, con un suelo provisional.
+  - **Puerta de la cabeza:** si el dorso nasal se mueve, se descartan los eventos de alrededor (±0,5 s). La velocidad se suaviza con la mediana de 3 pares, para que un pico suelto no descarte nada.
+  - **Parpadeos:** una contracción que coincide con un parpadeo de verdad (≥ 50 %) del mismo ojo cuenta como parpadeo.
+  - **Ceja y canto:** eventos experimentales por energía.
+- **Asistente:** el reposo de las pruebas de la fase 4 calibra al terminar, y desde ahí los eventos salen en directo.
+  - Aviso «Cabeza en movimiento».
+  - Contracciones en la lista de eventos.
+  - Curva nueva **«Eventos»**, con la subida, el umbral y las franjas de las contracciones; estas franjas salen también en «Cierre F».
+  - La revisión de cada paso dice cuántas contracciones hubo por ojo.
+- JSON del asistente **`orbicula-test-session/3`**: `calibration` (en el reposo) y `detections` (eventos de cada paso).
+- `scripts/dev/replay-events.mjs`: repite la calibración y el detector sobre un JSON del asistente. Da aciertos y falsas alarmas en las pruebas con controles, y eventos en el cabeceo y el giro.
+- **Selector de la curva:** en el móvil, en dos filas de tres.
+- **El cierre por flujo se congela durante los parpadeos.** Mientras algún ojo está cerrado más de la mitad según el EAR, no se integra. Así un parpadeo no deja el cierre desplazado ni da falsos eventos en los 2 s siguientes. El JSON guarda en `flow.frozen` los pares congelados.
+- **La subida del cierre necesita 2,1 s de historia:** sin ella no hay eventos al empezar.
+- **Repetición sobre los cuatro JSON de la fase 4:** contracciones mínimas detectadas por ojo, 17/19 y 16/19, con 3/17 y 4/17 falsas alarmas (dos de ellas, movimientos reales). Ningún evento en el cabeceo y el giro. Detalle en `docs/plan-fase-5.md`.
+- `replay-events.mjs` recalcula el cierre congelado en los JSON antiguos. Acepta `--fix paso:rep=act|control` y `--events`.
+- **Duración mínima de 0,5 s:** una contracción más corta queda como «breve» (`status: "brief"`) y no cuenta. Con los cinco JSON (la fase 4 y la prueba de la 5a de las 19:57):
+  - contracciones mínimas detectadas, 25/29 en el ojo izquierdo y 26/29 en el derecho;
+  - **0/26 falsas alarmas** en los controles;
+  - 0 eventos en el reposo, el parpadeo espontáneo, el cabeceo y el giro.
+- Los eventos que empiezan en la cuenta atrás no se guardan en el paso.
+- 18 tests nuevos.
+
 ### Añadido (fase 4b: medida del flujo por ROI)
 - **Flujo por ROI y por lado del paciente** (párpado superior e inferior, ceja y canto externo). El worker devuelve, por ROI, 14 sumas de su campo de flujo («momentos», `src/flow/metrics.js`); con ellas el hilo principal calcula el flujo medio y la energía residual frente a cualquier movimiento afín de la cabeza, sin volver a recorrer los píxeles.
 - **Tres compensaciones de la cabeza a la vez** (`src/flow/processor.js`): ninguna, **dorso nasal** (restar su traslación) y **postura** (movimiento afín de puntos estables de la cara —dorso nasal, extremos del óvalo y frente—, interpolados entre los análisis que rodean a cada frame; cada par espera hasta 300 ms al análisis siguiente).

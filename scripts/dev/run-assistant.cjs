@@ -2,7 +2,8 @@
 // Pulsa «Siguiente» en cada revisión hasta terminar. Ver docs/desarrollo.md.
 //
 //   node scripts/dev/run-assistant.cjs --video /ruta/lid.y4m --out /ruta/informe.json
-//        [--plan phase4|phase3] [--query '?escala=0.25'] [--url http://127.0.0.1:4173/] [--auto]
+//        [--plan phase4|phase3] [--card assistant|protocol] [--query '?escala=0.25'] [--url http://127.0.0.1:4173/] [--auto]
+// --card protocol recorre la tarjeta del protocolo clínico (fase 5; sin --plan).
 // Con --auto usa el modo seguido y no pulsa nada entre pasos (comprueba que avanza solo).
 const { chromium } = require('playwright');
 
@@ -16,6 +17,9 @@ const OUT = arg('out', 'informe.json');
 const PLAN = arg('plan', 'phase4');
 const QUERY = arg('query', '?escala=0.25');
 const AUTO = process.argv.includes('--auto');
+const CARD = arg('card', 'assistant');
+const P = CARD === 'protocol' ? 'pr' : 'as'; // prefijo de los ids de la tarjeta
+const ROOT = CARD === 'protocol' ? '#protocol' : '#assistant';
 
 (async () => {
   const args = ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--enable-unsafe-swiftshader'];
@@ -32,23 +36,23 @@ const AUTO = process.argv.includes('--auto');
   await page.goto(URL_BASE + QUERY);
   await page.click('#startBtn');
   await page.waitForFunction(() => /análisis/.test(document.querySelector('#anaPill')?.textContent ?? ''), null, { timeout: 60000 });
-  await page.selectOption('#asPlan', PLAN);
-  if (AUTO) await page.check('#asAuto');
-  else await page.uncheck('#asAuto');
-  await page.click('#asStart');
+  if (CARD !== 'protocol') await page.selectOption('#asPlan', PLAN);
+  if (AUTO) await page.check(`#${P}Auto`);
+  else await page.uncheck(`#${P}Auto`);
+  await page.click(`#${P}Start`);
   const t0 = Date.now();
   let reviews = 0;
   while (Date.now() - t0 < 600000) {
-    const st = await page.getAttribute('#assistant', 'data-state');
+    const st = await page.getAttribute(ROOT, 'data-state');
     if (st === 'done') break;
     if (st === 'review' && !AUTO) {
       reviews++;
-      console.log(`— ${await page.textContent('#asRevTitle')}\n${(await page.textContent('#asSummary')).trim()}`);
-      await page.click('#asNext');
+      console.log(`— ${await page.textContent(`#${P}RevTitle`)}\n${(await page.textContent(`#${P}Summary`)).trim()}`);
+      await page.click(`#${P}Next`);
     }
     await page.waitForTimeout(300);
   }
-  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#asDownload')]);
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click(`#${P}Download`)]);
   await dl.saveAs(OUT);
   if (AUTO) {
     const steps = JSON.parse(require('fs').readFileSync(OUT, 'utf8')).steps;

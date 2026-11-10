@@ -16,16 +16,18 @@ import { Analysis } from './landmarks/analysis.js';
 import { sampleOf } from './landmarks/process.js';
 import { BlinkDetector } from './metrics/blinks.js';
 import { createAssistant } from './ui/assistant.js';
+import { PROTOCOL_PLAN } from './assistant/steps.js';
 import { createBenchmark } from './ui/benchmark.js';
 import { Series } from './metrics/series.js';
 import { asymmetry } from './metrics/asymmetry.js';
 import { Overlay } from './ui/overlay.js';
-import { Curves } from './ui/curves.js';
+import { Curves, METRICS } from './ui/curves.js';
 import { FlowClient } from './flow/flow-client.js';
 import { FLOW_CONFIGS, DEFAULT_FLOW, OPENCV_VERSION, FARNEBACK_PARAMS } from './flow/config.js';
 import { FlowProcessor } from './flow/processor.js';
 import { RateGovernor } from './flow/governor.js';
 import { FLOW_ROIS, VARIANTS } from './flow/metrics.js';
+import { calibrate, EventDetector, headSpeedOf } from './protocol/events.js';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -84,18 +86,34 @@ let t0 = null; // inicio de las medidas (para el registro de parpadeos)
 
 // Flujo por ROI: velocidad residual (raíz de la energía, DI/s) por ROI y compensación ('upperLid:pose'…).
 const FLOW_SERIES_KEYS = FLOW_ROIS.flatMap((roi) => VARIANTS.map((v) => `${roi}:${v}`));
-// …y el cierre por flujo de cada ojo (DI, + = se cierra).
-const flowSeries = new Series({ maxAgeMs: 120000, keys: [...FLOW_SERIES_KEYS, 'closure'] });
+// …el cierre por flujo de cada ojo (DI, + = se cierra) y su subida, la medida de los eventos (fase 5).
+const flowSeries = new Series({ maxAgeMs: 120000, keys: [...FLOW_SERIES_KEYS, 'closure', 'rise'] });
+const isFlowMetric = (m) => METRICS[m]?.series === 'flow';
+
+// Fase 5: calibración sobre el reposo y eventos en directo (src/protocol/events.js). La calibración
+// sale del paso de reposo del asistente; hasta entonces no hay eventos.
+let calibration = null;
+let eventDetector = null;
+let calNotice = null; // { text, until }: aviso de la calibración en la franja de calidad
+function setCalibration(cal) {
+  calibration = cal;
+  eventDetector = cal ? new EventDetector(cal, { isClosing: (side) => detectors[side].closing }) : null;
+  calNotice = cal && !cal.valid ? { text: `Reposo no válido: ${cal.reason}. Los eventos pueden no ser fiables.`, until: performance.now() + 10000 }
+    : cal?.warning ? { text: cal.warning, until: performance.now() + 10000 } : null;
+  curves?.requestDraw();
+}
 const flowProcessor = new FlowProcessor(onFlowSample);
 let lastField = null; // última muestra del campo de flujo (para dibujarla)
 
 const curves = new Curves(
   { left: $('curveL'), right: $('curveR') },
   series,
-  () => ({
-    left: { events: detectors.left.events, baseline: detectors.left.baseline },
-    right: { events: detectors.right.events, baseline: detectors.right.baseline },
-  }),
+  () => Object.fromEntries(SIDES.map((side) => [side, {
+    events: detectors[side].events,
+    baseline: detectors[side].baseline,
+    detections: eventDetector ? eventDetector.events.filter((e) => e.side === side && e.kind === 'contraction') : [],
+    threshold: calibration?.rise?.[side] ?? null,
+  }])),
   { flowSeries },
 );
 
@@ -138,23 +156,40 @@ function captureContext() {
   };
 }
 
-const assistant = createAssistant({
+/** Lo que comparten el asistente de pruebas y el protocolo clínico: las mismas medidas y la misma calibración. */
+const sessionDeps = {
   getContext: captureContext,
   getPerf: () => ({
     cameraFps: round1(camera.meter.fps), analysisFps: round1(analysis?.fps), analysisMs: round1(analysis?.ms),
     flowFps: state.showFlow ? round1(flow?.fps) : null, flowMs: state.showFlow ? round1(flow?.ms) : null,
     flowRateCap: state.showFlow ? (flow?.rateCap ?? 0) : null, // pares/s de la rebaja automática (0 = sin rebaja)
   }),
-  // El reposo y las series empiezan de cero; el plan de la fase 4 enciende el flujo (y espera a OpenCV.js).
+  // El reposo y las series empiezan de cero; los planes con flujo lo encienden (y esperan a OpenCV.js).
   onStart: async (plan) => {
     resetMeasures();
+    setCalibration(null);
     if (plan.flow && !state.showFlow) {
       els.flowToggle.checked = true;
       await setFlow(true);
       if (!state.showFlow) throw new Error('no se pudo cargar el flujo óptico');
     }
   },
-});
+  // Mientras se calibra (el reposo, también al repetirlo) no hay eventos: los umbrales de un intento
+  // anterior no valen y los «eventos» del propio reposo no significan nada.
+  onStepStart: (step) => { if (step.calibrates) setCalibration(null); },
+  // El paso de reposo da la calibración de los eventos (fase 5). Con `minValidFraction`, el tiempo válido
+  // mínimo es esa fracción del reposo (el protocolo); si no, el de por defecto.
+  onStepEnd: (result, step) => {
+    if (!step.calibrates || !state.showFlow) return;
+    const o = step.calibrateOptions;
+    result.calibration = calibrate(result, o?.minValidFraction ? { minValidMs: Math.round(result.plannedMs * o.minValidFraction) } : {});
+    setCalibration(result.calibration);
+  },
+};
+const assistant = createAssistant(sessionDeps);
+const protocol = createAssistant({ ...sessionDeps, prefix: 'pr', rootId: 'protocol', busyKey: 'protocol', plan: PROTOCOL_PLAN });
+/** Las dos tarjetas reciben todas las medidas; solo la que está grabando un paso las guarda. */
+const recorders = [assistant, protocol];
 
 const bench = createBenchmark({
   camera,
@@ -267,6 +302,7 @@ const METRIC_HINTS = {
   ear: 'EAR: apertura vertical media del ojo / ancho del ojo. Ronda 0,25–0,35 con el ojo abierto y baja al cerrar. Es la señal que usa el detector (la línea discontinua es el reposo estimado).',
   aperture: 'Apertura palpebral central normalizada a la distancia entre las comisuras internas de los dos ojos.',
   blink: 'Blendshape de parpadeo de MediaPipe (0 abierto, 1 cerrado). Es una señal más lenta y de menor rango que el EAR; sirve de apoyo.',
+  rise: 'Subida del cierre por flujo: cuánto se ha cerrado el ojo respecto a cómo estaba justo antes (DI). Es la medida de los eventos: la línea discontinua es el umbral, calibrado con el reposo del asistente, y las franjas son las contracciones detectadas (más tenues si se descartaron por mover la cabeza o por un parpadeo).',
   closure: 'Cierre del ojo medido con el flujo: cuánto ha bajado el párpado superior menos lo que ha subido el inferior, en distancias intercantales (DI), compensado con el dorso nasal. Sube al entrecerrar y vuelve a 0 en unos segundos (para que no derive). Es la señal que detecta contracciones más finas que el EAR.',
   flow: 'Flujo óptico de la ROI elegida: velocidad del movimiento que queda tras restar el de la cabeza, en distancias intercantales por segundo (DI/s). Escala logarítmica, con líneas en 0,01, 0,17 y 3 DI/s. Por defecto, compensado con el dorso nasal (en los vídeos de prueba, la postura añadía el temblor de la malla).',
 };
@@ -287,7 +323,7 @@ function updateCurveStats(now) {
     r.base.textContent = b == null ? '—' : b.toFixed(2);
   }
   // Con la curva del flujo, la asimetría es la de la ROI y la compensación elegidas.
-  const flowCurve = curves.metric === 'flow' || curves.metric === 'closure';
+  const flowCurve = isFlowMetric(curves.metric);
   const src = flowCurve ? flowSeries : series;
   const key = curves.metric === 'flow' ? curves.flowKey : curves.metric;
   const tEnd = flowCurve ? (flowSeries.t.at(-1) ?? lastT) : lastT;
@@ -311,11 +347,36 @@ function logBlink(side, e) {
   while (els.blinkLog.children.length > 8) els.blinkLog.lastChild.remove();
 }
 
+const DET_KIND = { contraction: 'contracción', brow: 'ceja (exp.)', canthus: 'canto (exp.)' };
+const DET_STATUS = { head: ' · descartada: cabeza', blink: ' · era un parpadeo', brief: ' · breve, no cuenta' };
+/** Eventos de la fase 5: al asistente, a la lista y a las curvas. Los parpadeos ya los anota logBlink. */
+function onDetections(list) {
+  for (const e of list) {
+    for (const r of recorders) r.recordDetection(e);
+    if (e.kind === 'blink' || e.kind === 'closure') continue;
+    if (e.kind !== 'contraction' && e.status !== 'ok') continue;
+    els.blinkLog.querySelector('.log-empty')?.remove();
+    const li = document.createElement('li');
+    const at = document.createElement('span');
+    at.textContent = `+${((e.tStart - (t0 ?? e.tStart)) / 1000).toFixed(1)} s`;
+    const who = document.createElement('span');
+    who.className = `side-${e.side}`;
+    who.textContent = SIDE_LETTER[e.side];
+    const what = document.createElement('span');
+    what.textContent = `${DET_KIND[e.kind]} · ${e.duration} ms · ×${e.peak.toFixed(1).replace('.', ',')}${DET_STATUS[e.status] ?? ''}`;
+    li.append(at, who, what);
+    els.blinkLog.prepend(li);
+    while (els.blinkLog.children.length > 8) els.blinkLog.lastChild.remove();
+  }
+  if (list.length) curves.requestDraw();
+}
+
 function resetMeasures() {
   series.clear();
   flowSeries.clear();
   flowProcessor.reset();
   for (const side of SIDES) detectors[side].reset();
+  setCalibration(calibration); // la calibración se conserva; el detector empieza de cero
   t0 = null;
   els.blinkLog.replaceChildren(Object.assign(document.createElement('li'), { className: 'log-empty', textContent: 'Aún no hay ninguno.' }));
   lastStatsUi = 0;
@@ -340,6 +401,8 @@ function updateQuality(r, now) {
   let msg = '';
   if (faceLostSince && now - faceLostSince > SHOW_AFTER_MS) msg = 'No se detecta la cara. Encuádrala de frente y con buena luz.';
   else if (smallSince && now - smallSince > SHOW_AFTER_MS) msg = 'Cara pequeña en el encuadre: acerca el móvil o el paciente.';
+  else if (eventDetector?.last.moving && state.showFlow) msg = 'Cabeza en movimiento: quieto. Mientras tanto no se registran eventos.';
+  else if (calNotice && now < calNotice.until) msg = calNotice.text;
   els.quality.textContent = msg;
   els.quality.hidden = !msg;
 }
@@ -388,15 +451,20 @@ function onResult(r) {
 
   const sample = sampleOf(r);
   series.push(r.t, sample);
+  // Reposo del EAR para congelar el cierre por flujo durante los parpadeos: el de la calibración o,
+  // hasta tenerla, el que estima el detector de parpadeos.
+  const bl = (side) => calibration?.ear?.[side]?.baseline ?? detectors[side].baseline;
+  flowProcessor.earBaseline = bl('left') && bl('right') ? { left: bl('left'), right: bl('right') } : null;
   const newEvents = { left: [], right: [] };
   for (const side of SIDES) {
     const event = detectors[side].push(r.t, sample ? sample[side].ear : NaN);
     if (event) {
       logBlink(side, event);
       newEvents[side].push(event);
+      if (eventDetector) onDetections(eventDetector.pushBlink(side, event));
     }
   }
-  assistant.record(r.t, sample, newEvents);
+  for (const a of recorders) a.record(r.t, sample, newEvents);
 
   flow?.setFace(r);
   flowProcessor.pushFace(r.t, r);
@@ -469,12 +537,21 @@ function onFlowSample(s) {
     const e = x?.[roi]?.[v]?.energy;
     return [k, Number.isFinite(e) ? Math.sqrt(e) : NaN];
   }));
+  if (eventDetector) {
+    const root = (x, roi) => Math.sqrt(x?.[roi]?.reference?.energy ?? NaN);
+    onDetections(eventDetector.pushFlow({
+      t: s.t,
+      closure: s.closure,
+      headSpeed: headSpeedOf(s.head?.reference?.u, s.head?.reference?.v),
+      energy: Object.fromEntries(SIDES.map((x) => [x, { brow: root(s[x], 'brow'), canthus: root(s[x], 'canthus') }])),
+    }));
+  }
   flowSeries.push(s.t, {
-    left: { ...side(s.left), closure: s.closure?.left ?? NaN },
-    right: { ...side(s.right), closure: s.closure?.right ?? NaN },
+    left: { ...side(s.left), closure: s.closure?.left ?? NaN, rise: eventDetector?.last.rise.left ?? NaN },
+    right: { ...side(s.right), closure: s.closure?.right ?? NaN, rise: eventDetector?.last.rise.right ?? NaN },
   });
-  assistant.recordFlow(s);
-  if (curves.metric === 'flow' || curves.metric === 'closure') curves.requestDraw();
+  for (const a of recorders) a.recordFlow(s);
+  if (isFlowMetric(curves.metric)) curves.requestDraw();
 }
 
 function onFlowResult(m) {
@@ -548,7 +625,7 @@ async function start() {
   showError('');
   els.startBtn.disabled = true;
   lowSince = null;
-  assistant.interrupt('la cámara se reinició (cambio de cámara, de prioridad o de pestaña)');
+  for (const a of recorders) a.interrupt('la cámara se reinició (cambio de cámara, de prioridad o de pestaña)');
   bench.interrupt('la cámara se reinició');
   resetMeasures(); // otra cámara u otra resolución: el reposo y las series ya no valen
   flow?.resetStrip();
@@ -566,6 +643,7 @@ async function start() {
     els.live.hidden = false;
     els.curvesView.hidden = false;
     assistant.show();
+    protocol.show();
     bench.show();
     els.controls.hidden = false;
     // La resolución real se conoce cuando llega el primer frame.
@@ -650,7 +728,7 @@ document.querySelectorAll('[data-metric]').forEach((b) =>
     curves.setMetric(b.dataset.metric);
     setPressed('metric', b.dataset.metric);
     els.flowSelect.hidden = b.dataset.metric !== 'flow';
-    if ((b.dataset.metric === 'flow' || b.dataset.metric === 'closure') && !state.showFlow) {
+    if (isFlowMetric(b.dataset.metric) && !state.showFlow) {
       els.flowToggle.checked = true;
       setFlow(true); // la curva del flujo necesita el flujo encendido
     }

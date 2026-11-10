@@ -5,7 +5,8 @@
 
 // Versión 2 (fase 4): plan del asistente, posición del iris, flujo óptico por ROI con las tres
 // compensaciones y marcas de las repeticiones guiadas. Lo de la versión 1 sigue igual.
-export const REPORT_SCHEMA = 'orbicula-test-session/2';
+// Versión 3 (fase 5): calibración sobre el reposo (`calibration`) y eventos en directo (`detections`).
+export const REPORT_SCHEMA = 'orbicula-test-session/3';
 
 const FLOW_ROIS = ['upperLid', 'lowerLid', 'brow', 'canthus'];
 const FLOW_VARIANTS = { none: 'eN', reference: 'eR', pose: 'eP', hybrid: 'eH' };
@@ -97,6 +98,18 @@ export function describeSummary(step) {
   } else if (step.wantsFlow) {
     lines.push('Sin datos de flujo en este paso.');
   }
+  if (step.calibration) {
+    const c = step.calibration;
+    lines.push(c.valid
+      ? `Calibración válida: umbral del cierre I ${c.rise.left} · D ${c.rise.right} DI.${c.warning ? ` ${c.warning}` : ''}`
+      : `Calibración NO válida: ${c.reason}.`);
+  }
+  const ok = (step.detections ?? []).filter((e) => e.kind === 'contraction' && e.status === 'ok');
+  const gated = (step.detections ?? []).filter((e) => e.status === 'head').length;
+  const brief = (step.detections ?? []).filter((e) => e.status === 'brief').length;
+  if (step.detections?.length || step.calibration) {
+    lines.push(`Contracciones detectadas: I ${ok.filter((e) => e.side === 'left').length} · D ${ok.filter((e) => e.side === 'right').length}${gated ? ` (${gated} descartadas por mover la cabeza)` : ''}${brief ? `; ${brief} breves (< 0,5 s), que no cuentan` : ''}.`);
+  }
   return lines.join('\n');
 }
 
@@ -104,7 +117,7 @@ export function describeSummary(step) {
  * @param {{results: object[], startedAt: string|null, code?: string|null, build: object, device: object,
  *          capture: object, analysis: object, detector: object, includeSeries?: boolean}} ctx
  */
-export function buildReport({ results, startedAt, code = null, plan = null, build, device, capture, analysis, flow = null, detector, includeSeries = true }) {
+export function buildReport({ results, startedAt, code = null, plan = null, settings = null, summary = null, rejections = [], build, device, capture, analysis, flow = null, detector, includeSeries = true }) {
   return {
     app: 'orbicula',
     kind: 'test-session',
@@ -120,6 +133,9 @@ export function buildReport({ results, startedAt, code = null, plan = null, buil
     flow, // configuración del flujo óptico (fase 4)
     detector,
     plan,
+    settings, // configuración del protocolo (fase 5): duraciones y repeticiones
+    rejections, // intentos de reposo no válidos (con su calibración y el motivo)
+    summary, // resumen del protocolo por fase y lado (fase 5c); null en el asistente de pruebas
     steps: results.map((step) => ({
       id: step.id,
       title: step.title,
@@ -137,8 +153,10 @@ export function buildReport({ results, startedAt, code = null, plan = null, buil
       events: step.events,
       reps: step.reps ?? null,
       marks: step.marks ?? [],
+      calibration: step.calibration ?? null,
+      detections: step.detections ?? [],
       ...(includeSeries ? { series: { t: step.rel, left: step.series.left, right: step.series.right } } : {}),
-      ...(includeSeries && step.flow?.rel.length ? { flow: { t: step.flow.rel, dt: step.flow.dt, left: step.flow.left, right: step.flow.right, head: step.flow.head, closure: step.flow.closure } } : {}),
+      ...(includeSeries && step.flow?.rel.length ? { flow: { t: step.flow.rel, dt: step.flow.dt, left: step.flow.left, right: step.flow.right, head: step.flow.head, closure: step.flow.closure, frozen: step.flow.frozen } } : {}),
     })),
   };
 }

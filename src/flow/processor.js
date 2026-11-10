@@ -21,6 +21,17 @@ const anchorList = (a) => ANCHOR_KEYS.map((k) => (k === 'reference' ? a.referenc
  */
 export const CLOSURE_TAU_MS = 5000;
 
+/**
+ * Con el ojo tapado el flujo pierde el seguimiento y, al integrarlo, el cierre queda desplazado hasta
+ * ~2 s después del parpadeo (falsos eventos tras los parpadeos en los JSON de la fase 4). Por eso el
+ * cierre se CONGELA (no se integra) en los pares en que algún ojo está cerrado más de la mitad según el
+ * EAR (EAR < SHUT_FRACTION × su reposo), con un margen de SHUT_PAD_MS. Con datos reales, la mitad es
+ * la regla de los parpadeos «de verdad» y no congela las contracciones mínimas (cierran un 14–38 %).
+ * Necesita el reposo del EAR (earBaseline); sin él, no congela.
+ */
+export const SHUT_FRACTION = 0.5;
+export const SHUT_PAD_MS = 150;
+
 /** Cuánto puede esperar un par a la postura (ms de marca de tiempo de la cámara). */
 export const MAX_WAIT_MS = 300;
 /** Histórico de posturas que se guarda (ms). */
@@ -39,6 +50,17 @@ export class FlowProcessor {
     this.closure = { left: 0, right: 0 };
   }
 
+  /** EAR en reposo de cada ojo ({left, right}), para congelar el cierre durante los parpadeos. */
+  earBaseline = null;
+
+  /** ¿Algún ojo está cerrado más de la mitad entre t0 y t1 (con margen)? */
+  shutBetween(t0, t1) {
+    const b = this.earBaseline;
+    if (!b) return false;
+    return this.poses.some((p) => p.t >= t0 - SHUT_PAD_MS && p.t <= t1 + SHUT_PAD_MS && p.ear
+      && ['left', 'right'].some((s) => b[s] > 0 && Number.isFinite(p.ear[s]) && p.ear[s] < SHUT_FRACTION * b[s]));
+  }
+
   /** Un análisis de la cara (con su marca de tiempo de captura). */
   pushFace(t, result) {
     if (!result?.face || !result.rois?.pose) return;
@@ -47,6 +69,7 @@ export class FlowProcessor {
     if (last && t <= last.t) return;
     this.poses.push({
       t, points: r.pose, intercanthal: r.meta.intercanthal, axes: { left: r.left.axes, right: r.right.axes },
+      ear: { left: r.left.ear, right: r.right.ear },
       p3: r.pose3d ?? null, anchors: r.anchors3d ? anchorList(r.anchors3d) : null,
     });
     while (this.poses.length > 2 && this.poses[0].t < t - KEEP_MS) this.poses.shift();
@@ -142,13 +165,14 @@ export class FlowProcessor {
     const k = 1000 / (unit * f.dt);
     const head = (g) => (g ? { u: (g.a * cx + g.b * cy + g.c) * k, v: (g.d * cx + g.e * cy + g.f) * k } : null);
     out.head = { reference: head(motion.reference), pose: head(motion.pose) };
-    // Cierre por flujo de cada ojo (ver CLOSURE_TAU_MS).
+    // Cierre por flujo de cada ojo (ver CLOSURE_TAU_MS), congelado con el ojo tapado (SHUT_FRACTION).
     out.closure = {};
+    out.closureFrozen = this.shutBetween(f.t - f.dt, f.t);
     const leak = Math.exp(-f.dt / CLOSURE_TAU_MS);
     for (const side of ['left', 'right']) {
       const up = out[side].upperLid.reference?.down;
       const lo = out[side].lowerLid.reference?.down;
-      const step = Number.isFinite(up) && Number.isFinite(lo) ? ((up - lo) * f.dt) / 1000 : 0;
+      const step = !out.closureFrozen && Number.isFinite(up) && Number.isFinite(lo) ? ((up - lo) * f.dt) / 1000 : 0;
       this.closure[side] = this.closure[side] * leak + step;
       out.closure[side] = this.closure[side];
     }

@@ -33,6 +33,8 @@ export function sampleOf(result) {
     // Posición del iris en el ojo (ver geometry.js): para estudiar la mirada sin blendshapes.
     irisH: result.rois[s].iris?.h ?? NaN,
     irisV: result.rois[s].iris?.v ?? NaN,
+    // Sonrisa de ese lado de la boca (blendshape mouthSmile): para la co-activación ojo–boca (fase 5).
+    smile: result.blend[s].mouthSmile ?? NaN,
   });
   return { left: side('left'), right: side('right') };
 }

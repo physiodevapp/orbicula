@@ -117,6 +117,85 @@
       </div>
     </section>
 
+    <section class="assistant" id="protocol" data-state="idle" aria-label="Protocolo clínico" hidden>
+      <div class="assistant-head">
+        <span class="card-title">Protocolo clínico</span>
+        <span class="control-label" id="prStatus"></span>
+      </div>
+
+      <div class="as-view" data-view="idle">
+        <p class="hint">Seis fases guiadas con voz y pitidos: reposo (calibración), parpadeo espontáneo, cierre suave, cierre forzado, elevación de cejas y sonrisa amplia (unos 4 min). Del reposo salen los umbrales de la persona: <b>apoya la cabeza</b> en un respaldo o en una pared, de frente, con buena luz y sin moverte. Herramienta de apoyo y seguimiento, no de diagnóstico.</p>
+        <div class="control-row wrap">
+          <label class="field"><span class="control-label">Reposo</span>
+            <select class="select" id="prRest" aria-label="Duración del reposo"><option value="30">30 s</option><option value="45">45 s</option><option value="60">60 s</option></select></label>
+          <label class="field"><span class="control-label">Parpadeo</span>
+            <select class="select" id="prNatural" aria-label="Duración del parpadeo espontáneo"><option value="30">30 s</option><option value="60">60 s</option><option value="90">90 s</option></select></label>
+          <label class="field"><span class="control-label">Repeticiones</span>
+            <select class="select" id="prReps" aria-label="Repeticiones de cada gesto"><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></label>
+        </div>
+        <label class="field">
+          <span class="control-label">Código (opcional)</span>
+          <input class="input" id="prCode" maxlength="24" autocomplete="off" placeholder="p. ej. P01">
+        </label>
+        <label class="check"><input type="checkbox" id="prSound" checked> Sonidos y vibración</label>
+        <label class="check"><input type="checkbox" id="prAuto" checked> Modo seguido: sin revisión entre fases</label>
+        <label class="check"><input type="checkbox" id="prVoice" checked> Voz: explica cada fase (voz del móvil)</label>
+        <p class="hint">En cada gesto: pitido agudo = ahora, grave = relaja. Si el reposo no vale (la cabeza se mueve, demasiados parpadeos o se pierde la cara), se repite solo.</p>
+        <button class="btn btn-primary" id="prStart" type="button">Empezar el protocolo</button>
+      </div>
+
+      <div class="as-view" data-view="active">
+        <div class="step-title" id="prTitle"></div>
+        <p class="step-text" id="prText"></p>
+        <div class="control-row wrap">
+          <button class="btn btn-primary" id="prRepeatNow" type="button">Repetir este paso</button>
+          <button class="btn" id="prFinish" type="button">Terminar paso</button>
+        </div>
+        <div class="control-row wrap">
+          <button class="btn btn-quiet" id="prPrev" type="button">← Paso anterior</button>
+          <button class="btn btn-quiet" id="prSkip" type="button">Saltar</button>
+          <button class="btn btn-quiet" id="prAbort" type="button">Detener</button>
+        </div>
+        <p class="hint">«Repetir» vuelve a la cuenta atrás de este paso sin perder los anteriores. «Detener» guarda lo hecho y se puede retomar.</p>
+      </div>
+
+      <div class="as-view" data-view="review">
+        <div class="step-title" id="prRevTitle"></div>
+        <pre class="summary" id="prSummary"></pre>
+        <p class="hint" id="prExpect"></p>
+        <label class="field" id="prCountedRow">
+          <span class="control-label">Contados por mí (opcional)</span>
+          <input class="input" id="prCounted" type="number" inputmode="numeric" min="0" max="999">
+        </label>
+        <label class="field">
+          <span class="control-label">Observaciones (opcional)</span>
+          <textarea class="input" id="prNotes" rows="2" maxlength="400"></textarea>
+        </label>
+        <div class="control-row wrap">
+          <button class="btn" id="prRepeat" type="button">Repetir este paso</button>
+          <button class="btn btn-quiet" id="prPrevReview" type="button">← Paso anterior</button>
+          <button class="btn btn-primary" id="prNext" type="button">Siguiente</button>
+        </div>
+      </div>
+
+      <div class="as-view" data-view="done">
+        <div class="step-title" id="prDoneTitle">Protocolo completo</div>
+        <div class="proto-summary" id="prSummaryView" hidden></div>
+        <p class="hint" id="prDoneText"></p>
+        <div class="control-row wrap">
+          <button class="btn btn-primary" id="prResume" type="button" hidden>Retomar sesión</button>
+          <button class="btn" id="prRedoLast" type="button">Rehacer el último paso</button>
+        </div>
+        <div class="control-row wrap">
+          <button class="btn btn-primary" id="prDownload" type="button">Descargar JSON</button>
+          <button class="btn" id="prShare" type="button" hidden>Compartir</button>
+          <button class="btn" id="prCopy" type="button">Copiar resumen</button>
+        </div>
+        <p class="hint" id="prMsg"></p>
+        <button class="btn" id="prNew" type="button">Nueva sesión</button>
+      </div>
+    </section>
+
     <section class="assistant" id="bench" data-state="idle" aria-label="Prueba de rendimiento" hidden>
       <div class="assistant-head">
         <span class="card-title">Prueba de rendimiento</span>
@@ -166,6 +245,7 @@
           <button type="button" data-metric="blink" aria-pressed="false">Blendshape</button>
           <button type="button" data-metric="flow" aria-pressed="false">Flujo</button>
           <button type="button" data-metric="closure" aria-pressed="false">Cierre F</button>
+          <button type="button" data-metric="rise" aria-pressed="false">Eventos</button>
         </div>
       </div>
       <div class="control-row wrap" id="flowSelect" hidden>

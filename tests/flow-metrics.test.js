@@ -258,6 +258,33 @@ describe('cierre por flujo', () => {
     expect(out.at(-1).closure.right).toBeCloseTo(peak * Math.exp(-(150 * 33) / CLOSURE_TAU_MS), 3);
     expect(out.at(-1).closure.left).toBeCloseTo(0, 6);
   });
+
+  it('se congela mientras algún ojo está cerrado más de la mitad (y solo si se conoce el reposo del EAR)', () => {
+    const out = [];
+    const p = new FlowProcessor((s) => out.push(s));
+    const open = faceRes();
+    const shut = { ...open, rois: { ...open.rois, left: { ...open.rois.left, ear: open.rois.left.ear * 0.3 } } };
+    const lid = new Set(rasterize(toWork(open.rois.right.upperLid.polygon, STRIP, SCALE), W, H));
+    const down = momentsFor(open, (x, y) => (lid.has(Math.floor(y) * W + Math.floor(x)) ? [0, 0.3] : [0, 0]));
+    const run = (from, n, face) => {
+      for (let k = 1; k <= n; k++) {
+        p.pushFace(from + 33 * k, face);
+        p.pushFlow({ t: from + 33 * k, dt: 33, moments: down, strip: STRIP, scale: SCALE });
+      }
+    };
+    p.pushFace(0, open);
+    run(0, 3, shut); // sin reposo conocido: integra aunque el ojo esté cerrado
+    expect(out.at(-1).closureFrozen).toBe(false);
+    const before = out.at(-1).closure.right;
+    expect(before).toBeGreaterThan(0);
+    p.earBaseline = { left: open.rois.left.ear, right: open.rois.right.ear };
+    run(99, 5, shut);
+    expect(out.at(-1).closureFrozen).toBe(true);
+    expect(out.at(-1).closure.right).toBeLessThanOrEqual(before); // solo la fuga
+    run(264, 12, open); // 150 ms de margen y vuelve a integrar
+    expect(out.at(-1).closureFrozen).toBe(false);
+    expect(out.at(-1).closure.right).toBeGreaterThan(before);
+  });
 });
 
 describe('compensación «dorso nasal + giro»', () => {
