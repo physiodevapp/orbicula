@@ -5,6 +5,7 @@ import { summarizeProtocol } from '../protocol/summary.js';
 import { provenance } from '../export/provenance.js';
 import { renderSummary } from './summary.js';
 import { exportJson, exportCsv } from './export.js';
+import { bindCodeField, showMessage } from './code-field.js';
 import { TTL_DAYS, MAX_ITEMS } from '../persistence/store.js';
 
 const $ = (id) => document.getElementById(id);
@@ -94,15 +95,16 @@ export function createSavedCard({ store, build = null }) {
     el.view.scrollIntoView?.({ block: 'nearest' });
   }
 
+  bindCodeField(el.code);
   const input = () => ({ results: open.data.results, code: el.code.value, capture: open.data.capture });
   el.exportJson?.addEventListener('click', () => {
     if (!open) return;
-    el.viewMsg.textContent = exportJson({ ...input(), appVersion: open.header.appVersion, flowConfig: open.data.flowConfig ?? undefined, analysis: open.data.analysis });
+    showMessage(el.viewMsg, exportJson({ ...input(), appVersion: open.header.appVersion, flowConfig: open.data.flowConfig ?? undefined, analysis: open.data.analysis }));
     store.patchCode(open.header.id, el.code.value).then(refresh, () => {});
   });
   el.exportCsv?.addEventListener('click', () => {
     if (!open) return;
-    el.viewMsg.textContent = exportCsv(input());
+    showMessage(el.viewMsg, exportCsv(input()));
     store.patchCode(open.header.id, el.code.value).then(refresh, () => {});
   });
   el.close?.addEventListener('click', closeView);

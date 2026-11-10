@@ -9,6 +9,7 @@ import { buildReport } from '../assistant/report.js';
 import { renderSummary } from './summary.js';
 import { downloadJson, stamp } from './share.js';
 import { exportJson, exportCsv, fileCapture } from './export.js';
+import { showMessage } from './code-field.js';
 
 const $ = (id) => document.getElementById(id);
 const nf = (v, d = 0) => (Number.isFinite(v) ? v.toFixed(d).replace('.', ',') : '—');
@@ -26,7 +27,7 @@ export function createProtocolVideo({ getStream, analyzeVideoFile, saved = null 
     record: $('prRecord'), recordRow: $('prRecordRow'), block: $('prRecBlock'), info: $('prRecInfo'), analyze: $('prRecAnalyze'),
     cancel: $('prRecCancel'), discard: $('prRecDiscard'), cap: $('prRecCap'), barWrap: $('prRecBarWrap'), bar: $('prRecBar'),
     progress: $('prRecProgress'), summary: $('prRecSummary'), download: $('prRecDownload'), msg: $('prRecMsg'),
-    exportRow: $('prRecExport'), exportJson: $('prRecExportJson'), exportCsv: $('prRecExportCsv'), code: $('prCode'),
+    exportRow: $('prRecExport'), exportJson: $('prRecExportJson'), exportCsv: $('prRecExportCsv'), code: $('prExportCode') ?? $('prCode'),
   };
   const recorder = new FrameRecorder();
   const supported = recordingType() != null;
@@ -48,7 +49,7 @@ export function createProtocolVideo({ getStream, analyzeVideoFile, saved = null 
     if (el.summary) el.summary.hidden = true;
   }
 
-  function show(msg) { if (el.msg) el.msg.textContent = msg; }
+  function show(msg) { showMessage(el.msg, msg); }
 
   /** Antes de empezar el protocolo: arranca la grabación si la casilla está marcada. */
   async function beforeStart() {

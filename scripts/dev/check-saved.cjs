@@ -39,6 +39,18 @@ const check = (name, ok, extra = '') => { console.log(`${ok ? 'OK ' : 'MAL'} ${n
   await page.click('#prStart');
   await page.waitForFunction(() => document.querySelector('#protocol')?.dataset.state === 'done', null, { timeout: 600000 });
   await page.waitForSelector('#savedCard:not([hidden])', { timeout: 10000 });
+  check('el campo de Resultados trae el código escrito antes de empezar', (await page.inputValue('#prExportCode')) === 'P01');
+  // Un nombre en el campo de Resultados: aviso visible al escribir, justo bajo el campo, sin tener que pulsar nada.
+  await page.fill('#prExportCode', 'Juan Pérez');
+  const err = page.locator('#prExportCode').locator('xpath=ancestor::label/following-sibling::p[contains(@class,"field-error")]');
+  check('al escribir un nombre sale el aviso bajo el campo', (await err.isVisible()) && /no es válido|no válido/i.test(await err.textContent()) && (await page.getAttribute('#prExportCode', 'aria-invalid')) === 'true');
+  const inView = await err.evaluate((e) => { const r = e.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }).catch(() => false);
+  await err.scrollIntoViewIfNeeded();
+  await page.click('#prExportJson');
+  check('exportar con un nombre no descarga y lo dice en pantalla', /solo admite letras sin tilde/.test(await page.textContent('#prExportMsg')));
+  check('el mensaje de exportar queda a la vista', await page.locator('#prExportMsg').evaluate((e) => { const r = e.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight + 2; }));
+  await page.fill('#prExportCode', 'P01');
+  check('al corregir el código, el aviso desaparece', await err.isHidden());
   const before = await download('#prExportJson');
   check('al terminar el protocolo se guarda la sesión', (await page.locator('#savedList .sum-card').count()) === 1, (await page.textContent('#savedList .step-title')).trim());
 
@@ -54,6 +66,7 @@ const check = (name, ok, extra = '') => { console.log(`${ok ? 'OK ' : 'MAL'} ${n
 
   // 3. Un código que parece un nombre se rechaza y no descarga.
   await page.fill('#savedCode', 'Juan Pérez');
+  check('en sesiones guardadas, el aviso sale al escribir y se ve sin pulsar nada', await page.locator('#savedCode').locator('xpath=ancestor::label/following-sibling::p[contains(@class,"field-error")]').isVisible());
   await page.click('#savedExportJson');
   check('un código con nombre se rechaza', /solo admite letras sin tilde/.test(await page.textContent('#savedViewMsg')));
   await page.fill('#savedCode', 'P02');

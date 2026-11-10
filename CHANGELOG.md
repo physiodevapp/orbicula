@@ -4,6 +4,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Corregido (fase 7a: el código del participante)
+- **Un código no válido no daba ningún aviso:** el mensaje se escribía debajo de los botones, fuera de la pantalla del móvil. Ahora el campo del código **avisa al escribir** (borde rojo y un texto justo debajo), y los mensajes de exportar se traen a la vista.
+- **Campo «Código» en Resultados del protocolo:** antes solo se podía escribir antes de empezar y no se podía corregir al exportar. Arranca con el código escrito antes. También se usa para el protocolo grabado.
+- **Cierre por flujo (`docs/schema.md`):** se documenta que es una integral con fuga (nivel absoluto sin significado) y se exporta `analysis.closureTauMs`; y que un desfase de co-activación de ±300 ms está en el borde de la ventana.
+
 ### Añadido (fase 7a bis: sesiones guardadas en el dispositivo)
 - **Recuperar el trabajo tras recargar la página.** Al terminar un protocolo (en directo o grabado) o el análisis de un vídeo, las medidas se guardan en IndexedDB (`src/persistence/`), sin el vídeo ni imágenes ni el nombre del archivo.
 - **Tarjeta «Sesiones guardadas en este dispositivo»:** abrir una sesión (resumen, JSON y CSV), borrarla o borrar todo. Se conservan 5 y caducan a los 30 días.

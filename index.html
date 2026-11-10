@@ -265,7 +265,11 @@
         <div class="proto-summary" id="prSummaryView" hidden></div>
         <div class="sum-card" id="prExportBlock">
           <div class="sum-head"><span class="sum-title">Resultados</span></div>
-          <p class="hint">El <b>JSON de resultados</b> es el formato estable de orbicula (para el hub y para estudios); los <b>CSV</b> traen las series temporales, en dos archivos (cara y flujo). Sin ningún dato del paciente; solo el código si lo escribiste.</p>
+          <p class="hint">El <b>JSON de resultados</b> es el formato estable de orbicula (para el hub y para estudios); los <b>CSV</b> traen las series temporales, en dos archivos (cara y flujo). Sin ningún dato del paciente; solo el código si lo escribes.</p>
+          <label class="field">
+            <span class="control-label">Código (opcional)</span>
+            <input class="input" id="prExportCode" maxlength="24" autocomplete="off" placeholder="p. ej. P01">
+          </label>
           <div class="control-row wrap">
             <button class="btn btn-primary" id="prExportJson" type="button">Resultados (JSON)</button>
             <button class="btn" id="prExportCsv" type="button">CSV de las series</button>

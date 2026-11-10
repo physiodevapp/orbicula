@@ -6,6 +6,7 @@ import { PLANS, DEFAULT_PLAN, spokenPrepMs } from '../assistant/steps.js';
 import { cleanSettings, PROTOCOL_DEFAULTS } from '../protocol/steps.js';
 import { summarizeProtocol } from '../protocol/summary.js';
 import { renderSummary } from './summary.js';
+import { bindCodeField, showMessage } from './code-field.js';
 import { buildReport, describeSummary } from '../assistant/report.js';
 import { downloadJson, shareJson, copyJson, stamp } from './share.js';
 
@@ -145,6 +146,11 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
     for (const [k, b] of Object.entries(settingBox)) if (b) b.value = String(PROTOCOL_DEFAULTS[k]);
   }
 
+  // Los campos del código avisan al escribir. El de Resultados manda al exportar (si existe); si no, el del principio.
+  bindCodeField(el.code);
+  bindCodeField($(`${P}ExportCode`));
+  const exportCode = () => ($(`${P}ExportCode`) ? $(`${P}ExportCode`).value : el.code.value).trim();
+
   // Se declara antes de crear la sesión: su constructor ya llama a render (cambio de estado inicial).
   let lastState = null;
   const session = new GuidedSession(stepsOf(plan, readSettings()), {
@@ -190,7 +196,9 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
     if (s.state !== lastState) {
       lastState = s.state;
       // Aviso a quien lo use (la grabación del vídeo del protocolo): estado nuevo, sesión y configuración.
-      queueMicrotask(() => onState(s.state, session, { settings: readSettings(), code: el.code.value.trim() }));
+      // El código escrito antes de empezar pasa al campo de Resultados, donde se puede corregir.
+      if (s.state === 'done' && $(`${P}ExportCode`)) $(`${P}ExportCode`).value = el.code.value.trim();
+      queueMicrotask(() => onState(s.state, session, { settings: readSettings(), code: exportCode() }));
     }
     const busy = s.state === 'prep' || s.state === 'running' || s.state === 'review';
     if (busy) document.body.dataset.busy = busyKey;
@@ -285,9 +293,9 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
 
   // Resultados (fase 7): el JSON público y los CSV, solo en la tarjeta del protocolo.
   if (exporter && $(`${P}ExportJson`)) {
-    const say = (m) => { $(`${P}ExportMsg`).textContent = m; };
-    $(`${P}ExportJson`).addEventListener('click', () => say(exporter.json(session.results, el.code.value)));
-    $(`${P}ExportCsv`).addEventListener('click', () => say(exporter.csv(session.results, el.code.value)));
+    const say = (m) => showMessage($(`${P}ExportMsg`), m);
+    $(`${P}ExportJson`).addEventListener('click', () => say(exporter.json(session.results, exportCode())));
+    $(`${P}ExportCsv`).addEventListener('click', () => say(exporter.csv(session.results, exportCode())));
   }
 
   // ── Botones ──────────────────────────────────────────────────────────────────

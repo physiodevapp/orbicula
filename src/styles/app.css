@@ -262,6 +262,8 @@ main {
   font: inherit; font-size: var(--fs-md);
 }
 .input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.input[aria-invalid="true"] { border-color: var(--danger); }
+.field-error { margin-top: var(--sp-1); font-size: var(--fs-sm); color: var(--danger); line-height: 1.45; }
 .control-row.wrap { flex-wrap: wrap; justify-content: flex-start; }
 
 .btn-quiet { color: var(--text2); font-size: var(--fs-xs); padding: var(--sp-2) var(--sp-3); min-height: 36px; }

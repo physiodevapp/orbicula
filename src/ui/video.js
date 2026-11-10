@@ -9,6 +9,7 @@ import { summarizeProtocol } from '../protocol/summary.js';
 import { renderSummary } from './summary.js';
 import { exportJson, exportCsv, fileCapture } from './export.js';
 import { fingerprintOf } from '../persistence/fingerprint.js';
+import { bindCodeField, showMessage } from './code-field.js';
 
 export const VIDEO_PROBE_SCHEMA = 'orbicula-video-probe/1';
 const $ = (id) => document.getElementById(id);
@@ -31,6 +32,7 @@ export function createVideoCard({ getContext, analyzeVideoFile = null, saved = n
     saved: $('vidSaved'), savedText: $('vidSavedText'), savedRestore: $('vidSavedRestore'), savedDismiss: $('vidSavedDismiss'),
     exportRow: $('vidExport'), exportJson: $('vidExportJson'), exportCsv: $('vidExportCsv'), code: $('vidCode'),
   };
+  bindCodeField(el.code);
   let analysis = null; // { results, stats, context, settings, startedAt }
   // Un archivo elegido antes de recargar la página puede seguir en el selector sin permiso para leerlo.
   el.file.value = '';
@@ -214,12 +216,12 @@ export function createVideoCard({ getContext, analyzeVideoFile = null, saved = n
   const exportInput = () => ({ results: analysis.results, code: el.code.value, capture: fileCapture({ mp4, facing: el.facing.value, mirrored: el.mirror.checked }) });
   el.exportJson.addEventListener('click', () => {
     if (!analysis) return;
-    el.msg.textContent = exportJson({ ...exportInput(), appVersion: analysis.context?.build?.version ?? '', flowConfig: analysis.context?.flow?.config, analysis: restoredProv });
+    showMessage(el.msg, exportJson({ ...exportInput(), appVersion: analysis.context?.build?.version ?? '', flowConfig: analysis.context?.flow?.config, analysis: restoredProv }));
     saved?.patchCode(savedId, el.code.value);
   });
   el.exportCsv.addEventListener('click', () => {
     if (!analysis) return;
-    el.msg.textContent = exportCsv(exportInput());
+    showMessage(el.msg, exportCsv(exportInput()));
     saved?.patchCode(savedId, el.code.value);
   });
   el.aCancel.addEventListener('click', () => abort?.abort());
