@@ -4,6 +4,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (fase 7b: modo alojado)
+- **`?host=physiq`:** orbicula oculta su cabecera y su pie y adopta los tokens del hub: su texto (`#e8edf2`, `#8aa4bc`) y su rojo de error (`#ef4444`). El fondo, las superficies, los bordes y las fuentes ya coincidían. El acento sigue siendo el de orbicula: cada satélite del hub tiene el suyo.
+- **Tema oscuro forzado**, como hace `assessment` dentro del hub (el hub es solo oscuro). Un tema elegido después (`orbicula:config`, en 7c) se respeta.
+- **`public/host.js`:** aplica el modo antes de pintar, para que no se vea un instante la cabecera ni el tema claro. Un test comprueba que decide igual que `src/integration/host.js`.
+- La versión y el commit pasan también a «Detalle técnico de la captura», porque el pie se oculta.
+- Sin guardado de sesiones en modo alojado (ya estaba).
+- `scripts/dev/check-host.cjs`: autónomo frente a alojado, con el sistema en claro y en oscuro, a 380 px.
+- Arreglo menor: separación sobre el campo «Código» en los resultados.
+- 7 tests nuevos.
+
 ### Corregido (fase 7a: el código del participante)
 - **Un código no válido no daba ningún aviso:** el mensaje se escribía debajo de los botones, fuera de la pantalla del móvil. Ahora el campo del código **avisa al escribir** (borde rojo y un texto justo debajo), y los mensajes de exportar se traen a la vista.
 - **Campo «Código» en Resultados del protocolo:** antes solo se podía escribir antes de empezar y no se podía corregir al exportar. Arranca con el código escrito antes. También se usa para el protocolo grabado.

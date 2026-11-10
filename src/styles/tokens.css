@@ -104,6 +104,21 @@
   }
 }
 
+/*
+ * Modo alojado (?host=physiq): dentro del hub PhysiQ. Fondo, superficies, bordes, texto atenuado (--text3) y
+ * fuentes ya son los del hub; aquí se igualan los que difieren (texto y rojo de error, como en sus satélites).
+ * El acento y los colores de lado siguen siendo los de orbicula: cada satélite tiene el suyo. El hub es solo
+ * oscuro, así que public/host.js fuerza el tema oscuro; `orbicula:config { theme }` puede cambiarlo.
+ * El hub también puede sobrescribir cualquier variable con `style.setProperty` sobre el <html> del iframe.
+ */
+:root[data-host='physiq']:not([data-theme='light']) {
+  --text: #e8edf2;
+  --text2: #8aa4bc;
+  --danger: #ef4444;
+  --danger-soft: rgba(239, 68, 68, 0.1);
+}
+:root[data-host='physiq'] { --header-h: 0px; }
+
 :root[data-theme='light'] {
   color-scheme: light;
   --bg: #f5f7fb;

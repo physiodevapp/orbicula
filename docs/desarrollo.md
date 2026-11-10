@@ -63,6 +63,13 @@ node scripts/dev/check-protocol-video.cjs --video /tmp/caras/lid.y4m --live en-d
 ```
 Hace el protocolo en directo con la casilla «Grabar el vídeo…» marcada (MediaRecorder; el Chromium de Playwright graba MP4 H.264), descarga el JSON del directo, analiza el vídeo grabado y descarga el JSON del análisis. Con `--full` procesa todos los fotogramas y no uno de cada dos. Tarda unos 10 min con `escala=0.4` (análisis sin GPU).
 
+## Modo alojado (fase 7b)
+```bash
+npm run build && npx vite preview --port 4173 --host 127.0.0.1 &
+node scripts/dev/check-host.cjs
+```
+Abre la app con y sin `?host=physiq`, con el sistema en tema claro y en oscuro, y comprueba la cabecera y el pie, el tema, los tokens y el ancho a 380 px. Guarda `/tmp/host/alojado-380.png`. La carga dentro de un iframe, con el hub, se prueba en 7c. `tests/host.test.js` comprueba que `public/host.js` y `src/integration/host.js` deciden lo mismo.
+
 ## Sesiones guardadas (fase 7a bis)
 ```bash
 npm run build && npx vite preview --port 4173 --host 127.0.0.1 &

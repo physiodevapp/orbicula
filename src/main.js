@@ -19,6 +19,7 @@ import { createAssistant } from './ui/assistant.js';
 import { createVideoCard } from './ui/video.js';
 import { createProtocolVideo } from './ui/protocol-video.js';
 import { createSavedCard } from './ui/saved.js';
+import { hostFrom } from './integration/host.js';
 import { createStore } from './persistence/store.js';
 import { idbAdapter } from './persistence/idb.js';
 import { exportJson, exportCsv, liveCapture, fileCapture } from './ui/export.js';
@@ -244,7 +245,7 @@ async function analyzeVideoFile({ mp4, mirrored, restSec, maxFps, steps = null, 
 }
 // Sesiones guardadas en el dispositivo (IndexedDB). En modo alojado (?host=physiq) no se guarda nada: el hub
 // recibe el resultado por postMessage y no debe quedar una copia en el almacenamiento del iframe.
-const hosted = new URLSearchParams(location.search).get('host') === 'physiq';
+const hosted = hostFrom(location.search) === 'physiq';
 const saved = createSavedCard({ store: !hosted && typeof indexedDB !== 'undefined' ? createStore(idbAdapter()) : null, build: __COMMIT__ });
 saved.refresh();
 createVideoCard({ getContext: () => { const c = captureContext(); return { build: c.build, device: c.device }; }, analyzeVideoFile, saved });
@@ -313,6 +314,8 @@ function setPressed(attr, value) {
 
 function renderDetails(info, frame) {
   const rows = [
+    // El pie (con la versión) se oculta en modo alojado: aquí sigue pudiéndose comprobar qué versión se abrió.
+    ['Versión', `v${__APP_VERSION__} · ${__BRANCH__}@${__COMMIT__}`],
     ['Dispositivo', info.label || '—'],
     ['Cámara obtenida', info.facing === 'front' ? 'frontal (vista en espejo)' : 'trasera'],
     ['Pedido', `${PRIORITIES[state.priority].width} × ${PRIORITIES[state.priority].height} · ${REQUESTED_FPS} fps`],

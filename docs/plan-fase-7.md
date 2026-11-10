@@ -97,6 +97,12 @@ Recargar la página perdía un protocolo o 2 minutos de análisis de vídeo. Se 
   - **Necesito mirar el repo del hub** (`physiodevapp/physiq`) para tomar sus tokens y sus convenciones, como pide `CLAUDE.md`. Ninguna importación: se copian los valores.
 - **Cabecera para el iframe:** ya hay `frame-ancestors 'self' https://physiodevapp.github.io` en `public/_headers`. El hub tiene que cargarla con `allow="camera"`, porque la política de permisos solo da la cámara a `self`.
 
+### 7b: lo que se ha visto en el repo `physiq` (para 7d, `docs/integracion.md`)
+- **Convenciones de los satélites:** cada uno detecta que va dentro del hub y oculta su cabecera (`in-hub`); los neutros son los mismos (`#0a0d12`, `#111620`, `#232d45`, `#2d3a58`, `#5a6e8a`) y cada satélite tiene su propio acento (morado, verde, naranja, rosa…). El hub es solo oscuro y `assessment` fuerza el oscuro dentro del iframe. Orbicula hace lo mismo y mantiene su cyan.
+- **Lo que tiene que hacer el hub:** una entrada en `SATS` con `'/physiq/orbicula/?host=physiq'` (el hub carga cada satélite con una dirección fija; sin `?host=physiq` orbicula se ve con su cabecera), un `<iframe id="sat-orbicula" allow="camera" hidden>` y cargarlo **bajo demanda** (como `wiki`): precargarlo al arrancar bajaría el modelo de la cara y el WASM sin que nadie lo pida.
+- **Color de la tarjeta:** el cyan de orbicula (`#5ec8d8`) se parece al de `balance` (`#22d3ee`). Convendría otro color para la tarjeta de orbicula en el hub.
+- **Mensajes del hub (`PHYSIQ_SAT_VISIBLE`, `PHYSIQ_SAT_HIDDEN`, `PHYSIQ_MODE`):** el hub los manda con destino `'*'`. Orbicula no usa nunca `'*'` al enviar (solo al origen del hub); al recibirlos, valida el origen. Queda por decidir en 7c si al ocultarse apaga la cámara.
+
 ## API `postMessage`
 - **`{ type: "orbicula:ready" }`** al cargar, hacia el origen del padre.
 - **`{ type: "orbicula:result", payload }`** al terminar un protocolo, con el JSON público. También al terminar el análisis fotograma a fotograma del protocolo grabado, con `capture.analysis: "frame-by-frame"`.

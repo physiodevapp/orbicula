@@ -93,6 +93,12 @@ Al terminar un protocolo (en directo o grabado) o el análisis de un vídeo, orb
 - **Modo alojado (`?host=physiq`):** no se guarda nada; el hub recibe el resultado por `postMessage`.
 - **Móvil compartido:** las sesiones solo llevan el código anónimo, pero si el móvil lo usa más gente, pulsa «Borrar todo lo guardado» al terminar.
 
+## Modo alojado (dentro de PhysiQ)
+Con `?host=physiq` en la dirección, orbicula se ve como parte del hub: **sin cabecera ni pie**, con el **tema oscuro** del hub (el hub es solo oscuro, aunque el móvil esté en claro) y con sus colores de texto y de error. El acento sigue siendo el de orbicula: cada satélite del hub tiene el suyo. En este modo no se guardan sesiones en el dispositivo.
+- **Cómo cargarla en el hub:** `<iframe src="…/orbicula/?host=physiq" allow="camera">`. Sin `allow="camera"` el navegador no deja encender la cámara dentro del iframe.
+- **Versión:** al no haber pie, la versión y el commit están en «Detalle técnico de la captura» (con la cámara encendida).
+- **Cambiar los colores:** todos son variables de `src/styles/tokens.css`; el hub puede sobrescribirlas con `style.setProperty` sobre el `<html>` del iframe (misma origen en GitHub Pages).
+
 ## Parpadeos y curvas
 
 - **EAR** (eye aspect ratio): apertura vertical media del ojo dividida por su ancho. Ronda 0,25–0,35 con el ojo abierto. Es la señal del detector de parpadeos.
