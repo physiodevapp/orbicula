@@ -181,6 +181,7 @@
         <label class="check"><input type="checkbox" id="prSound" checked> Sonidos y vibración</label>
         <label class="check"><input type="checkbox" id="prAuto" checked> Modo seguido: sin revisión entre fases</label>
         <label class="check"><input type="checkbox" id="prVoice" checked> Voz: explica cada fase (voz del móvil)</label>
+        <label class="check" id="prRecordRow"><input type="checkbox" id="prRecord"> Grabar el vídeo para analizarlo después, más sensible (queda solo en la memoria del móvil y se borra al terminar)</label>
         <p class="hint">En cada gesto: pitido agudo = ahora, grave = relaja. Si el reposo no vale (la cabeza se mueve, demasiados parpadeos o se pierde la cara), se repite solo.</p>
         <button class="btn btn-primary" id="prStart" type="button">Empezar el protocolo</button>
       </div>
@@ -222,6 +223,21 @@
       <div class="as-view" data-view="done">
         <div class="step-title" id="prDoneTitle">Protocolo completo</div>
         <div class="proto-summary" id="prSummaryView" hidden></div>
+        <div class="sum-card" id="prRecBlock" hidden>
+          <div class="sum-head"><span class="sum-title">Análisis fotograma a fotograma</span></div>
+          <p class="hint" id="prRecInfo"></p>
+          <label class="check"><input type="checkbox" id="prRecCap" checked> Un fotograma de cada dos (tarda la mitad)</label>
+          <div class="control-row wrap">
+            <button class="btn btn-primary" id="prRecAnalyze" type="button">Analizar el vídeo ahora</button>
+            <button class="btn btn-quiet" id="prRecCancel" type="button" hidden>Cancelar</button>
+            <button class="btn btn-quiet" id="prRecDiscard" type="button">Descartar el vídeo</button>
+          </div>
+          <div class="coach-bar" id="prRecBarWrap" hidden><i id="prRecBar"></i></div>
+          <p class="hint" id="prRecProgress"></p>
+          <div class="proto-summary" id="prRecSummary" hidden></div>
+          <button class="btn" id="prRecDownload" type="button" hidden>Descargar JSON del análisis del vídeo</button>
+          <p class="hint" id="prRecMsg"></p>
+        </div>
         <p class="hint" id="prDoneText"></p>
         <div class="control-row wrap">
           <button class="btn btn-primary" id="prResume" type="button" hidden>Retomar sesión</button>

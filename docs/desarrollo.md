@@ -57,6 +57,12 @@ El Chromium de Playwright decodifica H.264 y VP9 con WebCodecs. `tests/fixtures/
 ffmpeg -i phone.mp4 -frames:v 1 ref.png
 ```
 
+## Protocolo grabado y analizado después (fase 6c)
+```bash
+node scripts/dev/check-protocol-video.cjs --video /tmp/caras/lid.y4m --live en-directo.json --out analisis-del-video.json --query '?escala=0.4&debug'
+```
+Hace el protocolo en directo con la casilla «Grabar el vídeo…» marcada (MediaRecorder; el Chromium de Playwright graba MP4 H.264), descarga el JSON del directo, analiza el vídeo grabado y descarga el JSON del análisis. Con `--full` procesa todos los fotogramas y no uno de cada dos. Tarda unos 10 min con `escala=0.4` (análisis sin GPU).
+
 ## Repetir los eventos de la fase 5 con datos reales
 ```bash
 node scripts/dev/replay-events.mjs informe.json ['{"riseFloor":0.002}']

@@ -183,3 +183,57 @@ export async function openMp4(file) {
     readStats: reader.stats,
   };
 }
+
+/**
+ * Abre una grabación hecha por MediaRecorder (MP4 fragmentado: `moov` vacío y los fotogramas en cajas
+ * `moof`/`mdat`) que está entera en memoria (fase 6c). Devuelve lo mismo que openMp4, con los datos de
+ * cada muestra ya extraídos (`read` los sirve de la memoria). Se pasa a mp4box por bloques de 8 MB.
+ * @param {{size:number, slice:(a:number,b:number)=>{arrayBuffer:()=>Promise<ArrayBuffer>}}} blob
+ */
+export async function openRecording(blob) {
+  const mp4 = createFile();
+  let info = null;
+  const raw = [];
+  mp4.onReady = (i) => {
+    info = i;
+    const t = i.videoTracks?.[0];
+    // Cada muestra se entrega en cuanto se puede decodificar (nbSamples: 1): con lotes, el último lote
+    // incompleto no llegaba nunca.
+    if (t) {
+      mp4.setExtractionOptions(t.id, null, { nbSamples: 1 });
+      mp4.start();
+    }
+  };
+  mp4.onSamples = (id, user, samples) => { for (const x of samples) raw.push(x); };
+  for (let at = 0; at < blob.size; at += CHUNK_BYTES) {
+    const ab = await blob.slice(at, Math.min(blob.size, at + CHUNK_BYTES)).arrayBuffer();
+    mp4.appendBuffer(MP4BoxBuffer.fromArrayBuffer(ab, at));
+  }
+  mp4.flush();
+  const track = info?.videoTracks?.[0];
+  if (!track) throw new Error('la grabación no tiene pista de vídeo');
+  if (!raw.length) throw new Error('la grabación no tiene fotogramas');
+  const entry = mp4.getTrackById(track.id).mdia.minf.stbl.stsd.entries[0];
+  const ts = track.timescale;
+  raw.sort((a, b) => a.dts - b.dts);
+  const cts0 = Math.min(...raw.map((x) => x.cts));
+  const samples = raw.map((x, i) => ({
+    offset: i,
+    size: x.size,
+    key: !!x.is_sync,
+    t: ((x.cts - cts0) * 1000) / ts,
+    durationMs: (x.duration * 1000) / ts,
+    data: x.data,
+  }));
+  const codedWidth = track.video?.width ?? track.track_width;
+  const codedHeight = track.video?.height ?? track.track_height;
+  return {
+    container: { brands: info.brands ?? [], hasAudio: false, moovAtEnd: false, fragmented: true },
+    track: { codec: track.codec, codedWidth, codedHeight, rotation: 0, width: codedWidth, height: codedHeight, timescale: ts, samples: samples.length, keyframes: samples.filter((x) => x.key).length, bitrateKbps: null },
+    timing: frameStats(samples.map((x) => x.t)),
+    decoderConfig: { codec: track.codec, codedWidth, codedHeight, description: descriptionOf(entry), optimizeForLatency: false },
+    samples,
+    read: async (x) => x.data,
+    readStats: { reads: 0, bytes: 0, ms: 0, fallbacks: 0, chunkError: null },
+  };
+}

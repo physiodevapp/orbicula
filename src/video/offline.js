@@ -63,6 +63,41 @@ export function createVideoSession(steps, { onStepEnd = () => {}, onStepStart = 
   };
 }
 
+/**
+ * Ventanas de los pasos de un protocolo ya hecho en directo, en el tiempo del vídeo grabado (ms).
+ * @param {object[]} results pasos guardados por la sesión en directo (con `t0`, marca de la cámara de la
+ *   primera muestra, y el paso con su duración)
+ * @param {number} recStartCam instante (reloj de la cámara) en que arrancó la grabación
+ * @returns {{id:string, runStart:number, runEnd:number}[]}
+ */
+export function protocolWindows(results, recStartCam) {
+  return results
+    .filter((r) => r.status === 'completed' && r.t0 != null)
+    .map((r) => ({ id: r.id, runStart: r.t0 - recStartCam, runEnd: r.t0 - recStartCam + r.plannedMs }));
+}
+
+/**
+ * Pasos del protocolo con los tiempos reales de cada uno en el vídeo: el reloj del vídeo arranca en 0, el
+ * primer paso empieza en su `runStart` (cuenta atrás = ese tiempo) y la pausa tras cada paso lleva hasta
+ * el `runStart` del siguiente. Así los marcas de las repeticiones y las fases caen donde cayeron en directo.
+ * El reposo no repite si no vale (el vídeo ya está grabado): la calibración avisa.
+ */
+export function windowedSteps(steps, windows) {
+  const byId = new Map(windows.map((w) => [w.id, w]));
+  const used = steps.filter((s) => byId.has(s.id));
+  return used.map((s, i) => {
+    const w = byId.get(s.id);
+    const next = byId.get(used[i + 1]?.id);
+    return {
+      ...s,
+      requireValid: false,
+      prepMs: i === 0 ? Math.max(0, w.runStart) : 0,
+      durationMs: w.runEnd - w.runStart,
+      ...(next ? { pauseAfterMs: Math.max(0, next.runStart - w.runEnd) } : {}),
+    };
+  });
+}
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
@@ -73,14 +108,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  *   flow: {submit: Function, inflight: number} | null,
  *   video: ReturnType<typeof createVideoSession>,
  *   maxFps?: number,            // procesar como mucho a este ritmo (salta fotogramas si el vídeo va más rápido)
+ *   fromMs?: number, toMs?: number, // solo los fotogramas de este tramo del vídeo
  *   signal?: AbortSignal,
  *   onProgress?: (p: {done:number, total:number, t:number, durationMs:number, elapsedMs:number, etaMs:number|null}) => void,
  * }} o
  */
-export async function processVideo({ mp4, analysis, flow, video, maxFps = 0, signal, onProgress = () => {} }) {
+export async function processVideo({ mp4, analysis, flow, video, maxFps = 0, fromMs = 0, toMs = Infinity, signal, onProgress = () => {} }) {
   const fps = mp4.timing.fps || 30;
   const every = maxFps > 0 && fps > maxFps * 1.3 ? Math.round(fps / maxFps) : 1;
-  const total = Math.ceil(mp4.samples.length / every);
+  const inRange = mp4.samples.filter((s) => s.t >= fromMs && s.t <= toMs).length;
+  const total = Math.ceil(inRange / every);
   const rotation = mp4.track.rotation;
   let canvas = null;
   let index = 0;
@@ -88,8 +125,9 @@ export async function processVideo({ mp4, analysis, flow, video, maxFps = 0, sig
   let lastT = 0;
   const t0 = performance.now();
   video.session.start();
-  for await (const { frame, t } of decodeFrames(mp4, { signal })) {
-    const take = index++ % every === 0;
+  for await (const { frame, t } of decodeFrames(mp4, { signal, toMs })) {
+    // Antes de `fromMs` se decodifica (hace falta para llegar al fotograma clave) pero no se analiza.
+    const take = t >= fromMs && index++ % every === 0;
     if (!take) {
       frame.close();
       continue;

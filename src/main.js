@@ -17,6 +17,7 @@ import { sampleOf } from './landmarks/process.js';
 import { BlinkDetector } from './metrics/blinks.js';
 import { createAssistant } from './ui/assistant.js';
 import { createVideoCard } from './ui/video.js';
+import { createProtocolVideo } from './ui/protocol-video.js';
 import { createVideoSession, videoSteps, processVideo } from './video/offline.js';
 import { PROTOCOL_PLAN } from './assistant/steps.js';
 import { createBenchmark } from './ui/benchmark.js';
@@ -196,11 +197,11 @@ const assistant = createAssistant(sessionDeps);
  * flujo sin límite de ritmo, y registra las medidas con el reloj del vídeo (src/video/offline.js). La
  * cámara se apaga mientras tanto (si no, sus frames se mezclarían con los del vídeo).
  */
-async function analyzeVideoFile({ mp4, mirrored, restSec, maxFps, signal, onProgress }) {
+async function analyzeVideoFile({ mp4, mirrored, restSec, maxFps, steps = null, fromMs = 0, toMs = Infinity, signal, onProgress }) {
   const busy = document.body.dataset.busy;
   if (busy) throw new Error(busy === 'video' ? 'ya hay un vídeo analizándose' : 'hay otra prueba en marcha');
   document.body.dataset.busy = 'video';
-  const video = createVideoSession(videoSteps(mp4.timing.durationMs, restSec), { onStepEnd: sessionDeps.onStepEnd, onStepStart: sessionDeps.onStepStart });
+  const video = createVideoSession(steps ?? videoSteps(mp4.timing.durationMs, restSec), { onStepEnd: sessionDeps.onStepEnd, onStepStart: sessionDeps.onStepStart });
   try {
     if (camera.stream) {
       for (const a of recorders) a.interrupt('se ha empezado a analizar un vídeo grabado');
@@ -216,7 +217,7 @@ async function analyzeVideoFile({ mp4, mirrored, restSec, maxFps, signal, onProg
     await analysis.setImageMode(true);
     els.curvesView.hidden = false;
     recorders.push(video.recorder);
-    const stats = await processVideo({ mp4, analysis, flow, video, maxFps, signal, onProgress });
+    const stats = await processVideo({ mp4, analysis, flow, video, maxFps, fromMs, toMs, signal, onProgress });
     return { results: video.session.results, stats, context: captureContext() };
   } finally {
     const k = recorders.indexOf(video.recorder);
@@ -231,7 +232,14 @@ async function analyzeVideoFile({ mp4, mirrored, restSec, maxFps, signal, onProg
   }
 }
 createVideoCard({ getContext: () => { const c = captureContext(); return { build: c.build, device: c.device }; }, analyzeVideoFile });
-const protocol = createAssistant({ ...sessionDeps, prefix: 'pr', rootId: 'protocol', busyKey: 'protocol', plan: PROTOCOL_PLAN });
+// Grabación del vídeo durante el protocolo y análisis posterior (fase 6c); `analyzeVideoFile` se define más abajo.
+const protocolVideo = createProtocolVideo({ getStream: () => camera.stream, analyzeVideoFile: (o) => analyzeVideoFile(o) });
+const protocol = createAssistant({
+  ...sessionDeps,
+  prefix: 'pr', rootId: 'protocol', busyKey: 'protocol', plan: PROTOCOL_PLAN,
+  onStart: async (plan) => { await sessionDeps.onStart(plan); await protocolVideo.beforeStart(); },
+  onState: (state, session, extra) => protocolVideo.onState(state, session, extra),
+});
 /** Las dos tarjetas reciben todas las medidas; solo la que está grabando un paso las guarda. */
 const recorders = [assistant, protocol];
 

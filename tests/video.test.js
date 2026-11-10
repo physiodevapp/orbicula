@@ -206,3 +206,22 @@ describe('decodificación fotograma a fotograma (decodificador simulado)', () =>
     expect(made.frames.every((f) => f.closed)).toBe(true);
   });
 });
+
+describe('grabación de MediaRecorder (MP4 fragmentado)', () => {
+  it('openRecording extrae todos los fotogramas con su tiempo, su tipo y los datos', async () => {
+    const { openRecording } = await import('../src/video/mp4.js');
+    const buf = readFileSync(new URL('./fixtures/frag.mp4', import.meta.url));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    // En trozos pequeños, como si el archivo fuera enorme.
+    const blob = { size: ab.byteLength, slice: (a, b) => ({ arrayBuffer: async () => ab.slice(a, b) }) };
+    const v = await openRecording(blob);
+    expect(v.container.fragmented).toBe(true);
+    expect(v.samples).toHaveLength(24);
+    expect(v.track).toMatchObject({ codec: expect.stringMatching(/^avc1\./), rotation: 0, width: 32, height: 16, keyframes: 2 });
+    expect(v.samples[0]).toMatchObject({ t: 0, key: true });
+    expect(v.timing.fps).toBeCloseTo(30, 0);
+    expect(v.samples.every((s, i) => i === 0 || s.t > v.samples[i - 1].t)).toBe(true);
+    expect((await v.read(v.samples[3])).byteLength).toBe(v.samples[3].size);
+    expect(v.decoderConfig.description.length).toBeGreaterThan(10);
+  });
+});

@@ -50,7 +50,7 @@ const mmss = (ms) => `${Math.floor(ms / 60000)}:${pad(Math.ceil((ms % 60000) / 1
  *   getContext: build, device, capture, analysis, flujo y detector para el informe
  *   onStart: se llama al empezar una sesión (la app reinicia sus medidas y, si el plan lo pide, enciende el flujo)
  */
-export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () => {}, onStepStart = () => {}, prefix = 'as', rootId = 'assistant', busyKey = 'assistant', plan: fixedPlan = null }) {
+export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () => {}, onStepStart = () => {}, onState = () => {}, prefix = 'as', rootId = 'assistant', busyKey = 'assistant', plan: fixedPlan = null }) {
   const root = $(rootId);
   const P = prefix;
   const el = {
@@ -145,6 +145,8 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
     for (const [k, b] of Object.entries(settingBox)) if (b) b.value = String(PROTOCOL_DEFAULTS[k]);
   }
 
+  // Se declara antes de crear la sesión: su constructor ya llama a render (cambio de estado inicial).
+  let lastState = null;
   const session = new GuidedSession(stepsOf(plan, readSettings()), {
     prepMs: scale() < 1 ? 600 : undefined,
     getPerf,
@@ -185,6 +187,11 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
 
   function render(s) {
     root.dataset.state = viewFor(s);
+    if (s.state !== lastState) {
+      lastState = s.state;
+      // Aviso a quien lo use (la grabación del vídeo del protocolo): estado nuevo, sesión y configuración.
+      queueMicrotask(() => onState(s.state, session, { settings: readSettings() }));
+    }
     const busy = s.state === 'prep' || s.state === 'running' || s.state === 'review';
     if (busy) document.body.dataset.busy = busyKey;
     else if (document.body.dataset.busy === busyKey) document.body.dataset.busy = '';

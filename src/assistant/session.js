@@ -201,7 +201,8 @@ export class GuidedSession {
     const t = this.now();
     if (this.autoAdvancing) {
       const invalid = this.cur.status === 'invalid';
-      if (t - this.phaseStart >= (invalid ? RETRY_PAUSE_MS : this.autoAdvanceMs)) {
+      // `pauseAfterMs` del paso: pausa propia (el análisis del vídeo grabado reproduce los tiempos reales).
+      if (t - this.phaseStart >= (invalid ? RETRY_PAUSE_MS : (this.step.pauseAfterMs ?? this.autoAdvanceMs))) {
         if (invalid) this.repeat();
         else this.next();
         return;
