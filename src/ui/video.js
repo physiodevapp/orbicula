@@ -7,6 +7,7 @@ import { downloadJson, copyJson, stamp } from './share.js';
 import { buildReport } from '../assistant/report.js';
 import { summarizeProtocol } from '../protocol/summary.js';
 import { renderSummary } from './summary.js';
+import { exportJson, exportCsv, fileCapture } from './export.js';
 
 export const VIDEO_PROBE_SCHEMA = 'orbicula-video-probe/1';
 const $ = (id) => document.getElementById(id);
@@ -25,6 +26,7 @@ export function createVideoCard({ getContext, analyzeVideoFile = null }) {
     facing: $('vidFacing'), mirror: $('vidMirror'),
     rest: $('vidRest'), cap: $('vidCap'), analyze: $('vidAnalyze'), aCancel: $('vidACancel'), aBar: $('vidABar'), aBarWrap: $('vidABarWrap'),
     progress: $('vidProgress'), summary: $('vidSummary'),
+    exportRow: $('vidExport'), exportJson: $('vidExportJson'), exportCsv: $('vidExportCsv'), code: $('vidCode'),
   };
   let analysis = null; // { results, stats, context, settings, startedAt }
   // Un archivo elegido antes de recargar la página puede seguir en el selector sin permiso para leerlo.
@@ -59,7 +61,7 @@ export function createVideoCard({ getContext, analyzeVideoFile = null }) {
   el.file.addEventListener('change', async () => {
     const file = el.file.files?.[0];
     mp4 = null; probe = null; support = null; analysis = null;
-    el.summary.hidden = true; el.progress.textContent = '';
+    el.summary.hidden = true; el.progress.textContent = ''; el.exportRow.hidden = true;
     el.result.textContent = ''; el.msg.textContent = ''; el.out.hidden = true; el.probe.disabled = true;
     el.thumb.hidden = true;
     if (!file) return;
@@ -133,7 +135,7 @@ export function createVideoCard({ getContext, analyzeVideoFile = null }) {
     abort = new AbortController();
     const settings = { restSec: Number(el.rest.value) || 30, maxFps: el.cap.checked ? 30 : 0, facing: el.facing.value, mirrored: el.mirror.checked };
     el.analyze.disabled = true; el.probe.disabled = true; el.aCancel.hidden = false; el.aBarWrap.hidden = false;
-    el.summary.hidden = true; el.msg.textContent = '';
+    el.summary.hidden = true; el.exportRow.hidden = true; el.msg.textContent = '';
     el.progress.textContent = 'Preparando el análisis (modelo de la cara y flujo óptico)…';
     let wake = null;
     try { wake = await navigator.wakeLock?.request('screen'); } catch { /* sin bloqueo de pantalla */ }
@@ -150,6 +152,7 @@ export function createVideoCard({ getContext, analyzeVideoFile = null }) {
       const s = out.stats;
       el.progress.textContent = `Hecho: ${s.frames} fotogramas en ${mmss(s.elapsedMs)} (${nf(s.framesPerSecond, 1)}/s)${s.every > 1 ? `, uno de cada ${s.every}` : ''}.`;
       renderSummary(el.summary, summarizeProtocol(out.results), out.results);
+      el.exportRow.hidden = false;
     } catch (err) {
       el.progress.textContent = err?.name === 'AbortError' ? 'Cancelado.'
         : err?.name === 'NotReadableError' ? 'El móvil no deja leer el archivo. Vuelve a elegirlo y analiza enseguida.'
@@ -159,6 +162,9 @@ export function createVideoCard({ getContext, analyzeVideoFile = null }) {
       el.analyze.disabled = false; el.probe.disabled = !support?.supported; el.aCancel.hidden = true; el.aBarWrap.hidden = true;
     }
   });
+  const exportInput = () => ({ results: analysis.results, code: el.code.value, capture: fileCapture({ mp4, facing: el.facing.value, mirrored: el.mirror.checked }) });
+  el.exportJson.addEventListener('click', () => { if (analysis) el.msg.textContent = exportJson({ ...exportInput(), appVersion: analysis.context?.build?.version ?? '' }); });
+  el.exportCsv.addEventListener('click', () => { if (analysis) el.msg.textContent = exportCsv(exportInput()); });
   el.aCancel.addEventListener('click', () => abort?.abort());
 
   el.download.addEventListener('click', () => {

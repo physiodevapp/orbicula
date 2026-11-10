@@ -1,6 +1,10 @@
 # Plan de la fase 7: exportación e integración
 
-**Borrador, pendiente de que lo apruebe el autor.** Se lee junto con `CLAUDE.md` (secciones «Exportación» e «Integrabilidad con PhysiQ») y las conclusiones de `docs/plan-fase-5.md` y `docs/plan-fase-6.md`. La rama sale de `feat/fase-6-video`, que sale de `feat/fase-5-protocolo`: los PR 5 → 6 → 7 se fusionan en ese orden.
+**Aprobado por el autor el 2026-11-10, con las recomendaciones:**
+- origen del hub: `https://physiodevapp.github.io` (más el propio origen);
+- CSV en dos archivos;
+- `timeseries` con las señales de la cara y el cierre por flujo, sin el flujo por zonas;
+- acceso de lectura al repo `physiodevapp/physiq` para los tokens (7b). Se lee junto con `CLAUDE.md` (secciones «Exportación» e «Integrabilidad con PhysiQ») y las conclusiones de `docs/plan-fase-5.md` y `docs/plan-fase-6.md`. La rama sale de `feat/fase-6-video`, que sale de `feat/fase-5-protocolo`: los PR 5 → 6 → 7 se fusionan en ese orden.
 
 ## Qué tiene que hacer
 Cerrar los criterios de aceptación 5 y 6 de `CLAUDE.md`:

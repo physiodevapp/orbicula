@@ -8,6 +8,7 @@ import { summarizeProtocol } from '../protocol/summary.js';
 import { buildReport } from '../assistant/report.js';
 import { renderSummary } from './summary.js';
 import { downloadJson, stamp } from './share.js';
+import { exportJson, exportCsv, fileCapture } from './export.js';
 
 const $ = (id) => document.getElementById(id);
 const nf = (v, d = 0) => (Number.isFinite(v) ? v.toFixed(d).replace('.', ',') : '—');
@@ -24,6 +25,7 @@ export function createProtocolVideo({ getStream, analyzeVideoFile }) {
     record: $('prRecord'), recordRow: $('prRecordRow'), block: $('prRecBlock'), info: $('prRecInfo'), analyze: $('prRecAnalyze'),
     cancel: $('prRecCancel'), discard: $('prRecDiscard'), cap: $('prRecCap'), barWrap: $('prRecBarWrap'), bar: $('prRecBar'),
     progress: $('prRecProgress'), summary: $('prRecSummary'), download: $('prRecDownload'), msg: $('prRecMsg'),
+    exportRow: $('prRecExport'), exportJson: $('prRecExportJson'), exportCsv: $('prRecExportCsv'), code: $('prCode'),
   };
   const recorder = new FrameRecorder();
   const supported = recordingType() != null;
@@ -74,6 +76,7 @@ export function createProtocolVideo({ getStream, analyzeVideoFile }) {
       el.progress.textContent = '';
       el.summary.hidden = true;
       el.download.hidden = true;
+      el.exportRow.hidden = true;
       el.analyze.disabled = false;
       el.cap.checked = false; // todos los fotogramas: es lo que hace más sensible al análisis
       el.block.hidden = false;
@@ -86,7 +89,7 @@ export function createProtocolVideo({ getStream, analyzeVideoFile }) {
     if (!recorded) return;
     abort = new AbortController();
     el.analyze.disabled = true; el.discard.disabled = true; el.cancel.hidden = false; el.barWrap.hidden = false;
-    el.summary.hidden = true; el.download.hidden = true; show('');
+    el.summary.hidden = true; el.download.hidden = true; el.exportRow.hidden = true; show('');
     el.progress.textContent = 'Preparando el análisis (modelo de la cara y flujo óptico)…';
     let wake = null;
     try { wake = await navigator.wakeLock?.request('screen'); } catch { /* sin bloqueo de pantalla */ }
@@ -107,6 +110,7 @@ export function createProtocolVideo({ getStream, analyzeVideoFile }) {
       el.progress.textContent = `Hecho: ${s.frames} fotogramas en ${mmss(s.elapsedMs)}. El vídeo se ha borrado de la memoria.`;
       renderSummary(el.summary, summarizeProtocol(out.results), out.results);
       el.download.hidden = false;
+      el.exportRow.hidden = false;
       const keep = recorded;
       recorder.discard(); // el vídeo ya no hace falta
       recorded = null;
@@ -122,6 +126,10 @@ export function createProtocolVideo({ getStream, analyzeVideoFile }) {
     }
   });
   el.cancel?.addEventListener('click', () => abort?.abort());
+  // Resultados (fase 7): la captura es la del vídeo que se grabó en directo (no hay archivo ni espejo).
+  const exportInput = () => ({ results: analysis.results, code: el.code?.value, capture: fileCapture({ mp4: { timing: analysis.video.timing, track: analysis.video.track }, facing: analysis.context?.capture?.facing, mirrored: false, source: 'live' }) });
+  el.exportJson?.addEventListener('click', () => { if (analysis) show(exportJson({ ...exportInput(), appVersion: analysis.context?.build?.version ?? '' })); });
+  el.exportCsv?.addEventListener('click', () => { if (analysis) show(exportCsv(exportInput())); });
   el.discard?.addEventListener('click', () => { forget(); show('Vídeo descartado.'); });
   el.download?.addEventListener('click', () => {
     if (!analysis) return;

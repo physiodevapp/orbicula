@@ -4,6 +4,17 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (fase 7a: resultados en JSON y CSV)
+- **JSON público de resultados** (`schemaVersion: "1"`; `src/export/result.js`). Es el formato estable de orbicula, distinto del de diagnóstico:
+  - **Contenido:** captura, fases con su inicio y fin, calibración, métricas por lado y fase con su asimetría, calidad de cada fase, eventos y las series de la cara.
+  - **Formato:** tiempos en milisegundos, lados del paciente y sin ninguna identificación; solo el código opcional.
+  - **Documentación:** `docs/schema.md`, con las unidades de cada métrica, y esquema formal en `docs/orbicula-result.schema.json` (JSON Schema 2020-12).
+  - **Validación:** un test la hace con `ajv` (dependencia de desarrollo, versión fija).
+- **CSV de las series temporales**, en dos archivos: cara (EAR, apertura, parpadeo, sonrisa y cierre) y flujo (cierre por flujo, congelado y cabeza).
+- **Botones «Resultados (JSON)» y «CSV de las series»** en los tres resultados: el protocolo en directo, el protocolo grabado y el análisis de un vídeo. La tarjeta del vídeo tiene ahora el código opcional.
+- `scripts/dev/check-export.cjs`: protocolo → JSON y CSV → validación contra el esquema.
+- 14 tests nuevos.
+
 ### Añadido (fase 6d: aviso y velocidad)
 - **Aviso en directo (criterio 1):** si el análisis de la cara va por debajo de 24 por segundo durante 5 s seguidos, la app lo dice con la velocidad actual y propone el vídeo grabado.
 - **El análisis del vídeo va más rápido:** dos fotogramas en vuelo a la vez. En la nube, 1,28 veces más rápido con los mismos resultados.

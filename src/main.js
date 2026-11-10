@@ -18,6 +18,7 @@ import { BlinkDetector } from './metrics/blinks.js';
 import { createAssistant } from './ui/assistant.js';
 import { createVideoCard } from './ui/video.js';
 import { createProtocolVideo } from './ui/protocol-video.js';
+import { exportJson, exportCsv, liveCapture, fileCapture } from './ui/export.js';
 import { createVideoSession, videoSteps, processVideo } from './video/offline.js';
 import { PROTOCOL_PLAN } from './assistant/steps.js';
 import { createBenchmark } from './ui/benchmark.js';
@@ -246,6 +247,10 @@ const protocol = createAssistant({
   prefix: 'pr', rootId: 'protocol', busyKey: 'protocol', plan: PROTOCOL_PLAN,
   onStart: async (plan) => { await sessionDeps.onStart(plan); await protocolVideo.beforeStart(); },
   onState: (state, session, extra) => protocolVideo.onState(state, session, extra),
+  exporter: {
+    json: (results, code) => exportJson({ results, code, capture: liveCapture({ camera, results }), appVersion: __APP_VERSION__ }),
+    csv: (results, code) => exportCsv({ results, code }),
+  },
 });
 /** Las dos tarjetas reciben todas las medidas; solo la que está grabando un paso las guarda. */
 const recorders = [assistant, protocol];

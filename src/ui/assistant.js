@@ -50,7 +50,7 @@ const mmss = (ms) => `${Math.floor(ms / 60000)}:${pad(Math.ceil((ms % 60000) / 1
  *   getContext: build, device, capture, analysis, flujo y detector para el informe
  *   onStart: se llama al empezar una sesión (la app reinicia sus medidas y, si el plan lo pide, enciende el flujo)
  */
-export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () => {}, onStepStart = () => {}, onState = () => {}, prefix = 'as', rootId = 'assistant', busyKey = 'assistant', plan: fixedPlan = null }) {
+export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () => {}, onStepStart = () => {}, onState = () => {}, exporter = null, prefix = 'as', rootId = 'assistant', busyKey = 'assistant', plan: fixedPlan = null }) {
   const root = $(rootId);
   const P = prefix;
   const el = {
@@ -281,6 +281,13 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
     } catch (err) {
       el.msg.textContent = `No se pudo copiar (${err?.message ?? err}). Usa «Descargar JSON».`;
     }
+  }
+
+  // Resultados (fase 7): el JSON público y los CSV, solo en la tarjeta del protocolo.
+  if (exporter && $(`${P}ExportJson`)) {
+    const say = (m) => { $(`${P}ExportMsg`).textContent = m; };
+    $(`${P}ExportJson`).addEventListener('click', () => say(exporter.json(session.results, el.code.value)));
+    $(`${P}ExportCsv`).addEventListener('click', () => say(exporter.csv(session.results, el.code.value)));
   }
 
   // ── Botones ──────────────────────────────────────────────────────────────────

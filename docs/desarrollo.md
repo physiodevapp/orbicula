@@ -63,6 +63,12 @@ node scripts/dev/check-protocol-video.cjs --video /tmp/caras/lid.y4m --live en-d
 ```
 Hace el protocolo en directo con la casilla «Grabar el vídeo…» marcada (MediaRecorder; el Chromium de Playwright graba MP4 H.264), descarga el JSON del directo, analiza el vídeo grabado y descarga el JSON del análisis. Con `--full` procesa todos los fotogramas y no uno de cada dos. Tarda unos 10 min con `escala=0.4` (análisis sin GPU).
 
+## Exportar y validar los resultados (fase 7)
+```bash
+node scripts/dev/check-export.cjs --video /tmp/caras/lid.y4m --out /tmp/export --query '?escala=0.2'
+```
+Hace el protocolo con la cámara simulada, descarga con los botones el JSON de resultados y los dos CSV, y valida el JSON contra `docs/orbicula-result.schema.json` con `ajv` (dependencia de desarrollo). Dice si hay peticiones externas.
+
 ## Repetir los eventos de la fase 5 con datos reales
 ```bash
 node scripts/dev/replay-events.mjs informe.json ['{"riseFloor":0.002}']

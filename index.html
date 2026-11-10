@@ -57,9 +57,17 @@
         <div class="coach-bar" id="vidABarWrap" hidden><i id="vidABar"></i></div>
         <p class="hint" id="vidProgress"></p>
         <div class="proto-summary" id="vidSummary" hidden></div>
+        <label class="field">
+          <span class="control-label">Código (opcional)</span>
+          <input class="input" id="vidCode" maxlength="24" autocomplete="off" placeholder="p. ej. P01">
+        </label>
+        <div class="control-row wrap" id="vidExport" hidden>
+          <button class="btn btn-primary" id="vidExportJson" type="button">Resultados (JSON)</button>
+          <button class="btn" id="vidExportCsv" type="button">CSV de las series</button>
+        </div>
         <div class="control-row wrap">
-          <button class="btn" id="vidDownload" type="button">Descargar JSON</button>
-          <button class="btn" id="vidCopy" type="button">Copiar ficha</button>
+          <button class="btn btn-quiet" id="vidDownload" type="button">Descargar JSON de diagnóstico</button>
+          <button class="btn btn-quiet" id="vidCopy" type="button">Copiar ficha</button>
         </div>
         <p class="hint" id="vidMsg"></p>
       </div>
@@ -223,6 +231,15 @@
       <div class="as-view" data-view="done">
         <div class="step-title" id="prDoneTitle">Protocolo completo</div>
         <div class="proto-summary" id="prSummaryView" hidden></div>
+        <div class="sum-card" id="prExportBlock">
+          <div class="sum-head"><span class="sum-title">Resultados</span></div>
+          <p class="hint">El <b>JSON de resultados</b> es el formato estable de orbicula (para el hub y para estudios); los <b>CSV</b> traen las series temporales, en dos archivos (cara y flujo). Sin ningún dato del paciente; solo el código si lo escribiste.</p>
+          <div class="control-row wrap">
+            <button class="btn btn-primary" id="prExportJson" type="button">Resultados (JSON)</button>
+            <button class="btn" id="prExportCsv" type="button">CSV de las series</button>
+          </div>
+          <p class="hint" id="prExportMsg"></p>
+        </div>
         <div class="sum-card" id="prRecBlock" hidden>
           <div class="sum-head"><span class="sum-title">Análisis fotograma a fotograma</span></div>
           <p class="hint" id="prRecInfo"></p>
@@ -235,7 +252,11 @@
           <div class="coach-bar" id="prRecBarWrap" hidden><i id="prRecBar"></i></div>
           <p class="hint" id="prRecProgress"></p>
           <div class="proto-summary" id="prRecSummary" hidden></div>
-          <button class="btn" id="prRecDownload" type="button" hidden>Descargar JSON del análisis del vídeo</button>
+          <div class="control-row wrap" id="prRecExport" hidden>
+            <button class="btn btn-primary" id="prRecExportJson" type="button">Resultados (JSON)</button>
+            <button class="btn" id="prRecExportCsv" type="button">CSV de las series</button>
+          </div>
+          <button class="btn btn-quiet" id="prRecDownload" type="button" hidden>Descargar JSON de diagnóstico del vídeo</button>
           <p class="hint" id="prRecMsg"></p>
         </div>
         <p class="hint" id="prDoneText"></p>
