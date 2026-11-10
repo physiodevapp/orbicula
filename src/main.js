@@ -16,6 +16,9 @@ import { Analysis } from './landmarks/analysis.js';
 import { sampleOf } from './landmarks/process.js';
 import { BlinkDetector } from './metrics/blinks.js';
 import { createAssistant } from './ui/assistant.js';
+import { createVideoCard } from './ui/video.js';
+import { createProtocolVideo } from './ui/protocol-video.js';
+import { createVideoSession, videoSteps, processVideo } from './video/offline.js';
 import { PROTOCOL_PLAN } from './assistant/steps.js';
 import { createBenchmark } from './ui/benchmark.js';
 import { Series } from './metrics/series.js';
@@ -48,6 +51,7 @@ const els = {
   swapToggle: $('swapToggle'),
   blendToggle: $('blendToggle'),
   fpsWarning: $('fpsWarning'),
+  analysisWarning: $('analysisWarning'),
   controls: $('controls'),
   curvesView: $('curvesView'),
   metricHint: $('metricHint'),
@@ -156,6 +160,7 @@ function captureContext() {
   };
 }
 
+
 /** Lo que comparten el asistente de pruebas y el protocolo clínico: las mismas medidas y la misma calibración. */
 const sessionDeps = {
   getContext: captureContext,
@@ -187,7 +192,61 @@ const sessionDeps = {
   },
 };
 const assistant = createAssistant(sessionDeps);
-const protocol = createAssistant({ ...sessionDeps, prefix: 'pr', rootId: 'protocol', busyKey: 'protocol', plan: PROTOCOL_PLAN });
+
+/**
+ * Vídeo grabado (fase 6b): procesa el archivo fotograma a fotograma con el análisis en modo IMAGE y el
+ * flujo sin límite de ritmo, y registra las medidas con el reloj del vídeo (src/video/offline.js). La
+ * cámara se apaga mientras tanto (si no, sus frames se mezclarían con los del vídeo).
+ */
+async function analyzeVideoFile({ mp4, mirrored, restSec, maxFps, steps = null, fromMs = 0, toMs = Infinity, signal, onProgress }) {
+  const busy = document.body.dataset.busy;
+  if (busy) throw new Error(busy === 'video' ? 'ya hay un vídeo analizándose' : 'hay otra prueba en marcha');
+  document.body.dataset.busy = 'video';
+  const video = createVideoSession(steps ?? videoSteps(mp4.timing.durationMs, restSec), { onStepEnd: sessionDeps.onStepEnd, onStepStart: sessionDeps.onStepStart });
+  try {
+    if (camera.stream) {
+      for (const a of recorders) a.interrupt('se ha empezado a analizar un vídeo grabado');
+      camera.stop();
+      state.running = false;
+    }
+    await loadModel();
+    if (!analysis) throw new Error('no se pudo cargar el modelo de la cara');
+    await sessionDeps.onStart({ flow: true }); // medidas a cero y flujo encendido
+    flow.resetStrip();
+    flow.setUnlimited(true);
+    analysis.frameMirrored = !!mirrored;
+    await analysis.setImageMode(true);
+    els.curvesView.hidden = false;
+    recorders.push(video.recorder);
+    const stats = await processVideo({ mp4, analysis, flow, video, maxFps, fromMs, toMs, signal, onProgress });
+    // Pares de flujo que llegaron a registrarse y lo que contó el cliente del flujo (para diagnosticar).
+    const pairs = video.session.results.reduce((n, r) => n + (r.flow?.rel.length ?? 0), 0);
+    stats.flow = { pairs, ...flow.counts };
+    // Una vez (en una prueba en la nube) salió un análisis sin ningún par de flujo y no se supo por qué:
+    // mejor avisar que entregar un resumen sin flujo.
+    if (!pairs) throw new Error(`no se pudo medir el flujo óptico (${JSON.stringify(flow.counts)}); vuelve a intentarlo`);
+    return { results: video.session.results, stats, context: captureContext() };
+  } finally {
+    const k = recorders.indexOf(video.recorder);
+    if (k >= 0) recorders.splice(k, 1);
+    flow?.setUnlimited(false);
+    flow?.resetStrip();
+    if (analysis) {
+      analysis.frameMirrored = false;
+      try { await analysis.setImageMode(false); } catch { /* se recarga al volver a la cámara */ }
+    }
+    if (document.body.dataset.busy === 'video') document.body.dataset.busy = '';
+  }
+}
+createVideoCard({ getContext: () => { const c = captureContext(); return { build: c.build, device: c.device }; }, analyzeVideoFile });
+// Grabación del vídeo durante el protocolo y análisis posterior (fase 6c); `analyzeVideoFile` se define más abajo.
+const protocolVideo = createProtocolVideo({ getStream: () => camera.stream, analyzeVideoFile: (o) => analyzeVideoFile(o) });
+const protocol = createAssistant({
+  ...sessionDeps,
+  prefix: 'pr', rootId: 'protocol', busyKey: 'protocol', plan: PROTOCOL_PLAN,
+  onStart: async (plan) => { await sessionDeps.onStart(plan); await protocolVideo.beforeStart(); },
+  onState: (state, session, extra) => protocolVideo.onState(state, session, extra),
+});
 /** Las dos tarjetas reciben todas las medidas; solo la que está grabando un paso las guarda. */
 const recorders = [assistant, protocol];
 
@@ -407,9 +466,25 @@ function updateQuality(r, now) {
   els.quality.hidden = !msg;
 }
 
+// Criterio de aceptación 1: el análisis en directo tiene que llegar a 24/s; si no, se dice y se propone el
+// vídeo grabado. Hay que verlo bajo el mínimo 5 s seguidos (el arranque siempre va lento) y no mientras
+// se procesa un vídeo (ahí no hay prisa).
+const MIN_ANALYSIS_FPS = 24;
+let slowAnalysisSince = null;
+function updateAnalysisWarning(now) {
+  const slow = state.running && analysis && analysis.fps > 0 && analysis.fps < MIN_ANALYSIS_FPS && document.body.dataset.busy !== 'video';
+  slowAnalysisSince = slow ? (slowAnalysisSince ?? now) : null;
+  const show = slowAnalysisSince != null && now - slowAnalysisSince > 5000;
+  els.analysisWarning.hidden = !show;
+  if (show) {
+    els.analysisWarning.textContent = `El análisis de la cara va a ${analysis.fps.toFixed(0)} por segundo y el mínimo es ${MIN_ANALYSIS_FPS}: las medidas en directo pierden sensibilidad. Para medir con la máxima sensibilidad, graba con la app de cámara y analiza el vídeo (tarjeta «Vídeo grabado», arriba), o marca «Grabar el vídeo para analizarlo después» al hacer el protocolo.`;
+  }
+}
+
 function updateAnalysisUi(r, now) {
   if (now - lastAnaUi < 250) return;
   lastAnaUi = now;
+  updateAnalysisWarning(now);
 
   const level = fpsLevel(analysis.fps);
   els.anaPill.textContent = `análisis ${analysis.fps.toFixed(0)}/s · ${analysis.ms.toFixed(0)} ms`;
@@ -499,8 +574,9 @@ async function createAnalysis() {
 // ── Ritmo del flujo: se rebaja solo si el análisis de la cara no llega a 24/s ─────────────
 const governor = new RateGovernor();
 setInterval(() => {
-  // La prueba de rendimiento mide configuraciones fijas: ahí no se toca.
-  if (!flow || !state.showFlow || !analysis || document.body.dataset.busy === 'bench') return;
+  updateAnalysisWarning(performance.now()); // también se quita sola si la cámara se para
+  // La prueba de rendimiento mide configuraciones fijas y el vídeo grabado procesa todos los pares.
+  if (!flow || !state.showFlow || !analysis || ['bench', 'video'].includes(document.body.dataset.busy)) return;
   const cap = governor.update(performance.now(), analysis.fps);
   if (cap !== flow.rateCap) {
     flow.setRateCap(cap);

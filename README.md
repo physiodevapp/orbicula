@@ -7,7 +7,7 @@ Cuantificación de movimientos finos de la musculatura periocular (orbicular de 
 
 ## Estado
 
-v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolución reales) **fase 2** (Face Landmarker, ROI por lado y lateralidad) y **fase 3** (EAR, parpadeos y curvas en tiempo real). **Fase 4** (flujo óptico): hecha; en el móvil del autor, el cierre por flujo detecta contracciones mínimas del orbicular que el EAR no distingue del reposo (ver `docs/plan-fase-4.md`). **Fase 5** (protocolo guiado): hecha; seis fases con voz y pitidos, calibración sobre el reposo del propio paciente, eventos en directo y un resumen por fase y lado con su asimetría (ver [`docs/plan-fase-5.md`](docs/plan-fase-5.md)). Ver [`CHANGELOG.md`](CHANGELOG.md).
+v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolución reales) **fase 2** (Face Landmarker, ROI por lado y lateralidad) y **fase 3** (EAR, parpadeos y curvas en tiempo real). **Fase 4** (flujo óptico): hecha; en el móvil del autor, el cierre por flujo detecta contracciones mínimas del orbicular que el EAR no distingue del reposo (ver `docs/plan-fase-4.md`). **Fase 6** (vídeo grabado): hecha; análisis fotograma a fotograma de un vídeo de la app de cámara y del propio protocolo grabado, con los guiños en su lado con las dos cámaras (ver [`docs/plan-fase-6.md`](docs/plan-fase-6.md)). **Fase 5** (protocolo guiado): hecha; seis fases con voz y pitidos, calibración sobre el reposo del propio paciente, eventos en directo y un resumen por fase y lado con su asimetría (ver [`docs/plan-fase-5.md`](docs/plan-fase-5.md)). Ver [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Uso clínico
 
@@ -65,6 +65,24 @@ Se pueden cambiar la duración del reposo y del parpadeo, y las repeticiones de 
 - Los eventos de ceja y canto son experimentales y no se resumen.
 
 El JSON de resultados lleva las series, la calibración, los eventos y este resumen (formato de diagnóstico `orbicula-test-session/3`, en [`docs/pruebas.md`](docs/pruebas.md)).
+
+## Vídeo grabado
+
+La tarjeta **«Vídeo grabado»** (arriba de todo, sin necesidad de activar la cámara) analiza un vídeo hecho con la **app de cámara del móvil**, fotograma a fotograma. Es el modo de **máxima sensibilidad**: se analizan todos los fotogramas, la cara sin el suavizado del directo y el flujo en todos los pares.
+
+**Cómo grabar el vídeo:**
+- Con la app de cámara normal, la trasera si puedes, con el móvil **firme** y la cara de frente, la cabeza apoyada y buena luz.
+- Los **primeros 30 s, quieto y mirando al frente**: son el reposo de calibración (se puede cambiar a 20 o 45 s). Después, lo que quieras medir.
+- Si grabas con la frontal, comprueba si el vídeo sale **en espejo** (las letras se leen al revés) y marca la casilla; con la trasera casi nunca lo está.
+- Formato MP4 (H.264 o HEVC). Si Chrome no puede decodificar el códec, la tarjeta lo dice: graba en H.264 («Más compatible» en la app de cámara).
+
+**Cómo analizarlo:** elige el archivo, comprueba que la ficha dice «El navegador lo puede decodificar» y pulsa **«Analizar el vídeo»**. Un vídeo de 1 minuto tarda unos 2–3 minutos; uno de 4 minutos, unos 10. Mantén la pantalla encendida. Al acabar salen el resumen (reposo y resto del vídeo, con asimetrías) y el JSON.
+
+**El protocolo, grabado:** en la tarjeta «Protocolo clínico», la casilla **«Grabar el vídeo para analizarlo después»** graba el vídeo del propio protocolo y, al acabar, lo analiza fotograma a fotograma con las fases exactas. Ofrece el mismo resumen por fases con más sensibilidad: por ejemplo, detecta más parpadeos y los mide con su duración real.
+
+**Privacidad:** el vídeo se lee en el móvil y no sale de él. El que graba el protocolo **solo existe en la memoria**: no se guarda como archivo ni se puede exportar, y se borra al terminar el análisis, al descartarlo o al empezar otra sesión.
+
+**Si el directo va lento:** cuando el análisis en directo baja de 24 por segundo, la app lo avisa y propone este modo.
 
 ## Parpadeos y curvas
 

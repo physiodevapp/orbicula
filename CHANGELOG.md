@@ -4,6 +4,50 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (fase 6d: aviso y velocidad)
+- **Aviso en directo (criterio 1):** si el análisis de la cara va por debajo de 24 por segundo durante 5 s seguidos, la app lo dice con la velocidad actual y propone el vídeo grabado.
+- **El análisis del vídeo va más rápido:** dos fotogramas en vuelo a la vez. En la nube, 1,28 veces más rápido con los mismos resultados.
+- El JSON de un vídeo analizado trae el desglose del tiempo por fotograma (decodificar, preparar, esperar a los workers, análisis y flujo).
+- La casilla «un fotograma de cada dos» del protocolo grabado es literal, va desmarcada y la tarjeta estima el tiempo antes de empezar.
+- 1 test nuevo.
+
+### Añadido (fase 6c: protocolo grabado y analizado después)
+- **Casilla «Grabar el vídeo para analizarlo después, más sensible»** en el protocolo (desmarcada por defecto). El vídeo de la cámara se graba en la memoria del móvil mientras haces el protocolo (MP4 H.264, 4 Mb/s) y, al acabar, un botón lo analiza **fotograma a fotograma**, con las fases y las repeticiones exactas del protocolo que acabas de hacer.
+  - **Privacidad:** el vídeo solo existe en la memoria. Nunca se guarda como archivo ni se exporta. Se borra al terminar el análisis, al descartarlo, al detener el protocolo o al empezar otra sesión. Tope de 300 MB.
+  - Un fotograma de cada dos por defecto (tarda la mitad; casilla).
+  - Progreso con el tiempo restante y botón de cancelar. Al acabar sale el resumen por fases (el mismo formato que en directo) y un JSON con las ventanas de cada fase y el procesado.
+- Lectura del MP4 fragmentado que graba `MediaRecorder` (`openRecording`).
+- `scripts/dev/check-protocol-video.cjs`.
+- Si el análisis no llega a medir el flujo, da error en vez de entregar un resumen sin flujo.
+- 7 tests nuevos.
+
+### Añadido (fase 6b: análisis de un vídeo grabado)
+- **«Analizar el vídeo»**, en la tarjeta «Vídeo grabado», analiza **todos** los fotogramas, de uno en uno: la cara en modo IMAGE (sin el suavizado del directo) y el flujo en todos los pares (sin límite de ritmo).
+  - Los primeros segundos (20, 30 o 45; por defecto, 30) son el reposo de calibración.
+  - Del resto salen los eventos, las curvas y el resumen. Tramo nuevo, «Resto del vídeo»: parpadeos, cierre, contracciones y actividad rítmica.
+  - Progreso con el tiempo restante, cancelar, y opción de procesar como mucho 30 fotogramas/s.
+- **Espejo:** la casilla «El vídeo está en espejo» corrige los lados, igual que en directo. Comprobado con un vídeo sintético: los parpadeos de cada ojo salen en su lado y se intercambian con la casilla.
+- **La cámara se apaga** al empezar a analizar un vídeo.
+- **JSON:** el mismo formato que el protocolo (`orbicula-test-session/3`, `plan: "video"`), con la ficha del vídeo y cómo se procesó.
+- `scripts/dev/check-video-analysis.cjs`.
+- 7 tests nuevos.
+
+### Añadido (fase 6a: lectura de vídeo grabado)
+- **Tarjeta «Vídeo grabado».** Se elige un MP4 de la app de cámara y se ve su ficha:
+  - códec y resolución;
+  - giro y tamaño ya girado;
+  - duración y fps reales (y si son variables);
+  - fotogramas clave;
+  - si el navegador lo puede decodificar.
+
+  «Probar la lectura» decodifica los primeros 15 s y mide cuántos fotogramas por segundo da el móvil con el giro aplicado. Muestra una miniatura del primer fotograma ya girado.
+- **Lectura sin cargar el archivo en memoria:** solo el índice (`moov`) con `mp4box` 2.4.1, y cada fotograma comprimido desde su posición en el archivo. Se decodifica con WebCodecs, sin adelantar más de 3 fotogramas.
+- JSON `orbicula-video-probe/1`: ficha y prueba de lectura, sin el nombre del archivo ni imágenes.
+- **Lectura del archivo en bloques de 8 MB:** en el móvil, leer muestra a muestra dejaba la lectura en 7 fotogramas/s. La prueba da ahora el desglose por fotograma: leer, girar y decodificar.
+- **Corregido: la lectura se quedaba colgada al final en el móvil.** El decodificador de hardware no termina el vaciado si no se le recogen los fotogramas.
+- `scripts/dev/check-video.cjs` y tres MP4 diminutos en `tests/fixtures/`.
+- 12 tests nuevos.
+
 ### Documentación (fase 5d)
 - `README.md`: instrucciones de uso clínico del protocolo (preparación, fases, cómo leer el resumen y límites conocidos).
 - `docs/plan-fase-5.md`: conclusión de la fase, tabla de parámetros provisionales y lo pendiente.

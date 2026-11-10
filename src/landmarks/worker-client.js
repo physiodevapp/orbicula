@@ -1,6 +1,7 @@
 // Cliente del worker de análisis. Interfaz común con Analysis (hilo principal):
 //   load(blendshapes), ready, delegate, mode, ms, fps, submit(video, t), onResult(result),
 //   frameMirrored, swapNames, setBlendshapes(on), analysisSize, inflight, dispose().
+import { sourceSize } from '../capture/source.js';
 import AnalysisWorker from './analysis.worker.js?worker';
 import { assetUrls } from './landmarker.js';
 import { FpsMeter } from '../capture/camera-logic.js';
@@ -67,6 +68,10 @@ export class WorkerAnalysis {
             this.onResult?.(m);
             break;
           }
+          case 'modeSet':
+            this.modeWaiter?.();
+            this.modeWaiter = null;
+            break;
           case 'blocked':
             this.blockedHosts.add(m.host);
             break;
@@ -82,6 +87,19 @@ export class WorkerAnalysis {
     return this._loading;
   }
 
+  /**
+   * Modo IMAGE (vídeo grabado, fase 6): cada fotograma por separado, sin el suavizado entre frames del
+   * modo VIDEO. Se espera a que el worker confirme el cambio.
+   */
+  setImageMode(on) {
+    if (!this.worker) return Promise.resolve();
+    return new Promise((resolve) => {
+      this.modeWaiter = resolve;
+      this.worker.postMessage({ type: 'mode', image: !!on });
+      setTimeout(resolve, 3000); // por si no contesta
+    });
+  }
+
   /** Activa o desactiva los blendshapes. El worker lo aplica de forma asíncrona: se espera un poco. */
   setBlendshapes(on) {
     this.worker?.postMessage({ type: 'options', blendshapes: on });
@@ -90,8 +108,8 @@ export class WorkerAnalysis {
 
   /** Manda una copia del frame actual al worker. Si está ocupado, el frame se descarta. */
   submit(video, t) {
-    if (!this.ready || this.inflight >= MAX_IN_FLIGHT || video.readyState < 2 || !video.videoWidth) return;
-    const frame = { width: video.videoWidth, height: video.videoHeight };
+    const frame = sourceSize(video); // <video> de la cámara o VideoFrame de un archivo (fase 6)
+    if (!this.ready || this.inflight >= MAX_IN_FLIGHT || !frame) return;
     const scale = Math.min(1, ANALYSIS_SHORT_SIDE / Math.min(frame.width, frame.height));
     const size = { width: Math.round(frame.width * scale), height: Math.round(frame.height * scale) };
     this.analysisSize = size;

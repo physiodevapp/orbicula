@@ -14,7 +14,7 @@ const f = (v) => (v == null ? '—' : typeof v === 'object' ? JSON.stringify(v) 
 console.log(`${file}\nplan ${r.plan} · commit ${r.build?.commit}`);
 for (const w of s.warnings) console.log(`AVISO: ${w}`);
 for (const [id, p] of Object.entries(s.phases)) {
-  console.log(`\n${p.title}${p.quality.reliable ? '' : `  [poco fiable: ${p.quality.notes.join('; ')}]`}  (cara ${p.quality.face}, cabeza en movimiento ${p.quality.headMoving}, análisis ${p.quality.analysisFps}/s)`);
+  console.log(`\n${p.title}${p.quality.reliable ? '' : `  [poco fiable: ${p.quality.notes.join('; ')}]`}  (cara ${p.quality.face}, cabeza en movimiento ${p.quality.headMoving}, análisis ${p.quality.analysisFps ?? '—'}/s)`);
   const keys = [...new Set([...Object.keys(p.left), ...Object.keys(p.right)])];
   for (const k of keys) console.log(`  ${k.padEnd(18)} I ${f(p.left[k]).padEnd(28)} D ${f(p.right[k]).padEnd(28)} asim ${f(p.asymmetry[k])}`);
 }

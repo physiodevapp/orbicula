@@ -10,6 +10,7 @@ import { stripFromRois, needsNewStrip, workingSize } from './strip.js';
 import { FpsMeter } from '../capture/camera-logic.js';
 import { RateLimiter } from './rate.js';
 import { ROI_KEYS, toWork } from './metrics.js';
+import { sourceSize } from '../capture/source.js';
 
 /** Frames en vuelo: uno calculándose y otro preparándose. Si están los dos, el frame se descarta. */
 const MAX_IN_FLIGHT = 2;
@@ -114,6 +115,14 @@ export class FlowClient {
     return Number.isFinite(out) ? out : 0;
   }
 
+  /**
+   * Vídeo grabado (fase 6): sin límite de pares por segundo, todos los fotogramas del archivo se
+   * emparejan (no hay prisa: se espera a cada resultado).
+   */
+  setUnlimited(on) {
+    this.unlimited = !!on;
+  }
+
   /** Rebaja (o quita, con 0) el límite de pares por segundo sin cambiar de configuración. */
   setRateCap(cap) {
     if (cap === this.rateCap) return;
@@ -163,8 +172,9 @@ export class FlowClient {
 
   /** Recorta la franja del frame actual y la manda al worker. */
   submit(video, t) {
-    if (!this.ready || video.readyState < 2 || !video.videoWidth) return;
-    if (!this.strip || video.videoWidth !== this.frame.width || video.videoHeight !== this.frame.height) {
+    const size = sourceSize(video); // <video> de la cámara o VideoFrame de un archivo (fase 6)
+    if (!this.ready || !size) return;
+    if (!this.strip || size.width !== this.frame.width || size.height !== this.frame.height) {
       this.counts.noStrip++;
       return;
     }
@@ -172,7 +182,7 @@ export class FlowClient {
       this.counts.busy++;
       return;
     }
-    if (!this.limiter.allow(t)) {
+    if (!this.unlimited && !this.limiter.allow(t)) {
       this.counts.capped++;
       return;
     }

@@ -24,6 +24,47 @@
       <button class="btn btn-primary" id="startBtn" type="button">Activar cámara</button>
     </section>
 
+    <section class="card" id="videoCard">
+      <div class="card-title">Vídeo grabado</div>
+      <p class="card-text">Analiza un vídeo grabado con la app de cámara del móvil, fotograma a fotograma: es el modo más sensible. El vídeo se lee en el móvil y no sale de él. <b>Los primeros segundos tienen que ser de reposo</b> (quieto, mirando al frente): de ellos salen los umbrales.</p>
+      <label class="field">
+        <span class="control-label">Archivo de vídeo (MP4)</span>
+        <input class="input" id="vidFile" type="file" accept="video/mp4,video/quicktime,video/*">
+      </label>
+      <div class="control-row wrap">
+        <label class="field"><span class="control-label">Grabado con</span>
+          <select class="select" id="vidFacing" aria-label="Cámara con que se grabó"><option value="rear">la trasera</option><option value="front">la frontal</option></select></label>
+        <label class="check"><input type="checkbox" id="vidMirror"> El vídeo está en espejo</label>
+      </div>
+      <pre class="summary" id="vidInfo"></pre>
+      <div id="vidOut" hidden>
+        <div class="control-row wrap">
+          <button class="btn btn-primary" id="vidProbe" type="button" disabled>Probar la lectura (15 s)</button>
+          <button class="btn btn-quiet" id="vidCancel" type="button" hidden>Cancelar</button>
+        </div>
+        <div class="coach-bar" id="vidBarWrap" hidden><i id="vidBar"></i></div>
+        <pre class="summary" id="vidResult"></pre>
+        <canvas class="vid-thumb" id="vidThumb" hidden aria-label="Primer fotograma, ya girado"></canvas>
+        <div class="control-row wrap">
+          <label class="field"><span class="control-label">Reposo al principio</span>
+            <select class="select" id="vidRest" aria-label="Segundos de reposo al principio del vídeo"><option value="20">20 s</option><option value="30" selected>30 s</option><option value="45">45 s</option></select></label>
+          <label class="check"><input type="checkbox" id="vidCap"> Como mucho 30 fotogramas/s (tarda la mitad)</label>
+        </div>
+        <div class="control-row wrap">
+          <button class="btn btn-primary" id="vidAnalyze" type="button">Analizar el vídeo</button>
+          <button class="btn btn-quiet" id="vidACancel" type="button" hidden>Cancelar</button>
+        </div>
+        <div class="coach-bar" id="vidABarWrap" hidden><i id="vidABar"></i></div>
+        <p class="hint" id="vidProgress"></p>
+        <div class="proto-summary" id="vidSummary" hidden></div>
+        <div class="control-row wrap">
+          <button class="btn" id="vidDownload" type="button">Descargar JSON</button>
+          <button class="btn" id="vidCopy" type="button">Copiar ficha</button>
+        </div>
+        <p class="hint" id="vidMsg"></p>
+      </div>
+    </section>
+
     <section id="liveView" hidden>
       <div class="stage">
         <video id="video" playsinline muted autoplay></video>
@@ -140,6 +181,7 @@
         <label class="check"><input type="checkbox" id="prSound" checked> Sonidos y vibración</label>
         <label class="check"><input type="checkbox" id="prAuto" checked> Modo seguido: sin revisión entre fases</label>
         <label class="check"><input type="checkbox" id="prVoice" checked> Voz: explica cada fase (voz del móvil)</label>
+        <label class="check" id="prRecordRow"><input type="checkbox" id="prRecord"> Grabar el vídeo para analizarlo después, más sensible (queda solo en la memoria del móvil y se borra al terminar)</label>
         <p class="hint">En cada gesto: pitido agudo = ahora, grave = relaja. Si el reposo no vale (la cabeza se mueve, demasiados parpadeos o se pierde la cara), se repite solo.</p>
         <button class="btn btn-primary" id="prStart" type="button">Empezar el protocolo</button>
       </div>
@@ -181,6 +223,21 @@
       <div class="as-view" data-view="done">
         <div class="step-title" id="prDoneTitle">Protocolo completo</div>
         <div class="proto-summary" id="prSummaryView" hidden></div>
+        <div class="sum-card" id="prRecBlock" hidden>
+          <div class="sum-head"><span class="sum-title">Análisis fotograma a fotograma</span></div>
+          <p class="hint" id="prRecInfo"></p>
+          <label class="check"><input type="checkbox" id="prRecCap"> Un fotograma de cada dos (tarda la mitad, algo menos preciso)</label>
+          <div class="control-row wrap">
+            <button class="btn btn-primary" id="prRecAnalyze" type="button">Analizar el vídeo ahora</button>
+            <button class="btn btn-quiet" id="prRecCancel" type="button" hidden>Cancelar</button>
+            <button class="btn btn-quiet" id="prRecDiscard" type="button">Descartar el vídeo</button>
+          </div>
+          <div class="coach-bar" id="prRecBarWrap" hidden><i id="prRecBar"></i></div>
+          <p class="hint" id="prRecProgress"></p>
+          <div class="proto-summary" id="prRecSummary" hidden></div>
+          <button class="btn" id="prRecDownload" type="button" hidden>Descargar JSON del análisis del vídeo</button>
+          <p class="hint" id="prRecMsg"></p>
+        </div>
         <p class="hint" id="prDoneText"></p>
         <div class="control-row wrap">
           <button class="btn btn-primary" id="prResume" type="button" hidden>Retomar sesión</button>
@@ -233,8 +290,10 @@
     <div class="banner warn" id="qualityBanner" role="status" hidden></div>
 
     <div class="banner warn" id="fpsWarning" hidden>
-      El directo no llega a 24 fps. Prueba la prioridad «fps» o, para máxima sensibilidad, graba con la app de cámara y usa el modo de vídeo grabado (llegará en una fase posterior).
+      La cámara no llega a 24 fps. Prueba la prioridad «fps» o, para máxima sensibilidad, graba con la app de cámara y analiza el vídeo (tarjeta «Vídeo grabado», arriba).
     </div>
+
+    <div class="banner warn" id="analysisWarning" role="status" hidden></div>
 
     <section class="curves" id="curvesView" aria-label="Curvas y parpadeos" hidden>
       <div class="control-row">

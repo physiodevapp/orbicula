@@ -50,7 +50,8 @@ Solo medidas numéricas y la configuración: ninguna imagen, ningún nombre. Inc
   "analysis": { "mode": "worker|main", "delegate": "GPU|CPU", "imageSize": {}, "blendshapes": true, "swapNames": false, "blockedHosts": [] },
   "flow":     { "on": true, "config": "farneback-320-vf-30", "library": "OpenCV.js", "version": "", "params": {}, "loadMs": 0 },
   "detector": { /* umbrales del detector de parpadeos usados */ },
-  "plan": "phase4|micro|phase3|protocol",
+  "plan": "phase4|micro|phase3|protocol|video",
+  "video": null,                                   // solo el vídeo grabado (fase 6): ficha del archivo, cámara, espejo y procesado
   "settings": null,                                // solo el protocolo: { "restSec": 30, "naturalSec": 60, "reps": 3 }
   "steps": [{
     "id": "wink-left", "title": "", "instruction": "",

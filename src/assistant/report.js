@@ -117,7 +117,7 @@ export function describeSummary(step) {
  * @param {{results: object[], startedAt: string|null, code?: string|null, build: object, device: object,
  *          capture: object, analysis: object, detector: object, includeSeries?: boolean}} ctx
  */
-export function buildReport({ results, startedAt, code = null, plan = null, settings = null, summary = null, rejections = [], build, device, capture, analysis, flow = null, detector, includeSeries = true }) {
+export function buildReport({ results, startedAt, code = null, plan = null, settings = null, summary = null, rejections = [], video = null, build, device, capture, analysis, flow = null, detector, includeSeries = true }) {
   return {
     app: 'orbicula',
     kind: 'test-session',
@@ -134,6 +134,7 @@ export function buildReport({ results, startedAt, code = null, plan = null, sett
     detector,
     plan,
     settings, // configuración del protocolo (fase 5): duraciones y repeticiones
+    ...(video ? { video } : {}), // vídeo grabado (fase 6): ficha del archivo y cómo se procesó
     rejections, // intentos de reposo no válidos (con su calibración y el motivo)
     summary, // resumen del protocolo por fase y lado (fase 5c); null en el asistente de pruebas
     steps: results.map((step) => ({

@@ -298,3 +298,9 @@ main {
 .sum-events { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text2); }
 .sum-events li { display: grid; grid-template-columns: minmax(0, 1fr) 16px auto; gap: var(--sp-2); }
 .sum-foot { font-size: var(--fs-xs); color: var(--text3); line-height: 1.45; }
+
+/* ── Vídeo grabado (fase 6) ─────────────────────────────────────────────── */
+#videoCard { display: flex; flex-direction: column; gap: var(--sp-3); margin-top: var(--sp-4); }
+#videoCard .coach-bar { background: var(--surface3); }
+#videoCard .coach-bar i { background: var(--accent); }
+.vid-thumb { max-width: 160px; border-radius: var(--radius-sm); border: 1px solid var(--border); }

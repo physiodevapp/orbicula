@@ -34,7 +34,8 @@ export const SUMMARY = {
   maxHeadMoving: 0.2, // cabeza en movimiento como mucho este tanto por uno
 };
 
-const PHASES = ['rest', 'natural', 'soft', 'forced', 'brows', 'smile'];
+// 'free': el resto de un vídeo grabado tras el reposo (fase 6, análisis libre); se resume como el parpadeo.
+const PHASES = ['rest', 'natural', 'soft', 'forced', 'brows', 'smile', 'free'];
 const fin = (v) => (Number.isFinite(v) ? v : null);
 const r3 = (v) => (Number.isFinite(v) ? Math.round(v * 1000) / 1000 : null);
 const mean = (a) => {
@@ -204,7 +205,7 @@ function sideMetrics(phase, step, v, side, cal, ctx) {
   const reps = repWindows(step);
   // En el reposo no se cuentan eventos: es la calibración.
   const out = phase === 'rest' ? {} : { ...eventCounts(step, side) };
-  if (phase === 'rest' || phase === 'natural') {
+  if (phase === 'rest' || phase === 'natural' || phase === 'free') {
     // Pico espectral del párpado superior (velocidad vertical); los pares congelados valen 0.
     const d = v.f[side]?.upperLid?.dR ?? [];
     const sig = v.ft.map((_, i) => (v.f.frozen?.[i] ? 0 : d[i]));
@@ -216,7 +217,7 @@ function sideMetrics(phase, step, v, side, cal, ctx) {
     out.aperture = fin(cal?.aperture?.[side]?.baseline);
     out.threshold = fin(cal?.rise?.[side]);
   }
-  if (phase === 'natural') {
+  if (phase === 'natural' || phase === 'free') {
     const blinks = (step.events?.[side] ?? []).filter((e) => e.kind === 'blink');
     const minutes = (step.durationMs ?? (v.st.at(-1) ?? 0)) / 60000;
     out.blinksPerMin = minutes > 0 ? r3(blinks.length / minutes) : null;
