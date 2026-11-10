@@ -2,7 +2,7 @@
 // calculado las métricas, para poder comparar sesiones analizadas con versiones distintas de la app.
 // No lleva nada del dispositivo ni del paciente (ni modelo de móvil, ni navegador). Sin DOM.
 import { EVENT_DEFAULTS } from '../protocol/events.js';
-import { SHUT_FRACTION, SHUT_PAD_MS } from '../flow/processor.js';
+import { SHUT_FRACTION, SHUT_PAD_MS, CLOSURE_TAU_MS } from '../flow/processor.js';
 import { SUMMARY } from '../protocol/summary.js';
 import { FLOW_CONFIGS, DEFAULT_FLOW, OPENCV_VERSION, FARNEBACK_PARAMS } from '../flow/config.js';
 
@@ -34,6 +34,7 @@ export function provenance({ flowConfig = DEFAULT_FLOW, snapshot = null } = {}) 
       params: cfg.method === 'farneback' ? { ...FARNEBACK_PARAMS[cfg.params] } : null,
     },
     detector: Object.fromEntries(DETECTOR_KEYS.map((k) => [k, num(EVENT_DEFAULTS[k])])),
+    closureTauMs: CLOSURE_TAU_MS,
     closureFreeze: { earFraction: SHUT_FRACTION, padMs: SHUT_PAD_MS },
     summary: { incompleteRatio: SUMMARY.incompleteRatio, coactLagMs: SUMMARY.coactLagMs, minAnalysisFps: SUMMARY.minAnalysisFps },
   };

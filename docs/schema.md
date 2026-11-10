@@ -24,7 +24,7 @@ El JSON de resultados es la **interfaz pública de orbicula**: lo que consume el
   "schemaVersion": "1",
   "createdAt": "2026-11-10T13:02:00.000Z",
   "participantCode": "P01",            // o null
-  "analysis": { "mediapipe": { "version": "1.1.0", "model": "face_landmarker_float16_1" }, "opencv": { "version": "5.0.0-release.1" }, "flow": { "config": "farneback-320-vf-30", "method": "farneback", "maxWidth": 320, "maxRate": 30, "params": { } }, "detector": { }, "closureFreeze": { "earFraction": 0.5, "padMs": 150 }, "summary": { } },
+  "analysis": { "mediapipe": { "version": "1.1.0", "model": "face_landmarker_float16_1" }, "opencv": { "version": "5.0.0-release.1" }, "flow": { "config": "farneback-320-vf-30", "method": "farneback", "maxWidth": 320, "maxRate": 30, "params": { } }, "detector": { }, "closureTauMs": 5000, "closureFreeze": { "earFraction": 0.5, "padMs": 150 }, "summary": { } },
   "capture": { "source": "live", "analysis": "live", "camera": "rear", "fps": 29.97, "width": 720, "height": 1280, "mirrored": false },
   "protocol": [ { "phase": "rest", "start": 0, "end": 30014 } ],
   "calibration": { "valid": true, "reason": null, "reasonCode": null, "thresholds": { "left": 0.045, "right": 0.062 }, "earBaseline": { "left": 0.34, "right": 0.32 }, "headStill": 0.1, "warnings": [ { "code": "high-threshold", "text": "Umbral alto en el ojo izquierdo: …" } ] },
@@ -44,6 +44,7 @@ Con qué se calcularon las métricas, para comparar sesiones analizadas con vers
 | `opencv.version` | Versión de OpenCV.js. |
 | `flow` | Configuración del flujo óptico: `config` (clave), `method`, `maxWidth` (px de la franja de trabajo, `null` = sin reducir), `maxRate` (pares/s como máximo, `null` = sin límite) y `params` (Farnebäck: `pyrScale, levels, winsize, iterations, polyN, polySigma`). |
 | `detector` | Parámetros del detector de eventos: `riseMargin, riseFloor, spikyRatio, endRatio, minDurationMs, headK, headFloor, headMax, marginMs, blinkMin`. Los tiempos van en ms, los umbrales de flujo en DI. |
+| `closureTauMs` | Constante de tiempo de la fuga del integrador del cierre por flujo (5000 ms). Ver `timeseries`. |
 | `closureFreeze` | El cierre por flujo se congela mientras el EAR de un ojo baja de `earFraction` × su reposo, con `padMs` ms de margen (ver `timeseries.frozen`). |
 | `summary` | Parámetros del resumen: `incompleteRatio`, `coactLagMs`, `minAnalysisFps`. |
 
@@ -105,7 +106,7 @@ Sale del reposo del propio paciente; `null` si no hubo reposo.
 | `browPeak` | `brows` | × | Pico de movimiento de la ceja, en veces su p99 del reposo. |
 | `smile` | `smile` | 0–1 | Blendshape `mouthSmile` de ese lado. **Casi satura** con una sonrisa amplia: da la dirección, no la magnitud. |
 | `coactivation` | `smile` | r | Correlación entre la sonrisa y el cierre del ojo del mismo lado. |
-| `coactivationLagMs` | `smile` | ms | Desfase de esa correlación (−300 a +300). |
+| `coactivationLagMs` | `smile` | ms | Desfase de esa correlación (−300 a +300). **Si vale ±300, el máximo está en el borde de la ventana**: con un desfase mayor la correlación podría ser más alta; tómala como una cota inferior. |
 | `contractions` | todas menos `rest` | recuento | Contracciones finas que cuentan en la fase (estado `ok`). |
 | `brief` | ídem | recuento | Movimientos breves del párpado (< 0,5 s) que no cuentan como contracción. |
 
@@ -131,7 +132,7 @@ Un solo eje `t` (ms) con las señales de la cara de todas las fases, y los array
 | `aperture` | Apertura palpebral / distancia intercantal. |
 | `blink` | Blendshape de parpadeo (0 abierto, 1 cerrado). |
 | `smile` | Blendshape de sonrisa de ese lado (0–1). |
-| `closure` | Cierre por flujo (DI, + = se cierra), de la muestra de flujo más cercana (≤ 40 ms) o `null`. |
+| `closure` | Cierre por flujo (DI, + = se cierra), de la muestra de flujo más cercana (≤ 40 ms) o `null`. Es una **integral con fuga** (`analysis.closureTauMs`, 5 s): solo importan los cambios en unos segundos; **el nivel absoluto no significa nada**, y las primeras muestras de la grabación arrastran lo que pasó antes (en una prueba real empezó en −0,47 y tardó ~15 s en asentarse hacia 0). |
 
 Además, `frozen` (compartido por los dos lados): `1` si en esa muestra el cierre por flujo estaba **congelado** (un ojo cerrado más de la mitad, más el margen de `analysis.closureFreeze`; el `closure` no se integra en esa muestra: queda casi constante, decae despacio, y no es una medida), `0` si no y `null` si no hay muestra de flujo cercana. **Quien reanalice el `closure` debe excluir las muestras con `frozen = 1`.**
 

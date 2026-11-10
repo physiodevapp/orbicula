@@ -387,6 +387,7 @@
         "opencv",
         "flow",
         "detector",
+        "closureTauMs",
         "closureFreeze",
         "summary"
       ],
@@ -516,6 +517,10 @@
           "additionalProperties": {
             "type": "number"
           }
+        },
+        "closureTauMs": {
+          "type": "number",
+          "description": "Constante de tiempo (ms) de la fuga del integrador con que se calcula el cierre por flujo (`timeseries.*.closure`): solo cuentan los cambios en unos segundos, no el nivel absoluto."
         }
       }
     }

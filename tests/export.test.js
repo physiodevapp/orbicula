@@ -7,6 +7,7 @@ import { provenance, MODEL_NAME, DETECTOR_KEYS } from '../src/export/provenance.
 import { EVENT_DEFAULTS } from '../src/protocol/events.js';
 import { SHUT_FRACTION, SHUT_PAD_MS } from '../src/flow/processor.js';
 import { OPENCV_VERSION } from '../src/flow/config.js';
+import { CLOSURE_TAU_MS } from '../src/flow/processor.js';
 import { faceCsv, flowCsv } from '../src/export/csv.js';
 
 const schema = JSON.parse(readFileSync(new URL('../docs/orbicula-result.schema.json', import.meta.url), 'utf8'));
@@ -159,6 +160,7 @@ describe('procedencia (analysis)', () => {
 
   it('los parámetros del detector, del congelado y del flujo son los que se usan', () => {
     for (const k of DETECTOR_KEYS) expect(doc.analysis.detector[k]).toBe(EVENT_DEFAULTS[k]);
+    expect(doc.analysis.closureTauMs).toBe(CLOSURE_TAU_MS);
     expect(doc.analysis.closureFreeze).toEqual({ earFraction: SHUT_FRACTION, padMs: SHUT_PAD_MS });
     expect(doc.analysis.flow).toMatchObject({ config: 'farneback-320-vf-30', method: 'farneback', maxWidth: 320, maxRate: 30, params: { winsize: 13, levels: 3 } });
     expect(provenance({ flowConfig: 'lite-320-vf' }).flow.params.winsize).toBe(9);
