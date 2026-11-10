@@ -145,6 +145,15 @@ El vídeo de la app de cámara no sabe en qué fase está cada momento. Hay tres
   - **lateralidad:** en el resto del vídeo, ojo derecho 11 parpadeos/min e izquierdo 4, lo esperado (3 y 1 por cada vuelta de 16 s). Con «en espejo», 4 y 11: se intercambian.
   - Unos 6 fotogramas/s en la nube, sin GPU.
 
+### Prueba del 6b en el móvil: frontal (2026-11-10, commit a345f0e)
+- **Vídeo:** frontal, HEVC 1080p a 30 fps, girado 270°, 66 s y 157 MB, con el índice al final. **Sin espejo**, comprobado por el autor.
+- **Procesado:** los 1975 fotogramas en 2:35, a **12,7 fotogramas/s** (0,42 × tiempo real); flujo en todos los pares. El plan estimaba ~25/s: con HEVC 1080p girado, más el análisis en modo IMAGE y el flujo, sale la mitad.
+- **Reposo válido:** 25 s útiles de 30. Con el aviso de umbral alto (una sacudida suelta).
+- **Lateralidad (criterio 2 con la frontal, en vídeo): correcta.**
+  - **Guiños del ojo izquierdo** (3,5 s, 8,9 s y 14,7 s del resto): **cierres largos en I** (93 %, 92 % y 57 %, 2,4–3,3 s). En D, solo parpadeos cortos o entornados (32–42 %): el otro ojo acompaña, como en la fase 3.
+  - **Guiños del ojo derecho** (20,7 s, 25,7 s y 30,4 s): **cierres largos en D** (85 %, 69 % y 78 %, 1,8–2,6 s). En I, entornados del 33–35 %, y un cierre del 57 % a los 23,1 s, justo después del primero.
+- **Contracciones:** las cuatro que pasaron el umbral coinciden con los guiños y quedan como «era un parpadeo». No hay ninguna que cuente.
+
 ## Pruebas
 - **Vídeos de prueba fabricados con `ffmpeg`** a partir de los vídeos sintéticos de `make-face-videos.py`:
   - MP4 H.264 y VP9;
