@@ -149,17 +149,12 @@ async function waitFor(url, ms = 30000) {
   check('el hub oculta orbicula: la cámara se apaga', !(await camOn()));
   check('el hub oculta orbicula: el protocolo se detiene (ya no está en marcha) y se puede volver a encender la cámara', (await f.evaluate(() => document.querySelector('#protocol')?.dataset.state)) !== 'active' && (await f.locator('#startCard').isVisible()));
   await page.click('#show');
-  // Vuelve, y hace el protocolo completo
-  await f.click('#startBtn');
+  await f.waitForFunction(() => !!document.querySelector('video')?.srcObject?.getTracks().some((t) => t.readyState === 'live'), null, { timeout: 20000 }).catch(() => {});
+  check('el hub vuelve a mostrar orbicula: la cámara se reabre sola', await camOn());
   await f.waitForFunction(() => /análisis/.test(document.querySelector('#anaPill')?.textContent ?? ''), null, { timeout: 90000 });
-  const resumeBtn = f.locator('#prResume');
-  if (await resumeBtn.isVisible()) { /* sesión detenida: se empieza de nuevo */ }
-  await f.evaluate(() => { document.getElementById('prDone')?.click?.(); });
-  await f.click('#prStart').catch(() => {});
-  if (!(await f.evaluate(() => document.querySelector('#protocol')?.dataset.state === 'active'))) {
-    await f.click('#prAbort').catch(() => {});
-    await f.click('#prStart').catch(() => {});
-  }
+  // La sesión quedó detenida: se empieza otra y se hace el protocolo completo.
+  if (await f.locator('#prNew').isVisible()) await f.click('#prNew'); // con pasos hechos queda «Sesión detenida»; sin ninguno vuelve al inicio
+  await f.click('#prStart');
   await f.waitForFunction(() => document.querySelector('#protocol')?.dataset.state === 'done', null, { timeout: 600000 });
   await page.waitForFunction(() => window.__hub.lastResult, null, { timeout: 20000 });
 

@@ -261,7 +261,7 @@ const hub = createBridge({
   allowed: allowedOrigins({ extra: import.meta.env.VITE_ORBICULA_ORIGINS }),
   appVersion: __APP_VERSION__,
   permissions: () => ({ camera: featureAllowed('camera'), screenWakeLock: featureAllowed('screen-wake-lock') }),
-  handlers: { config: (payload) => applyHubConfig(payload), hidden: () => releaseForHub() },
+  handlers: { config: (payload) => applyHubConfig(payload), hidden: () => releaseForHub(), visible: () => resumeFromHub() },
 });
 let lastHubResult = null; // el último resultado mandado, para «Enviar al hub» tras corregir el código
 const hubStatus = (text) => { const p = document.getElementById('prHubStatus'); if (p) { p.textContent = text; p.hidden = !text; } };
@@ -301,14 +301,21 @@ function applyHubConfig(payload) {
 }
 
 /** El hub oculta orbicula (vuelve a su portada): se suelta la cámara y se detiene el protocolo en marcha, conservando lo hecho. */
+let releasedByHub = false; // la cámara la apagó el hub al ocultar orbicula
 function releaseForHub() {
   if (!camera.stream) return; // un análisis de vídeo no usa la cámara y sigue
+  releasedByHub = true;
   const reason = 'orbicula se ocultó en el hub';
   for (const a of recorders) (a.halt ?? a.interrupt)?.call(a, reason);
   bench.interrupt(reason);
   camera.stop();
   state.running = false;
-  els.startCard.hidden = false; // para volver a encender la cámara al regresar
+  els.startCard.hidden = false; // por si el hub no vuelve a avisar: se puede encender a mano
+}
+
+/** El hub vuelve a mostrar orbicula: si la cámara la había apagado él, se reabre con la misma configuración (como al volver a la pestaña). */
+function resumeFromHub() {
+  if (releasedByHub) start();
 }
 
 const protocolVideo = createProtocolVideo({
@@ -793,6 +800,7 @@ async function refreshDevices() {
 }
 
 async function start() {
+  releasedByHub = false;
   showError('');
   els.startBtn.disabled = true;
   lowSince = null;
