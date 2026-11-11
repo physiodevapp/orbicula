@@ -83,6 +83,13 @@
     }
   });
 
+  ['Light', 'Dark', 'Auto'].forEach(function (name) {
+    $('theme' + name).addEventListener('click', function () {
+      var theme = name.toLowerCase();
+      $('theme').value = theme;
+      send({ type: 'orbicula:config', payload: { theme: theme } });
+    });
+  });
   $('sendConfig').addEventListener('click', function () { send({ type: 'orbicula:config', payload: currentConfig() }); });
   $('short').addEventListener('click', function () {
     $('rest').value = '30'; $('natural').value = '30'; $('reps').value = '3';
