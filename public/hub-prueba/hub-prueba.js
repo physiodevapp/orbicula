@@ -96,8 +96,19 @@
     send({ type: 'orbicula:config', payload: { protocol: { restSec: 30, naturalSec: 30, reps: 3 } } });
   });
   $('bad').addEventListener('click', function () { send({ type: 'orbicula:config', payload: { theme: 'rosa', lang: 'en', protocol: { restSec: 31 }, otro: 1 } }); });
-  $('hide').addEventListener('click', function () { send({ type: 'PHYSIQ_SAT_HIDDEN' }); });
-  $('show').addEventListener('click', function () { send({ type: 'PHYSIQ_SAT_VISIBLE' }); });
+  // Como el hub de verdad: avisa y oculta el iframe (hidden), y al mostrarlo lo muestra, avisa y lo trae a la vista.
+  // (Un iframe de otro origen fuera de la pantalla se frena: sin traerlo a la vista, el vídeo no se procesa.)
+  $('hide').addEventListener('click', function () {
+    send({ type: 'PHYSIQ_SAT_HIDDEN' });
+    frame.hidden = true;
+    $('frameState').textContent = ' — oculta (el hub la ha ocultado)';
+  });
+  $('show').addEventListener('click', function () {
+    frame.hidden = false;
+    $('frameState').textContent = '';
+    send({ type: 'PHYSIQ_SAT_VISIBLE' });
+    frame.scrollIntoView({ block: 'start' });
+  });
   $('download').addEventListener('click', function () {
     if (!lastResult) return;
     var a = document.createElement('a');

@@ -310,6 +310,13 @@ function releaseForHub() {
   bench.interrupt(reason);
   camera.stop();
   state.running = false;
+  // El vídeo queda en negro: sin esto los contornos y los indicadores se quedan congelados y parece que sigue midiendo.
+  overlay.clear();
+  els.fpsPill.textContent = '— fps';
+  els.fpsPill.className = 'pill';
+  els.anaPill.textContent = 'cámara apagada';
+  els.anaPill.className = 'pill warn';
+  els.roiPill.textContent = 'ojo ≈ — px';
   els.startCard.hidden = false; // por si el hub no vuelve a avisar: se puede encender a mano
 }
 
@@ -584,6 +591,7 @@ function updateAnalysisWarning(now) {
 }
 
 function updateAnalysisUi(r, now) {
+  if (releasedByHub) return; // la cámara está apagada: los indicadores no se vuelven a pintar
   if (now - lastAnaUi < 250) return;
   lastAnaUi = now;
   updateAnalysisWarning(now);
@@ -645,7 +653,7 @@ function onResult(r) {
 
   flow?.setFace(r);
   flowProcessor.pushFace(r.t, r);
-  if (r.face && state.showRoi) overlay.draw(r, { displayMirrored: state.displayMirrored });
+  if (r.face && state.showRoi && !releasedByHub) overlay.draw(r, { displayMirrored: state.displayMirrored });
   else overlay.clear();
   if (r.face && state.showFlow && flow?.strip) overlay.drawStrip(flow.strip, r.frame, { displayMirrored: state.displayMirrored });
   if (r.face && state.showFlow && state.showField && lastField) overlay.drawField(lastField, r.frame, { displayMirrored: state.displayMirrored });

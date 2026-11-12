@@ -116,6 +116,7 @@ Recargar la página perdía un protocolo o 2 minutos de análisis de vídeo. Se 
 ### 7c: decisiones del autor y hallazgos
 - **El hub oculta orbicula:** se aceptan `PHYSIQ_SAT_HIDDEN` y `PHYSIQ_SAT_VISIBLE` (los que el hub ya manda a sus satélites; solo de un origen permitido y sin importar nada del hub). Al ocultarse: cámara apagada y protocolo detenido conservando lo hecho; un análisis de vídeo sigue. Al mostrarse de nuevo, la cámara se reabre sola (lo añadí tras la prueba en el móvil: al principio «mostrar» no hacía nada).
 - **Qué se manda como `orbicula:result`:** solo el protocolo en directo y el protocolo grabado, con `sessionId`. El análisis de un vídeo suelto no.
+- **Hallazgo (prueba en el móvil):** un iframe de otro origen que queda fuera de la pantalla se frena y no procesa el vídeo. En el hub de verdad no pasa (cada satélite ocupa la pantalla), pero la página de prueba, con el iframe debajo de los botones, lo sufría: «mostrar» parecía no hacer nada. Ahora oculta y muestra el iframe como el hub y lo trae a la vista.
 - **Hallazgo:** dentro de un iframe, el bloqueo de pantalla exige `allow="screen-wake-lock"` en el iframe del hub (ahora se comprueba antes de pedirlo, y el `ready` informa de los permisos).
 
 ## Pasos (me detengo al final de cada uno para que lo pruebes en el móvil)

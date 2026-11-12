@@ -147,11 +147,16 @@ async function waitFor(url, ms = 30000) {
   await page.click('#hide');
   await sleep(1500);
   check('el hub oculta orbicula: la cámara se apaga', !(await camOn()));
-  check('el hub oculta orbicula: el protocolo se detiene (ya no está en marcha) y se puede volver a encender la cámara', (await f.evaluate(() => document.querySelector('#protocol')?.dataset.state)) !== 'active' && (await f.locator('#startCard').isVisible()));
-  await page.click('#show');
+  check('el hub oculta orbicula: los indicadores dicen «cámara apagada» (no se quedan congelados)', (await f.textContent('#anaPill')).trim() === 'cámara apagada' && /—/.test(await f.textContent('#fpsPill')));
+  check('el hub oculta orbicula: el protocolo se detiene (ya no está en marcha) y se puede volver a encender la cámara', (await f.evaluate(() => document.querySelector('#protocol')?.dataset.state)) !== 'active' && (await f.evaluate(() => !document.getElementById('startCard').hidden)));
+  await page.click('#show'); // como el hub: muestra el iframe, avisa y lo trae a la vista
   await f.waitForFunction(() => !!document.querySelector('video')?.srcObject?.getTracks().some((t) => t.readyState === 'live'), null, { timeout: 20000 }).catch(() => {});
   check('el hub vuelve a mostrar orbicula: la cámara se reabre sola', await camOn());
-  await f.waitForFunction(() => /análisis/.test(document.querySelector('#anaPill')?.textContent ?? ''), null, { timeout: 90000 });
+  await f.waitForFunction(() => /análisis/.test(document.querySelector('#anaPill')?.textContent ?? ''), null, { timeout: 90000 }).catch(async (e) => {
+    console.log('ESTADO al fallar:', JSON.stringify(await f.evaluate(() => ({ ana: document.getElementById('anaPill').textContent, fps: document.getElementById('fpsPill').textContent, state: document.querySelector('#protocol')?.dataset.state, live: !!document.querySelector('video')?.srcObject, busy: document.body.dataset.busy ?? null, err: document.getElementById('errorBanner')?.textContent, video: (() => { const v = document.querySelector('video'); return v && { ready: v.readyState, paused: v.paused, w: v.videoWidth, t: v.currentTime, tracks: v.srcObject?.getTracks().map((t) => t.readyState + (t.muted ? '/muted' : '')) }; })(), hiddenDoc: document.hidden, start: document.getElementById('startBtn').disabled, startCardHidden: document.getElementById('startCard').hidden }))));
+    console.log('ERRORES:', JSON.stringify(errors));
+    throw e;
+  });
   // La sesión quedó detenida: se empieza otra y se hace el protocolo completo.
   if (await f.locator('#prNew').isVisible()) await f.click('#prNew'); // con pasos hechos queda «Sesión detenida»; sin ninguno vuelve al inicio
   await f.click('#prStart');

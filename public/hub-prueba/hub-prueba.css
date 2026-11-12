@@ -18,6 +18,7 @@ pre { background: #111620; border: 1px solid #232d45; border-radius: 6px; paddin
 .log .in { color: #5ec8d8; }
 .log .out { color: #f2b33d; }
 .log .bad { color: #ff6b6b; }
+[hidden] { display: none !important; }
 iframe { width: 100%; height: 720px; border: 1px solid #2d3a58; border-radius: 6px; background: #0a0d12; }
 .ok { color: #38d9a9; }
 .warn { color: #ff6b6b; }
