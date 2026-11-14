@@ -4,6 +4,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (aviso de cara pequeña)
+- **El aviso usa los píxeles del ojo, no una proporción del encuadre.** Con una webcam, con el ojo a ~50 px el reposo fallaba siempre («la cabeza se ha movido»); a ~70 px y con más luz calibró a la primera. El aviso anterior (cara < 30 % del lado corto) no saltó. Ahora avisa por debajo de **60 px** (provisional), con histéresis para que no parpadee, y dice cuánto mide el ojo.
+- **También por voz:** «Cara pequeña. Acércate un poco», un tono grave y vibración, solo antes y durante el reposo (donde decide si la calibración vale), como mucho cada 15 s y **sin cortar la instrucción del paso**. Respeta las casillas de voz y de sonidos.
+- **Si el reposo falla por movimiento y la cara es pequeña, lo dice** (en pantalla y por voz): «la cara es pequeña y eso se confunde con movimiento: acércate».
+- **Cada sesión guarda el tamaño del ojo** (`eyePx` por muestra en el diagnóstico y `quality.<fase>.eyePx` en el JSON público, más la nota `small-face`), para ajustar el umbral con datos reales. Campos nuevos, sin cambiar `schemaVersion`.
+- No se tocan los umbrales de movimiento de la cabeza.
+- `scripts/dev/check-smallface.cjs`: con una cara pequeña y otra grande, el aviso en pantalla, la voz (simulada), que no habla sin protocolo, que no corta la instrucción y que no se repite a cada rato.
+- 11 tests nuevos.
+
 ### Añadido (fase 7d: cierre de la integración)
 - **`docs/integracion.md`:** la guía para quien programe el hub. Lista de comprobación, cómo cargar el iframe (`allow="camera; screen-wake-lock"`, bajo demanda, `?host=physiq`), los mensajes con sus campos, las reglas de orígenes y privacidad, un ejemplo de código del lado del hub, cómo probarlo, compatibilidad y limitaciones conocidas.
 - **Selector Trasera / Frontal en la tarjeta «Cámara» de inicio** (antes solo aparecía tras activar la cámara). Comparte el estado con el de los controles, y elegir no enciende la cámara: se enciende con «Activar cámara». `scripts/dev/check-facing.cjs` lo comprueba.

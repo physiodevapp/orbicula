@@ -39,10 +39,14 @@ function stepsOf(plan, settings) {
 const INVALID_SAY = {
   face: 'No te veo bien la cara. Encuádrala de frente y con buena luz.',
   head: 'Te has movido. Apoya la cabeza y quédate quieto.',
+  headSmall: 'Parece que te has movido, pero la cara se ve pequeña y eso se confunde con movimiento. Acércate un poco, apoya la cabeza y quédate quieto.',
   blinks: 'Has parpadeado mucho. Parpadea con calma y sin forzar.',
   clean: 'No he tenido momentos tranquilos suficientes. Quédate quieto y parpadea poco.',
   noflow: 'No me llegan datos del movimiento. Comprueba que se ve la cara.',
 };
+
+/** Qué decir cuando el reposo no vale: si fue por movimiento y la cara es pequeña, se dice que se acerque. */
+const invalidKey = (cal) => (cal?.reasonCode === 'head' && cal?.smallFace ? 'headSmall' : cal?.reasonCode);
 
 const pad = (n) => String(n).padStart(2, '0');
 const mmss = (ms) => `${Math.floor(ms / 60000)}:${pad(Math.ceil((ms % 60000) / 1000) % 60)}`;
@@ -96,12 +100,13 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
     }
   };
   try { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = () => {}; } catch { /* sin voz */ }
-  function say(text) {
+  /** `queue`: sin cortar lo que esté diciendo (un aviso no debe cortar las instrucciones del paso). */
+  function say(text, { queue = false } = {}) {
     if (!el.voice.checked) return;
     const voice = localVoice();
     if (!voice) return;
     try {
-      speechSynthesis.cancel();
+      if (!queue) speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.voice = voice;
       u.lang = voice.lang;
@@ -118,7 +123,7 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
     }
     else if (cue === 'go') { beep(880, 200); buzz(150); }
     // Reposo no válido: dos pitidos graves y la voz lo explica; el paso se repite.
-    else if (cue === 'invalid') { beep(330, 200); beep(330, 200, 0.28); buzz([200, 80, 200]); say(`El reposo no ha valido. ${INVALID_SAY[session.cur?.calibration?.reasonCode] ?? 'Quédate quieto.'} Repetimos.`); }
+    else if (cue === 'invalid') { beep(330, 200); beep(330, 200, 0.28); buzz([200, 80, 200]); say(`El reposo no ha valido. ${INVALID_SAY[invalidKey(session.cur?.calibration)] ?? 'Quédate quieto.'} Repetimos.`); }
     else if (cue === 'end') { beep(660); beep(660, 130, 0.22); buzz([80, 60, 80]); }
     else if (cue === 'done') { beep(660); beep(880, 130, 0.18); beep(1100, 200, 0.36); buzz([100, 60, 100, 60, 200]); say('Prueba terminada.'); }
     // Repeticiones: agudo y largo = «ahora»; grave = «suelta».
@@ -368,6 +373,17 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
     recordDetection: (e) => session.recordDetection(e),
     /** La cámara se reinició, etc.: el paso en curso queda interrumpido. */
     interrupt: (reason) => session.interrupt(reason),
+    /**
+     * Aviso de calidad (p. ej. «cara pequeña»): un tono grave y la voz, solo antes y durante el reposo, que es
+     * donde el tamaño de la cara decide si la calibración vale. No corta la voz del paso. Devuelve si avisó.
+     */
+    speakWarning: (text) => {
+      const s = session.snapshot();
+      if (!['prep', 'running'].includes(s.state) || !s.step?.calibrates) return false;
+      beep(260, 280); buzz(90);
+      say(text, { queue: true });
+      return true;
+    },
     /** El hub oculta orbicula: se detiene la sesión conservando lo ya hecho (como «Detener», con «Retomar sesión»). */
     halt: (reason) => { session.interrupt(reason); session.abort(); },
     /** Estado de la tarjeta: 'idle', 'active', 'review' o 'done'. */

@@ -89,6 +89,7 @@ const newResult = (step, attempt) => ({
   perf: null,
   t0: null, // marca de tiempo (cámara) de la primera muestra
   rel: [], // ms desde t0
+  eyePx: [], // tamaño del ojo en píxeles en cada muestra (paralelo a rel)
   series: { left: emptySide(), right: emptySide() },
   events: { left: [], right: [] },
   flow: emptyFlow(),
@@ -240,6 +241,7 @@ export class GuidedSession {
     const c = this.cur;
     c.t0 ??= t;
     c.rel.push(Math.round(t - c.t0));
+    c.eyePx.push(Number.isFinite(sample?.eyePx) ? Math.round(sample.eyePx * 10) / 10 : null);
     for (const side of ['left', 'right']) {
       for (const k of SERIES_KEYS) c.series[side][k].push(r3(sample?.[side]?.[k]));
       for (const e of events[side] ?? []) {

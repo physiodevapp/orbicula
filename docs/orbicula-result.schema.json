@@ -258,7 +258,15 @@
             "items": {
               "$ref": "#/$defs/coded"
             },
-            "description": "Notas de calidad: código (face-lost, head-moving, low-fps) y texto."
+            "description": "Notas de calidad: código (face-lost, head-moving, low-fps, small-face) y texto."
+          },
+          "eyePx": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Mediana del ancho del ojo en la imagen, en píxeles. Con el ojo pequeño, el ruido de la cámara se confunde con movimiento de la cabeza."
           }
         }
       }
