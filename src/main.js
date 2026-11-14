@@ -24,6 +24,7 @@ import { allowedOrigins } from './integration/origins.js';
 import { createBridge } from './integration/bridge.js';
 import { parseConfig } from './integration/messages.js';
 import { featureAllowed } from './ui/wake.js';
+import { isSmallFace, smallFaceText, SMALL_FACE_SAY } from './protocol/face-size.js';
 import { buildPublicResult, isValidCode } from './export/result.js';
 import { createStore } from './persistence/store.js';
 import { idbAdapter } from './persistence/idb.js';
@@ -555,7 +556,9 @@ function resetMeasures() {
 let lastAnaUi = 0;
 let faceLostSince = null;
 let smallSince = null;
-const SMALL_FACE_RATIO = 0.3; // provisional: la cara ocupa menos del 30 % del lado corto del frame
+let smallFace = false; // con histéresis (face-size.js): el aviso no parpadea al rondar el umbral
+let lastSmallSpoken = -Infinity;
+const SMALL_SPOKEN_EVERY_MS = 15000; // la voz repite el aviso como mucho cada tanto mientras siga pequeña
 const SHOW_AFTER_MS = 1000; // un aviso de calidad solo sale si la condición se mantiene
 
 function setBar(id, valueId, frac, text) {
@@ -565,10 +568,21 @@ function setBar(id, valueId, frac, text) {
 
 function updateQuality(r, now) {
   faceLostSince = r.face ? null : (faceLostSince ?? now);
-  smallSince = r.face && r.rois.meta.faceRatio < SMALL_FACE_RATIO ? (smallSince ?? now) : null;
+  // Cara pequeña: por los píxeles del ojo (lo que importa para el ruido), no por una proporción del encuadre.
+  const eyePx = r.face ? (r.rois.left.eyeWidth + r.rois.right.eyeWidth) / 2 : NaN;
+  smallFace = r.face ? isSmallFace(eyePx, smallFace) : false;
+  smallSince = smallFace ? (smallSince ?? now) : null;
   let msg = '';
   if (faceLostSince && now - faceLostSince > SHOW_AFTER_MS) msg = 'No se detecta la cara. Encuádrala de frente y con buena luz.';
-  else if (smallSince && now - smallSince > SHOW_AFTER_MS) msg = 'Cara pequeña en el encuadre: acerca el móvil o el paciente.';
+  else if (smallSince && now - smallSince > SHOW_AFTER_MS) {
+    msg = smallFaceText(eyePx);
+    // También por voz (con la cámara trasera no se mira la pantalla), solo antes y durante el reposo.
+    // Solo cuenta como «ya avisado» si habló de verdad: antes de empezar el protocolo no habla, y el aviso debe
+    // salir en cuanto empiece (no 15 s después).
+    if (now - lastSmallSpoken >= SMALL_SPOKEN_EVERY_MS) {
+      for (const a of [assistant, protocol]) if (a.speakWarning?.(SMALL_FACE_SAY)) lastSmallSpoken = now;
+    }
+  }
   else if (eventDetector?.last.moving && state.showFlow) msg = 'Cabeza en movimiento: quieto. Mientras tanto no se registran eventos.';
   else if (calNotice && now < calNotice.until) msg = calNotice.text;
   els.quality.textContent = msg;

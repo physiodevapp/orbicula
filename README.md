@@ -15,6 +15,7 @@ v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolu
 
 - **Navegador:** Chrome para Android, abriendo la app por su dirección `https://`.
 - **Cámara:** la trasera da más resolución y suele dar más fps; úsala con el móvil en un soporte o trípode. La frontal sirve para que el paciente se vea, pero la imagen se muestra en espejo (las mediciones siempre se refieren a la izquierda y la derecha **del paciente**).
+- **Tamaño de la cara:** mira el indicador **«ojo ≈ N px»**: el ojo debe medir **más de 60 px** (el umbral es provisional). Con el ojo pequeño, el ruido de la cámara se confunde con movimiento de la cabeza y el reposo falla una y otra vez («te has movido») aunque estés quieto. Por debajo de 60 px, orbicula lo avisa en pantalla y, durante el reposo, **también por voz** («Cara pequeña. Acércate un poco»). En un ordenador, con la webcam, hay que sentarse más cerca de lo que parece (unos 30–40 cm) y con luz de frente.
 - **Encuadre:** la cara de frente, centrada, ocupando al menos la mitad del ancho de la imagen. La mirada al frente y la cabeza apoyada si es posible (respaldo o reposacabezas).
 - **Distancia:** unos 30–50 cm entre el objetivo y la cara. Más cerca, la cara se sale del encuadre al moverse; más lejos, la región periocular tiene pocos píxeles.
 - **Iluminación:** luz frontal, difusa y uniforme (por ejemplo, frente a una ventana sin sol directo). Evita contraluces, sombras sobre un solo lado de la cara y fluorescentes que parpadeen.

@@ -142,7 +142,7 @@ export function buildPublicResult({ results, capture, appVersion, participantCod
     metrics.left[id] = flat(p.left);
     metrics.right[id] = flat(p.right);
     metrics.asymmetry[id] = flat(p.asymmetry);
-    quality[id] = { reliable: p.quality.reliable, faceFraction: p.quality.face, headMoving: p.quality.headMoving, analysisFps: p.quality.analysisFps, notes: p.quality.notes.map((text, i) => ({ code: p.quality.noteCodes?.[i] ?? 'other', text })) };
+    quality[id] = { reliable: p.quality.reliable, faceFraction: p.quality.face, headMoving: p.quality.headMoving, analysisFps: p.quality.analysisFps, eyePx: p.quality.eyePx ?? null, notes: p.quality.notes.map((text, i) => ({ code: p.quality.noteCodes?.[i] ?? 'other', text })) };
   }
   const { face, flow } = collectSeries(windows);
   const timeseries = { t: face.t, phase: face.phase, frozen: face.frozen, left: face.left, right: face.right };
