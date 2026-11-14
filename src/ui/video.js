@@ -194,7 +194,8 @@ export function createVideoCard({ getContext, analyzeVideoFile = null, saved = n
       });
       analysis = { ...out, settings, startedAt };
       const s = out.stats;
-      el.progress.textContent = `Hecho: ${s.frames} fotogramas en ${mmss(s.elapsedMs)} (${nf(s.framesPerSecond, 1)}/s)${s.every > 1 ? `, uno de cada ${s.every}` : ''}.`;
+      const lanes = s.face?.choice && s.face.choice !== '1' ? ` · análisis de la cara: ${s.face.lanes} a la vez en ${s.face.workers[0]?.delegate ?? '?'}` : '';
+      el.progress.textContent = `Hecho: ${s.frames} fotogramas en ${mmss(s.elapsedMs)} (${nf(s.framesPerSecond, 1)}/s)${s.every > 1 ? `, uno de cada ${s.every}` : ''}${lanes}.${s.face?.fallback ? ` (${s.face.fallback}; se usó uno)` : ''}`;
       renderSummary(el.summary, summarizeProtocol(out.results), out.results);
       el.exportRow.hidden = false;
       const header = await saved?.save({

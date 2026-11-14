@@ -15,13 +15,14 @@ export function assetUrls() {
 }
 
 /**
- * Crea el Face Landmarker. Intenta la GPU y, si falla, la CPU.
- * @param {{wasmDir: string, modelUrl: string, blendshapes?: boolean}} opts
+ * Crea el Face Landmarker. Intenta la GPU y, si falla, la CPU (o el orden de `delegates`: un segundo análisis
+ * en paralelo puede ir a la CPU para no competir con el primero por la GPU).
+ * @param {{wasmDir: string, modelUrl: string, blendshapes?: boolean, delegates?: ('GPU'|'CPU')[]}} opts
  */
-export async function createLandmarker({ wasmDir, modelUrl, blendshapes = true }) {
+export async function createLandmarker({ wasmDir, modelUrl, blendshapes = true, delegates = ['GPU', 'CPU'] }) {
   const fileset = await FilesetResolver.forVisionTasks(wasmDir);
   let lastError;
-  for (const delegate of ['GPU', 'CPU']) {
+  for (const delegate of delegates) {
     try {
       const landmarker = await FaceLandmarker.createFromOptions(fileset, {
         baseOptions: { modelAssetPath: modelUrl, delegate },

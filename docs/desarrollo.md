@@ -57,6 +57,14 @@ El Chromium de Playwright decodifica H.264 y VP9 con WebCodecs. `tests/fixtures/
 ffmpeg -i phone.mp4 -frames:v 1 ref.png
 ```
 
+## Análisis de la cara en paralelo
+```bash
+ffmpeg -y -i /tmp/caras/blink.y4m -t 16 -c:v libx264 -pix_fmt yuv420p -movflags +faststart /tmp/blink.mp4
+ffmpeg -y -stream_loop 2 -i /tmp/blink.mp4 -c copy /tmp/blink48.mp4     # 48 s: reposo de 20 s y tramo libre
+for v in 1 gpu+gpu cpu cpu+cpu; do node scripts/dev/check-video-analysis.cjs /tmp/blink48.mp4 /tmp/out-$v.json --rest 20 --lanes $v; done
+```
+Analiza el mismo vídeo con cada variante (`--lanes`). Para comprobar que dos variantes del mismo acelerador dan lo mismo, compara las series de cada tramo de los dos JSON (deben coincidir el número de muestras, el EAR de todas y los parpadeos). En la nube no hay GPU real: la velocidad de las variantes con GPU no dice nada del móvil. La lógica sin navegador está en `tests/pool.test.js`.
+
 ## Protocolo grabado y analizado después (fase 6c)
 ```bash
 node scripts/dev/check-protocol-video.cjs --video /tmp/caras/lid.y4m --live en-directo.json --out analisis-del-video.json --query '?escala=0.4&debug'

@@ -50,9 +50,14 @@ export function createVideoSession(steps, { onStepEnd = () => {}, onStepStart = 
     /** Avanza el reloj al tiempo de un fotograma y deja que la sesión cambie de tramo. */
     advance(t) {
       clock = t;
-      // Dos ticks: de la revisión pasa al siguiente tramo y de su «cuenta atrás» (0 ms) a grabar.
-      session.tick();
-      session.tick();
+      // Hasta que la sesión quede estable: al cruzar una frontera hacen falta tres pasos (terminar el tramo, pasar
+      // al siguiente y, tras su «cuenta atrás» de 0 ms, empezar a grabar). Con solo dos, el fotograma de la
+      // frontera llegaba con la sesión aún en la cuenta atrás y se perdía.
+      for (let i = 0; i < 6; i++) {
+        const before = `${session.state}:${session.index}`;
+        session.tick();
+        if (`${session.state}:${session.index}` === before) break;
+      }
     },
     /** Cierra el último tramo al acabar el vídeo. */
     finish(t) {
@@ -111,11 +116,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  *   every?: number,             // o procesar uno de cada N fotogramas (manda sobre maxFps)
  *   pipeline?: number,          // fotogramas en vuelo a la vez (1 = de uno en uno; 2 = se solapan el análisis y la preparación del siguiente)
  *   fromMs?: number, toMs?: number, // solo los fotogramas de este tramo del vídeo
+ *   beforeFinish?: () => void,   // al acabar, antes de cerrar el último tramo (vaciar lo que espera, p. ej. el flujo)
  *   signal?: AbortSignal,
  *   onProgress?: (p: {done:number, total:number, t:number, durationMs:number, elapsedMs:number, etaMs:number|null}) => void,
  * }} o
  */
-export async function processVideo({ mp4, analysis, flow, video, maxFps = 0, every: fixedEvery = 0, pipeline = 2, fromMs = 0, toMs = Infinity, signal, onProgress = () => {} }) {
+export async function processVideo({ mp4, analysis, flow, video, maxFps = 0, every: fixedEvery = 0, pipeline = 2, fromMs = 0, toMs = Infinity, signal, onProgress = () => {}, beforeFinish = () => {} }) {
   const fps = mp4.timing.fps || 30;
   // `every` (uno de cada N) manda sobre `maxFps`: con ~34 fps reales, «como mucho 30» no salta ninguno.
   const every = fixedEvery > 1 ? fixedEvery : maxFps > 0 && fps > maxFps * 1.3 ? Math.round(fps / maxFps) : 1;
@@ -131,62 +137,82 @@ export async function processVideo({ mp4, analysis, flow, video, maxFps = 0, eve
   // esperar a que los workers tengan hueco. Se guarda en el JSON para saber qué optimizar.
   const spent = { decodeWait: 0, prepare: 0, workerWait: 0 };
   const depth = Math.max(1, Math.min(2, pipeline)); // los dos clientes admiten 2 en vuelo
-  const full = () => analysis.inflight >= depth || (flow && flow.inflight >= depth);
+  // Con varios análisis de la cara en paralelo (AnalysisPool), cada uno puede tener los suyos en vuelo; el
+  // flujo sigue siendo uno solo.
+  const lanes = analysis.lanes ?? 1;
+  const full = () => analysis.inflight >= depth * lanes || (flow && flow.inflight >= depth);
+  // El reloj de la sesión avanza con los RESULTADOS de la cara (que llegan en orden), no con los envíos. Con
+  // varios fotogramas en vuelo, los resultados llegan algo después; si el reloj avanzara al enviar, los últimos
+  // de un paso se guardarían en el siguiente (se vio con dos análisis: 2 muestras del reposo en el tramo libre).
+  // Las muestras del flujo salen cuando hay resultados de la cara alrededor, así que siguen al mismo reloj.
+  const deliver = analysis.onResult;
+  analysis.onResult = (m) => {
+    if (Number.isFinite(m?.t)) video.advance(m.t);
+    deliver?.(m);
+  };
   video.session.start();
-  const it = decodeFrames(mp4, { signal, toMs })[Symbol.asyncIterator]();
-  while (true) {
-    const w0 = performance.now();
-    const next = await it.next();
-    spent.decodeWait += performance.now() - w0;
-    if (next.done) break;
-    const { frame, t } = next.value;
-    // Antes de `fromMs` se decodifica (hace falta para llegar al fotograma clave) pero no se analiza.
-    const take = t >= fromMs && index++ % every === 0;
-    if (!take) {
-      frame.close();
-      continue;
-    }
-    let upright = frame;
-    try {
-      // Esperar a que los workers tengan hueco (con pipeline 1, a que terminen el anterior).
-      const q0 = performance.now();
-      while (full()) {
-        if (signal?.aborted) throw new DOMException('cancelado', 'AbortError');
-        await sleep(1);
+  try {
+    const it = decodeFrames(mp4, { signal, toMs })[Symbol.asyncIterator]();
+    while (true) {
+      const w0 = performance.now();
+      const next = await it.next();
+      spent.decodeWait += performance.now() - w0;
+      if (next.done) break;
+      const { frame, t } = next.value;
+      // Antes de `fromMs` se decodifica (hace falta para llegar al fotograma clave) pero no se analiza.
+      const take = t >= fromMs && index++ % every === 0;
+      if (!take) {
+        frame.close();
+        continue;
       }
-      spent.workerWait += performance.now() - q0;
-      const p0 = performance.now();
-      video.advance(t);
-      if (rotation) {
-        const r = rotateFrame(frame, rotation, canvas);
-        canvas = r.canvas;
-        upright = r.frame;
+      let upright = frame;
+      try {
+        // Esperar a que los workers tengan hueco (con pipeline 1, a que terminen el anterior).
+        const q0 = performance.now();
+        while (full()) {
+          if (signal?.aborted) throw new DOMException('cancelado', 'AbortError');
+          await sleep(1);
+        }
+        spent.workerWait += performance.now() - q0;
+        const p0 = performance.now();
+        if (rotation) {
+          const r = rotateFrame(frame, rotation, canvas);
+          canvas = r.canvas;
+          upright = r.frame;
+        }
+        analysis.submit(upright, t);
+        flow?.submit(upright, t);
+        spent.prepare += performance.now() - p0;
+      } finally {
+        if (upright !== frame) upright.close();
+        frame.close();
       }
-      analysis.submit(upright, t);
-      flow?.submit(upright, t);
-      spent.prepare += performance.now() - p0;
-    } finally {
-      if (upright !== frame) upright.close();
-      frame.close();
+      done++;
+      lastT = t;
+      if (done % 5 === 0 || done === total) {
+        const elapsedMs = performance.now() - t0;
+        onProgress({ done, total, t, durationMs: mp4.timing.durationMs, elapsedMs, etaMs: done > 10 ? (elapsedMs / done) * (total - done) : null });
+      }
     }
-    done++;
-    lastT = t;
-    if (done % 5 === 0 || done === total) {
-      const elapsedMs = performance.now() - t0;
-      onProgress({ done, total, t, durationMs: mp4.timing.durationMs, elapsedMs, etaMs: done > 10 ? (elapsedMs / done) * (total - done) : null });
+    // Esperar a los últimos resultados antes de cerrar el último tramo.
+    while (analysis.inflight > 0 || (flow && flow.inflight > 0)) {
+      if (signal?.aborted) throw new DOMException('cancelado', 'AbortError');
+      await sleep(1);
     }
+    // Los últimos pares de flujo esperan la pose de la cara de después, que ya no llegará: se registran ahora, en
+    // el último tramo (antes se perdían).
+    beforeFinish();
+    video.finish(lastT + 1);
+  } finally {
+    analysis.onResult = deliver;
   }
-  // Esperar a los últimos resultados antes de cerrar el último tramo.
-  while (analysis.inflight > 0 || (flow && flow.inflight > 0)) {
-    if (signal?.aborted) throw new DOMException('cancelado', 'AbortError');
-    await sleep(1);
-  }
-  video.finish(lastT + 1);
   const wall = performance.now() - t0;
   const per = (ms) => (done ? Math.round((ms / done) * 100) / 100 : null);
   return {
     frames: done, every, pipeline: depth, elapsedMs: Math.round(wall), framesPerSecond: Math.round((done / (wall / 1000)) * 10) / 10,
     msPerFrame: per(wall), decodeWaitMsPerFrame: per(spent.decodeWait), prepareMsPerFrame: per(spent.prepare), workerWaitMsPerFrame: per(spent.workerWait),
     analysisMs: Math.round((analysis.ms ?? 0) * 10) / 10, flowMs: Math.round((flow?.ms ?? 0) * 10) / 10,
+    // Análisis de la cara: cuántos a la vez y, de cada uno, el acelerador, su tiempo y cuántos fotogramas hizo.
+    face: analysis.describe?.() ?? { lanes: 1, workers: [{ delegate: analysis.delegate ?? null, ms: Math.round((analysis.ms ?? 0) * 10) / 10, frames: done }] },
   };
 }

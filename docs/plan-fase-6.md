@@ -235,7 +235,8 @@ El vídeo de la app de cámara no sabe en qué fase está cada momento. Hay tres
 - La subida de la ceja sale más baja en el vídeo que en directo; sin explicar.
 
 **Pendiente (no bloquea):**
-- **Análisis de la cara en paralelo** (ver 6d). **Decidido (2026-11-10): proponérselo al autor después de la fase 7.** Un segundo worker con el análisis de la cara, que en modo IMAGE son fotogramas independientes. Hay que reordenar los resultados por tiempo antes de pasarlos al procesador de flujo, que descarta los que llegan en desorden, y se duplica el modelo en memoria. Objetivo: de 14,6 a ~25 fotogramas/s. Opus, esfuerzo medio.
+- **Análisis de la cara en paralelo: hecho en la rama `feat/caras-en-paralelo`, pendiente de medir en el móvil** (ver «Análisis de la cara en paralelo» al final).
+- *(Original)* **Análisis de la cara en paralelo** (ver 6d). **Decidido (2026-11-10): proponérselo al autor después de la fase 7.** Un segundo worker con el análisis de la cara, que en modo IMAGE son fotogramas independientes. Hay que reordenar los resultados por tiempo antes de pasarlos al procesador de flujo, que descarta los que llegan en desorden, y se duplica el modelo en memoria. Objetivo: de 14,6 a ~25 fotogramas/s. Opus, esfuerzo medio.
 - Entender la diferencia en la subida de la ceja entre el directo y el vídeo.
 - Probar HEVC con el protocolo grabado: `MediaRecorder` solo graba H.264 aquí.
 - Medir la sonrisa con las comisuras de la boca (decidido para después de la fase 7).
@@ -278,3 +279,24 @@ El vídeo de la app de cámara no sabe en qué fase está cada momento. Hay tres
 2. **En C:** el vídeo, temporal y en memoria, con casilla.
 3. **Reposo:** 30 s.
 4. **App de cámara:** se lee del archivo (6a).
+
+## Análisis de la cara en paralelo (tras la fase 7)
+**Qué se hizo.** Un «pool» de análisis de la cara (`src/landmarks/pool.js`) solo para el vídeo grabado (en modo IMAGE los fotogramas son independientes; en directo, el modo VIDEO suaviza entre fotogramas y exige un solo análisis). Los resultados llegan desordenados y se entregan en orden de envío (`src/landmarks/in-order.js`). Variantes elegibles en la tarjeta del vídeo: 1 GPU (como hasta ahora, por defecto), GPU + GPU, 1 CPU y CPU + CPU. El segundo análisis vive solo mientras dura el vídeo.
+
+**Hallazgo 1: no se pueden mezclar GPU y CPU.** Para el mismo fotograma no dan los mismos números: en la nube, el EAR difería 0,004 de mediana y hasta 0,014 en el 10 % peor, de 2 a 5 veces el ruido del EAR en reposo (0,0015–0,0026). Alternarlos metería ese ruido en la señal fina. GPU + CPU iba 2,5 veces más rápido en la nube y aun así **se descartó**. Ahora, si el segundo análisis no consigue el mismo acelerador que el primero, se usa uno solo y el resultado lo dice.
+
+**Hallazgo 2: el reloj de la sesión avanzaba al enviar, no al recibir.** Con varios fotogramas en vuelo, las últimas muestras de un tramo llegaban cuando la sesión ya estaba en el siguiente (2 muestras del reposo en el tramo libre). Ahora el reloj avanza con los resultados de la cara, en orden. Al arreglarlo apareció un fallo antiguo: al cruzar una frontera la sesión necesita tres pasos y `advance` daba dos, así que la muestra de la frontera se perdía (antes no se notaba porque el reloj iba un fotograma adelantado). Ahora avanza hasta que la sesión queda estable: **la variante de siempre pasa de 1439 a 1440 muestras de 1440**, con los mismos valores.
+
+**Medido en la nube** (4 núcleos y sin GPU real: la «GPU» es una emulación por software, así que solo vale para comparar entre sí las variantes de CPU y para comprobar resultados):
+| Variante | Fotogramas/s | Resultados |
+|---|---|---|
+| 1 GPU (como hasta ahora) | 5,6 | — |
+| GPU + GPU | 5,7 | **Idénticos** a 1 GPU (600 + 840 muestras, EAR igual en todas, mismos parpadeos y umbrales) |
+| 1 CPU | 29,0 | — |
+| CPU + CPU | 51,3 (1,8×) | **Idénticos** a 1 CPU |
+
+En la nube GPU + GPU no gana porque la GPU emulada ya ocupa los 4 núcleos (cada análisis pasa de 174 a 330 ms). **En el móvil del autor la GPU es real y hay 8 núcleos más: la medida que decide es la del móvil.**
+
+**Lo que queda igual o casi:** con dos análisis se pierden unos pares de flujo más **al principio del vídeo** (los de 0,1–0,2 s: el flujo va por delante mientras arrancan los análisis y sus primeros pares no tienen pose con la que normalizarse; con uno solo ya se perdían los tres primeros). No afecta a ninguna métrica: la subida del cierre necesita 2,1 s de historia.
+
+**Pendiente:** medir en el móvil las cuatro variantes con el mismo vídeo y elegir la de por defecto.

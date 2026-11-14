@@ -38,8 +38,17 @@ export class WorkerAnalysis {
     return this.meter.fps;
   }
 
-  /** Arranca el worker y carga el modelo. Rechaza si el worker no puede arrancar. */
-  load(blendshapes = true) {
+  /** Fotogramas en vuelo que admite (el pool de análisis lo usa para repartir). */
+  get capacity() {
+    return MAX_IN_FLIGHT;
+  }
+
+  /**
+   * Arranca el worker y carga el modelo. Rechaza si el worker no puede arrancar.
+   * @param {boolean} blendshapes
+   * @param {{delegates?: ('GPU'|'CPU')[]}} [o] orden de aceleradores a probar (por defecto GPU y, si falla, CPU)
+   */
+  load(blendshapes = true, { delegates } = {}) {
     this._loading ??= new Promise((resolve, reject) => {
       const worker = new AnalysisWorker();
       this.worker = worker;
@@ -64,6 +73,7 @@ export class WorkerAnalysis {
             if (meta) {
               m.bitmapMs = meta.bitmapMs; // tiempo en el hilo principal hasta tener la copia del frame
               m.roundTripMs = now - meta.submitAt; // desde que se pide hasta que vuelve el resultado
+              m.tag = meta.tag; // número del envío (para reordenar los resultados de varios análisis)
             }
             this.onResult?.(m);
             break;
@@ -76,13 +86,16 @@ export class WorkerAnalysis {
             this.blockedHosts.add(m.host);
             break;
           case 'skipped':
-          case 'frameError':
+          case 'frameError': {
             this.inflight = Math.max(0, this.inflight - 1);
+            const tag = this.meta.get(m.id)?.tag;
             this.meta.delete(m.id);
+            this.onDrop?.(tag); // el fotograma no se analizó: que no se le espere
             break;
+          }
         }
       };
-      worker.postMessage({ type: 'init', ...assetUrls(), blendshapes });
+      worker.postMessage({ type: 'init', ...assetUrls(), blendshapes, ...(delegates ? { delegates } : {}) });
     });
     return this._loading;
   }
@@ -106,16 +119,20 @@ export class WorkerAnalysis {
     return new Promise((resolve) => setTimeout(resolve, 400));
   }
 
-  /** Manda una copia del frame actual al worker. Si está ocupado, el frame se descarta. */
-  submit(video, t) {
+  /**
+   * Manda una copia del frame actual al worker. Si está ocupado, el frame se descarta.
+   * @param {*} [tag] número del envío; vuelve en el resultado (`m.tag`) o en `onDrop(tag)` si no se analiza
+   * @returns {boolean} si lo aceptó
+   */
+  submit(video, t, tag = null) {
     const frame = sourceSize(video); // <video> de la cámara o VideoFrame de un archivo (fase 6)
-    if (!this.ready || this.inflight >= MAX_IN_FLIGHT || !frame) return;
+    if (!this.ready || this.inflight >= MAX_IN_FLIGHT || !frame) return false;
     const scale = Math.min(1, ANALYSIS_SHORT_SIDE / Math.min(frame.width, frame.height));
     const size = { width: Math.round(frame.width * scale), height: Math.round(frame.height * scale) };
     this.analysisSize = size;
     const id = ++this.seq;
     const submitAt = performance.now();
-    this.meta.set(id, { submitAt, bitmapMs: null });
+    this.meta.set(id, { submitAt, bitmapMs: null, tag });
     this.inflight++;
     const options = scale < 1 ? { resizeWidth: size.width, resizeHeight: size.height, resizeQuality: 'low' } : undefined;
     createImageBitmap(video, options)
@@ -130,7 +147,9 @@ export class WorkerAnalysis {
       .catch(() => {
         this.inflight = Math.max(0, this.inflight - 1);
         this.meta.delete(id);
+        this.onDrop?.(tag);
       });
+    return true;
   }
 
   /** Libera el worker (y con él el modelo). */

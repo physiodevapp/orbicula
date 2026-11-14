@@ -62,7 +62,8 @@ describe('procesado fotograma a fotograma (decodificador y análisis simulados)'
         this.inflight++;
         seen.maxInflight = Math.max(seen.maxInflight, analysis.inflight + flow.inflight);
         seen[name].push(t);
-        setTimeout(() => { this.inflight--; }, 2);
+        // Como los workers: devuelve el resultado con su tiempo (el reloj de la sesión avanza con ellos).
+        setTimeout(() => { this.inflight--; this.onResult?.({ t }); }, 2);
       },
     });
     const analysis = worker('analysis');

@@ -59,6 +59,15 @@
             <select class="select" id="vidRest" aria-label="Segundos de reposo al principio del vídeo"><option value="20">20 s</option><option value="30" selected>30 s</option><option value="45">45 s</option></select></label>
           <label class="check"><input type="checkbox" id="vidCap"> Como mucho 30 fotogramas/s (tarda la mitad)</label>
         </div>
+        <label class="field">
+          <span class="control-label">Análisis de la cara (prueba de velocidad)</span>
+          <select class="select" id="vidLanes" aria-label="Análisis de la cara en paralelo">
+            <option value="1" selected>1 a la vez, GPU (como hasta ahora)</option>
+            <option value="gpu+gpu">2 a la vez, GPU + GPU</option>
+            <option value="cpu">1 a la vez, CPU</option>
+            <option value="cpu+cpu">2 a la vez, CPU + CPU</option>
+          </select>
+        </label>
         <div class="sum-card" id="vidSaved" hidden>
           <p class="hint" id="vidSavedText"></p>
           <div class="control-row wrap">

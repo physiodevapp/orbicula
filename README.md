@@ -81,6 +81,8 @@ La tarjeta **«Vídeo grabado»** (arriba de todo, sin necesidad de activar la c
 
 **El protocolo, grabado:** en la tarjeta «Protocolo clínico», la casilla **«Grabar el vídeo para analizarlo después»** graba el vídeo del propio protocolo y, al acabar, lo analiza fotograma a fotograma con las fases exactas. Ofrece el mismo resumen por fases con más sensibilidad: por ejemplo, detecta más parpadeos y los mide con su duración real.
 
+**Análisis de la cara (prueba de velocidad):** la tarjeta deja elegir cuántos análisis de la cara trabajan a la vez y con qué acelerador: 1 GPU (como hasta ahora), GPU + GPU, 1 CPU o CPU + CPU. Nunca se mezclan GPU y CPU en un mismo vídeo, porque no dan los mismos números y eso metería ruido en la señal. Es una opción de prueba hasta medir en el móvil cuál va más rápido.
+
 **Privacidad:** el vídeo se lee en el móvil y no sale de él. El que graba el protocolo **solo existe en la memoria**: no se guarda como archivo ni se puede exportar, y se borra al terminar el análisis, al descartarlo o al empezar otra sesión.
 
 **Si el directo va lento:** cuando el análisis en directo baja de 24 por segundo, la app lo avisa y propone este modo.

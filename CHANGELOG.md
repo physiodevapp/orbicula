@@ -4,6 +4,18 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (análisis de la cara en paralelo para el vídeo grabado)
+- **Varios análisis de la cara a la vez** al analizar un vídeo, en un «pool» que reparte los fotogramas y entrega los resultados en su orden (`src/landmarks/pool.js`, `src/landmarks/in-order.js`). Solo para el vídeo (modo IMAGE); el directo sigue con uno.
+- **Variantes elegibles en la tarjeta del vídeo:** 1 GPU (por defecto, como hasta ahora), GPU + GPU, 1 CPU y CPU + CPU. **Nunca se mezclan GPU y CPU:** no dan los mismos números para el mismo fotograma (el EAR difería de 2 a 5 veces el ruido del reposo). Si el segundo análisis no consigue el mismo acelerador, se usa uno y se dice.
+- El informe del vídeo guarda los análisis usados, su acelerador, su tiempo y cuántos fotogramas hizo cada uno.
+- En la nube: CPU + CPU va 1,8 veces más rápido que 1 CPU con resultados idénticos; GPU + GPU, idéntico a 1 GPU. Falta medir en el móvil.
+
+### Corregido (análisis de vídeo)
+- **El reloj de la sesión avanza con los resultados de la cara, no al enviar los fotogramas:** con varios en vuelo, las últimas muestras de un tramo caían en el siguiente.
+- **La muestra de la frontera entre tramos ya no se pierde:** la sesión necesitaba tres pasos para cruzarla y se le daban dos. La variante de siempre pasa de 1439 a 1440 muestras de 1440.
+- Los pares de flujo que esperan su pose al final del vídeo se registran antes de cerrar el último tramo.
+- 12 tests nuevos.
+
 ### Añadido (aviso de versión nueva)
 - **Aviso flotante «Hay una versión nueva»** con «Recargar» y «✕». Cada build publica `version.json` (`{ commit, branch }`, el mismo commit que el pie, servido sin caché); la app lo pide al abrir, al volver a ella (`visibilitychange`, `pageshow`) y cada 10 minutos mientras se ve. Resuelve el caso de una versión vieja que se queda abierta en las recientes de Android.
 - **No interrumpe lo que está en marcha:** es `fixed` (no mueve la maquetación) y «Recargar» queda desactivado, con el motivo, mientras haya un protocolo, una prueba, un análisis de vídeo o un vídeo grabado sin analizar; se activa solo al acabar.
