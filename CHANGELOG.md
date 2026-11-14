@@ -13,7 +13,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ### Añadido (cámara y análisis en directo)
 - **La frontal se preselecciona si el navegador solo da esa cámara:** si se pide la trasera y da la frontal (un ordenador), la próxima vez la tarjeta de inicio ya marca «Frontal». Se olvida en cuanto da la trasera. Una elección del clínico no se recuerda: en el móvil, la trasera sigue siendo la de por defecto.
-- **«Análisis en directo» (GPU / CPU)** en «Detalle del análisis», para medir si el directo va más rápido con la CPU, como el vídeo grabado. Se recuerda; cambiarlo recarga el modelo y empieza las medidas de cero. No se puede cambiar con una prueba en marcha. Por defecto, la GPU (como hasta ahora) hasta medirlo en el móvil.
+- **«Análisis de la cara en directo» (GPU / CPU)**, al principio del desplegable «Detalle técnico del análisis y verificación de lado» (antes «Verificación de lado (guiño)»). Se recuerda; cambiarlo recarga el modelo y empieza las medidas de cero. No se puede cambiar con una prueba en marcha.
+- **Medido en el móvil del autor** (protocolo completo, cámara trasera a 720p, mismo encuadre): en directo **la GPU va mejor**, 24,1–28,8 análisis/s por fase (34–40 ms), frente a 22,4–23,9 con la CPU (41–43 ms, todas las fases por debajo de 24) y con un 36 % más de ruido del EAR en reposo. En directo la CPU la comparten la cámara y el flujo, y el modo VIDEO (seguimiento) le sienta mejor a la GPU. **El directo sigue con la GPU por defecto** y el vídeo grabado, con la CPU.
+- La sonrisa más fuerte del lado derecho salió en el derecho en las dos pruebas: asimetría de la comisura −0,13 y −0,09 (subida −0,14 y −0,12), frente a −0,03 del blendshape.
 - `scripts/dev/check-camera-prefs.cjs` comprueba las dos cosas.
 
 ### Revisado (umbral del reposo)

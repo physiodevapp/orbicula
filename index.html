@@ -447,7 +447,15 @@
       </div>
 
       <details class="details">
-        <summary>Verificación de lado (guiño)</summary>
+        <summary>Detalle técnico del análisis y verificación de lado</summary>
+        <label class="field">
+          <span class="control-label">Análisis de la cara en directo</span>
+          <select class="select" id="liveDelegate" aria-label="Acelerador del análisis de la cara en directo">
+            <option value="gpu" selected>GPU (recomendado)</option>
+            <option value="cpu">CPU</option>
+          </select>
+        </label>
+        <p class="hint">En el móvil de pruebas, en directo la GPU da 24–29 análisis/s y la CPU 22–24 (la CPU la comparten la cámara y el flujo). En el vídeo grabado es al revés: allí se usa la CPU. Cambiarlo recarga el modelo y borra las medidas en curso.</p>
         <p class="hint">Cierra solo un ojo. I = izquierda del paciente, D = derecha. Las dos comprobaciones de lado ya están verificadas; este panel sigue aquí para repetirlas.</p>
         <div class="verify">
           <span class="control-label">Parpadeo (blendshape)</span>
@@ -464,14 +472,6 @@
         <label class="check"><input type="checkbox" id="swapToggle"> Invertir blendshapes</label>
         <label class="check"><input type="checkbox" id="blendToggle" checked> Calcular blendshapes</label>
         <p class="hint">Desactivar los blendshapes sirve para medir cuánto cuestan. Hacen falta para la sonrisa (fase 5); el EAR no los usa.</p>
-        <label class="field">
-          <span class="control-label">Análisis en directo (prueba de velocidad)</span>
-          <select class="select" id="liveDelegate" aria-label="Acelerador del análisis de la cara en directo">
-            <option value="gpu" selected>GPU (si la hay)</option>
-            <option value="cpu">CPU</option>
-          </select>
-        </label>
-        <p class="hint">En el vídeo grabado la CPU fue el doble de rápida que la GPU. Cambiarlo recarga el modelo y borra las medidas en curso (la GPU y la CPU no dan exactamente los mismos números).</p>
         <dl class="kv" id="analysisDetails">
           <dt>Modo</dt><dd id="kvDelegate">—</dd>
           <dt>Análisis</dt><dd id="kvTime">—</dd>
