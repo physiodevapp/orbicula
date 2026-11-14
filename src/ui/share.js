@@ -20,6 +20,19 @@ export function downloadJson(obj, name) {
   return { name, size: blob.size };
 }
 
+/** Descarga un texto (CSV) como archivo. */
+export function downloadText(text, name, type = 'text/csv') {
+  const blob = new Blob([text], { type: `${type};charset=utf-8` });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  return { name, size: blob.size };
+}
+
 /** Comparte el archivo con el menú del sistema. Lanza si el navegador no puede; AbortError si se cancela. */
 export async function shareJson(obj, name, title) {
   const file = new File([JSON.stringify(obj)], name, { type: 'application/json' });

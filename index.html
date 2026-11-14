@@ -8,6 +8,7 @@
   <meta name="theme-color" content="#0a0d12">
   <meta name="referrer" content="no-referrer">
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <script src="./host.js"></script>
 </head>
 <body>
   <header class="app-header" id="appHeader">
@@ -21,7 +22,15 @@
     <section class="card" id="startCard">
       <div class="card-title">Cámara</div>
       <p class="card-text">orbicula usa la cámara para medir movimientos alrededor de los ojos. La imagen se procesa en el móvil y no sale de él.</p>
+      <div class="control-row">
+        <span class="control-label">Usar</span>
+        <div class="segmented" role="group" aria-label="Cámara a usar">
+          <button type="button" data-facing="rear" aria-pressed="true">Trasera</button>
+          <button type="button" data-facing="front" aria-pressed="false">Frontal</button>
+        </div>
+      </div>
       <button class="btn btn-primary" id="startBtn" type="button">Activar cámara</button>
+      <p class="hint">En un móvil, la trasera da la mejor imagen. En un ordenador, la webcam suele reconocerse sola como frontal.</p>
     </section>
 
     <section class="card" id="videoCard">
@@ -50,6 +59,13 @@
             <select class="select" id="vidRest" aria-label="Segundos de reposo al principio del vídeo"><option value="20">20 s</option><option value="30" selected>30 s</option><option value="45">45 s</option></select></label>
           <label class="check"><input type="checkbox" id="vidCap"> Como mucho 30 fotogramas/s (tarda la mitad)</label>
         </div>
+        <div class="sum-card" id="vidSaved" hidden>
+          <p class="hint" id="vidSavedText"></p>
+          <div class="control-row wrap">
+            <button class="btn btn-primary" id="vidSavedRestore" type="button">Recuperar el análisis</button>
+            <button class="btn btn-quiet" id="vidSavedDismiss" type="button">Analizar de nuevo</button>
+          </div>
+        </div>
         <div class="control-row wrap">
           <button class="btn btn-primary" id="vidAnalyze" type="button">Analizar el vídeo</button>
           <button class="btn btn-quiet" id="vidACancel" type="button" hidden>Cancelar</button>
@@ -57,12 +73,45 @@
         <div class="coach-bar" id="vidABarWrap" hidden><i id="vidABar"></i></div>
         <p class="hint" id="vidProgress"></p>
         <div class="proto-summary" id="vidSummary" hidden></div>
+        <label class="field">
+          <span class="control-label">Código (opcional)</span>
+          <input class="input" id="vidCode" maxlength="24" autocomplete="off" placeholder="p. ej. P01">
+        </label>
+        <div class="control-row wrap" id="vidExport" hidden>
+          <button class="btn btn-primary" id="vidExportJson" type="button">Resultados (JSON)</button>
+          <button class="btn" id="vidExportCsv" type="button">CSV de las series</button>
+        </div>
         <div class="control-row wrap">
-          <button class="btn" id="vidDownload" type="button">Descargar JSON</button>
-          <button class="btn" id="vidCopy" type="button">Copiar ficha</button>
+          <button class="btn btn-quiet" id="vidDownload" type="button">Descargar JSON de diagnóstico</button>
+          <button class="btn btn-quiet" id="vidCopy" type="button">Copiar ficha</button>
         </div>
         <p class="hint" id="vidMsg"></p>
       </div>
+    </section>
+
+    <section class="card" id="savedCard" hidden>
+      <div class="card-title">Sesiones guardadas en este dispositivo</div>
+      <p class="card-text" id="savedNote"></p>
+      <div id="savedList"></div>
+      <div class="sum-card" id="savedView" hidden>
+        <div class="step-title" id="savedViewTitle"></div>
+        <p class="hint" id="savedViewNote"></p>
+        <div class="proto-summary" id="savedSummary" hidden></div>
+        <label class="field">
+          <span class="control-label">Código (opcional)</span>
+          <input class="input" id="savedCode" maxlength="24" autocomplete="off" placeholder="p. ej. P01">
+        </label>
+        <div class="control-row wrap">
+          <button class="btn btn-primary" id="savedExportJson" type="button">Resultados (JSON)</button>
+          <button class="btn" id="savedExportCsv" type="button">CSV de las series</button>
+          <button class="btn btn-quiet" id="savedClose" type="button">Cerrar</button>
+        </div>
+        <p class="hint" id="savedViewMsg"></p>
+      </div>
+      <div class="control-row wrap">
+        <button class="btn btn-quiet" id="savedClear" type="button">Borrar todo lo guardado</button>
+      </div>
+      <p class="hint" id="savedMsg"></p>
     </section>
 
     <section id="liveView" hidden>
@@ -223,6 +272,23 @@
       <div class="as-view" data-view="done">
         <div class="step-title" id="prDoneTitle">Protocolo completo</div>
         <div class="proto-summary" id="prSummaryView" hidden></div>
+        <div class="sum-card" id="prExportBlock">
+          <div class="sum-head"><span class="sum-title">Resultados</span></div>
+          <p class="hint">El <b>JSON de resultados</b> es el formato estable de orbicula (para el hub y para estudios); los <b>CSV</b> traen las series temporales, en dos archivos (cara y flujo). Sin ningún dato del paciente; solo el código si lo escribes.</p>
+          <label class="field">
+            <span class="control-label">Código (opcional)</span>
+            <input class="input" id="prExportCode" maxlength="24" autocomplete="off" placeholder="p. ej. P01">
+          </label>
+          <div class="control-row wrap">
+            <button class="btn btn-primary" id="prExportJson" type="button">Resultados (JSON)</button>
+            <button class="btn" id="prExportCsv" type="button">CSV de las series</button>
+          </div>
+          <p class="hint" id="prExportMsg"></p>
+          <div class="control-row wrap" id="prHubRow" hidden>
+            <button class="btn" id="prSendHub" type="button">Enviar al hub</button>
+          </div>
+          <p class="hint" id="prHubStatus" hidden></p>
+        </div>
         <div class="sum-card" id="prRecBlock" hidden>
           <div class="sum-head"><span class="sum-title">Análisis fotograma a fotograma</span></div>
           <p class="hint" id="prRecInfo"></p>
@@ -235,7 +301,11 @@
           <div class="coach-bar" id="prRecBarWrap" hidden><i id="prRecBar"></i></div>
           <p class="hint" id="prRecProgress"></p>
           <div class="proto-summary" id="prRecSummary" hidden></div>
-          <button class="btn" id="prRecDownload" type="button" hidden>Descargar JSON del análisis del vídeo</button>
+          <div class="control-row wrap" id="prRecExport" hidden>
+            <button class="btn btn-primary" id="prRecExportJson" type="button">Resultados (JSON)</button>
+            <button class="btn" id="prRecExportCsv" type="button">CSV de las series</button>
+          </div>
+          <button class="btn btn-quiet" id="prRecDownload" type="button" hidden>Descargar JSON de diagnóstico del vídeo</button>
           <p class="hint" id="prRecMsg"></p>
         </div>
         <p class="hint" id="prDoneText"></p>

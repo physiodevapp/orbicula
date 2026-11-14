@@ -7,7 +7,7 @@ Cuantificación de movimientos finos de la musculatura periocular (orbicular de 
 
 ## Estado
 
-v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolución reales) **fase 2** (Face Landmarker, ROI por lado y lateralidad) y **fase 3** (EAR, parpadeos y curvas en tiempo real). **Fase 4** (flujo óptico): hecha; en el móvil del autor, el cierre por flujo detecta contracciones mínimas del orbicular que el EAR no distingue del reposo (ver `docs/plan-fase-4.md`). **Fase 6** (vídeo grabado): hecha; análisis fotograma a fotograma de un vídeo de la app de cámara y del propio protocolo grabado, con los guiños en su lado con las dos cámaras (ver [`docs/plan-fase-6.md`](docs/plan-fase-6.md)). **Fase 5** (protocolo guiado): hecha; seis fases con voz y pitidos, calibración sobre el reposo del propio paciente, eventos en directo y un resumen por fase y lado con su asimetría (ver [`docs/plan-fase-5.md`](docs/plan-fase-5.md)). Ver [`CHANGELOG.md`](CHANGELOG.md).
+v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolución reales) **fase 2** (Face Landmarker, ROI por lado y lateralidad) y **fase 3** (EAR, parpadeos y curvas en tiempo real). **Fase 4** (flujo óptico): hecha; en el móvil del autor, el cierre por flujo detecta contracciones mínimas del orbicular que el EAR no distingue del reposo (ver `docs/plan-fase-4.md`). **Fase 6** (vídeo grabado): hecha; análisis fotograma a fotograma de un vídeo de la app de cámara y del propio protocolo grabado, con los guiños en su lado con las dos cámaras (ver [`docs/plan-fase-6.md`](docs/plan-fase-6.md)). **Fase 5** (protocolo guiado): hecha; seis fases con voz y pitidos, calibración sobre el reposo del propio paciente, eventos en directo y un resumen por fase y lado con su asimetría (ver [`docs/plan-fase-5.md`](docs/plan-fase-5.md)). **Fase 7** (exportación e integración): hecha; JSON y CSV de los resultados con un esquema documentado y validado ([`docs/schema.md`](docs/schema.md)), sesiones guardadas en el dispositivo para recuperar el trabajo tras recargar, modo alojado dentro del hub PhysiQ y API por `postMessage` ([`docs/integracion.md`](docs/integracion.md); ver [`docs/plan-fase-7.md`](docs/plan-fase-7.md)). Ver [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Uso clínico
 
@@ -83,6 +83,22 @@ La tarjeta **«Vídeo grabado»** (arriba de todo, sin necesidad de activar la c
 **Privacidad:** el vídeo se lee en el móvil y no sale de él. El que graba el protocolo **solo existe en la memoria**: no se guarda como archivo ni se puede exportar, y se borra al terminar el análisis, al descartarlo o al empezar otra sesión.
 
 **Si el directo va lento:** cuando el análisis en directo baja de 24 por segundo, la app lo avisa y propone este modo.
+
+## Sesiones guardadas
+Al terminar un protocolo (en directo o grabado) o el análisis de un vídeo, orbicula **guarda sus medidas en el propio móvil** (IndexedDB), para que recargar la página no las pierda. Aparecen en la tarjeta «Sesiones guardadas en este dispositivo», donde se pueden abrir para ver el resumen y descargar el JSON y los CSV.
+- **Qué se guarda:** solo medidas numéricas, la ficha de la captura y el código anónimo. **Nunca el vídeo, imágenes ni el nombre del archivo.**
+- **Cuánto:** las últimas 5 sesiones, y se borran solas a los 30 días. «Borrar» y «Borrar todo lo guardado» las quitan en el acto.
+- **Recuperar un análisis de vídeo:** al elegir de nuevo el mismo vídeo, la tarjeta «Vídeo grabado» ofrece «Recuperar el análisis», que ahorra volver a hacerlo (unos 2 minutos por cada minuto de vídeo). Se reconoce por tamaño, número de fotogramas y duración, **no por el nombre**: Android le da otro nombre al mismo vídeo según se elija desde Fotos o desde Archivos.
+- **Qué no se recupera:** un análisis o un protocolo a medias. Si recargas durante el análisis, hay que repetirlo.
+- **Modo alojado (`?host=physiq`):** no se guarda nada; el hub recibe el resultado por `postMessage`.
+- **Móvil compartido:** las sesiones solo llevan el código anónimo, pero si el móvil lo usa más gente, pulsa «Borrar todo lo guardado» al terminar.
+
+## Modo alojado (dentro de PhysiQ)
+Con `?host=physiq` en la dirección, orbicula se ve como parte del hub: **sin cabecera ni pie**, con el **tema oscuro** del hub (el hub es solo oscuro, aunque el móvil esté en claro) y con sus colores de texto y de error. El acento sigue siendo el de orbicula: cada satélite del hub tiene el suyo. En este modo no se guardan sesiones en el dispositivo.
+- **Cómo cargarla en el hub:** `<iframe src="…/orbicula/?host=physiq" allow="camera; screen-wake-lock">`. Sin `camera` el navegador no deja encender la cámara dentro del iframe; sin `screen-wake-lock` la pantalla puede apagarse a mitad de un protocolo (orbicula lo dice en `orbicula:ready`).
+- **Mensajes con el hub (`postMessage`):** `orbicula:ready` al cargar, `orbicula:result` con el JSON al terminar un protocolo y `orbicula:config` para elegir tema y duraciones. Solo se habla con los orígenes permitidos (`src/integration/origins.js`) y nunca con `"*"`. `/hub-prueba/` hace de hub para probarlo a mano. La guía completa para quien programe el hub está en [`docs/integracion.md`](docs/integracion.md).
+- **Versión:** al no haber pie, la versión y el commit están en «Detalle técnico de la captura» (con la cámara encendida).
+- **Cambiar los colores:** todos son variables de `src/styles/tokens.css`; el hub puede sobrescribirlas con `style.setProperty` sobre el `<html>` del iframe (misma origen en GitHub Pages).
 
 ## Parpadeos y curvas
 

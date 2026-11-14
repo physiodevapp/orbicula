@@ -181,6 +181,10 @@ main {
 .details dt { color: var(--text3); }
 .details dd { color: var(--text); word-break: break-word; }
 
+/* En modo alojado (?host=physiq) el hub ya pone su marco: sin cabecera ni pie de orbicula. */
+:root[data-host='physiq'] .app-header,
+:root[data-host='physiq'] .app-footer { display: none; }
+
 /* ── Pie ────────────────────────────────────────────────────────────────── */
 .app-footer {
   padding: var(--sp-4);
@@ -254,6 +258,7 @@ main {
 .step-text { font-size: var(--fs-md); line-height: 1.5; color: var(--text); }
 .summary { font-family: var(--font-mono); font-size: var(--fs-xs); line-height: 1.6; color: var(--text2); white-space: pre-wrap; }
 .field { display: flex; flex-direction: column; gap: var(--sp-1); }
+.hint + .field, .proto-summary + .field { margin-top: var(--sp-3); }
 .input {
   width: 100%;
   background: var(--bg); color: var(--text);
@@ -262,6 +267,8 @@ main {
   font: inherit; font-size: var(--fs-md);
 }
 .input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.input[aria-invalid="true"] { border-color: var(--danger); }
+.field-error { margin-top: var(--sp-1); font-size: var(--fs-sm); color: var(--danger); line-height: 1.45; }
 .control-row.wrap { flex-wrap: wrap; justify-content: flex-start; }
 
 .btn-quiet { color: var(--text2); font-size: var(--fs-xs); padding: var(--sp-2) var(--sp-3); min-height: 36px; }

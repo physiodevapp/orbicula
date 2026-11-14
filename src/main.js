@@ -18,6 +18,16 @@ import { BlinkDetector } from './metrics/blinks.js';
 import { createAssistant } from './ui/assistant.js';
 import { createVideoCard } from './ui/video.js';
 import { createProtocolVideo } from './ui/protocol-video.js';
+import { createSavedCard } from './ui/saved.js';
+import { hostFrom } from './integration/host.js';
+import { allowedOrigins } from './integration/origins.js';
+import { createBridge } from './integration/bridge.js';
+import { parseConfig } from './integration/messages.js';
+import { featureAllowed } from './ui/wake.js';
+import { buildPublicResult, isValidCode } from './export/result.js';
+import { createStore } from './persistence/store.js';
+import { idbAdapter } from './persistence/idb.js';
+import { exportJson, exportCsv, liveCapture, fileCapture } from './ui/export.js';
 import { createVideoSession, videoSteps, processVideo } from './video/offline.js';
 import { PROTOCOL_PLAN } from './assistant/steps.js';
 import { createBenchmark } from './ui/benchmark.js';
@@ -238,14 +248,111 @@ async function analyzeVideoFile({ mp4, mirrored, restSec, maxFps, steps = null, 
     if (document.body.dataset.busy === 'video') document.body.dataset.busy = '';
   }
 }
-createVideoCard({ getContext: () => { const c = captureContext(); return { build: c.build, device: c.device }; }, analyzeVideoFile });
+// Sesiones guardadas en el dispositivo (IndexedDB). En modo alojado (?host=physiq) no se guarda nada: el hub
+// recibe el resultado por postMessage y no debe quedar una copia en el almacenamiento del iframe.
+const hosted = hostFrom(location.search) === 'physiq';
+const saved = createSavedCard({ store: !hosted && typeof indexedDB !== 'undefined' ? createStore(idbAdapter()) : null, build: __COMMIT__ });
+saved.refresh();
+createVideoCard({ getContext: () => { const c = captureContext(); return { build: c.build, device: c.device }; }, analyzeVideoFile, saved });
 // Grabación del vídeo durante el protocolo y análisis posterior (fase 6c); `analyzeVideoFile` se define más abajo.
-const protocolVideo = createProtocolVideo({ getStream: () => camera.stream, analyzeVideoFile: (o) => analyzeVideoFile(o) });
+// ── Integración con el hub (iframe, postMessage; src/integration/) ─────────────────────────────────────────────
+// Los mensajes salen solo al origen del padre si está en la lista de permitidos (nunca con «*»).
+const hub = createBridge({
+  allowed: allowedOrigins({ extra: import.meta.env.VITE_ORBICULA_ORIGINS }),
+  appVersion: __APP_VERSION__,
+  permissions: () => ({ camera: featureAllowed('camera'), screenWakeLock: featureAllowed('screen-wake-lock') }),
+  handlers: { config: (payload) => applyHubConfig(payload), hidden: () => releaseForHub(), visible: () => resumeFromHub() },
+});
+let lastHubResult = null; // el último resultado mandado, para «Enviar al hub» tras corregir el código
+const hubStatus = (text) => { const p = document.getElementById('prHubStatus'); if (p) { p.textContent = text; p.hidden = !text; } };
+const HUB_TEXT = {
+  sent: 'Resultado enviado al hub.',
+  queued: 'Esperando a que el hub conteste para enviarle el resultado. Si no llega, descarga el JSON.',
+  blocked: 'Este origen no está autorizado a recibir resultados: descarga el JSON.',
+};
+
+/** Manda un resultado al hub (solo si orbicula va en un iframe). El código que no sea válido no se manda. */
+function sendToHub(r) {
+  if (!hub.embedded) return;
+  lastHubResult = r;
+  const doc = buildPublicResult({
+    results: r.results, capture: r.capture, appVersion: __APP_VERSION__, flowConfig: r.flowConfig,
+    participantCode: isValidCode(r.code) ? r.code || null : null,
+  });
+  hubStatus(HUB_TEXT[hub.sendResult(doc, r.sessionId)] ?? '');
+}
+
+/** `orbicula:config`: tema, idioma y valores del protocolo. Lo válido se aplica; lo demás se ignora y se avisa en la consola. */
+function applyHubConfig(payload) {
+  const { applied, rejected } = parseConfig(payload);
+  const root = document.documentElement;
+  if (applied.theme === 'auto') delete root.dataset.theme; // sigue al sistema
+  else if (applied.theme) root.dataset.theme = applied.theme;
+  if (applied.lang) root.lang = applied.lang;
+  if (applied.protocol) {
+    if (['idle', 'done'].includes(protocol.view)) {
+      const boxes = { restSec: 'prRest', naturalSec: 'prNatural', reps: 'prReps' };
+      for (const [k, v] of Object.entries(applied.protocol)) document.getElementById(boxes[k]).value = String(v);
+    } else {
+      rejected.push({ key: 'protocol', reason: 'hay un protocolo en marcha; se aplicará al empezar el siguiente si se vuelve a mandar' });
+    }
+  }
+  if (rejected.length) console.warn('[orbicula] configuración del hub: no se ha aplicado', rejected);
+}
+
+/** El hub oculta orbicula (vuelve a su portada): se suelta la cámara y se detiene el protocolo en marcha, conservando lo hecho. */
+let releasedByHub = false; // la cámara la apagó el hub al ocultar orbicula
+function releaseForHub() {
+  if (!camera.stream) return; // un análisis de vídeo no usa la cámara y sigue
+  releasedByHub = true;
+  const reason = 'orbicula se ocultó en el hub';
+  for (const a of recorders) (a.halt ?? a.interrupt)?.call(a, reason);
+  bench.interrupt(reason);
+  camera.stop();
+  state.running = false;
+  // El vídeo queda en negro: sin esto los contornos y los indicadores se quedan congelados y parece que sigue midiendo.
+  overlay.clear();
+  els.fpsPill.textContent = '— fps';
+  els.fpsPill.className = 'pill';
+  els.anaPill.textContent = 'cámara apagada';
+  els.anaPill.className = 'pill warn';
+  els.roiPill.textContent = 'ojo ≈ — px';
+  els.startCard.hidden = false; // por si el hub no vuelve a avisar: se puede encender a mano
+}
+
+/** El hub vuelve a mostrar orbicula: si la cámara la había apagado él, se reabre con la misma configuración (como al volver a la pestaña). */
+function resumeFromHub() {
+  if (releasedByHub) start();
+}
+
+const protocolVideo = createProtocolVideo({
+  getStream: () => camera.stream, analyzeVideoFile: (o) => analyzeVideoFile(o), saved,
+  onResult: (r) => sendToHub(r),
+});
+let protocolSavedId = null; // sesión guardada del protocolo en directo
 const protocol = createAssistant({
   ...sessionDeps,
   prefix: 'pr', rootId: 'protocol', busyKey: 'protocol', plan: PROTOCOL_PLAN,
   onStart: async (plan) => { await sessionDeps.onStart(plan); await protocolVideo.beforeStart(); },
-  onState: (state, session, extra) => protocolVideo.onState(state, session, extra),
+  onState: (state, session, extra) => {
+    protocolVideo.onState(state, session, extra);
+    // Al terminar el protocolo, sus medidas se guardan en el móvil (id por inicio de la sesión: «rehacer el último paso» reemplaza).
+    if (state === 'done' && session.results.some((r) => r.status === 'completed')) {
+      saved.save({
+        id: `protocol-${session.startedAt}`, kind: 'protocol', code: extra.code || null, appVersion: __APP_VERSION__, flowConfig: flow?.config.key,
+        capture: liveCapture({ camera, results: session.results }), results: session.results,
+        meta: { phases: session.results.filter((r) => r.status === 'completed').length, durationMs: session.results.filter((r) => r.status === 'completed').reduce((a, r) => a + (r.durationMs ?? 0), 0) },
+      }).then((h) => { protocolSavedId = h?.id ?? null; });
+      sendToHub({
+        sessionId: session.startedAt, results: session.results, code: extra.code, flowConfig: flow?.config.key,
+        capture: liveCapture({ camera, results: session.results }),
+      });
+    }
+  },
+  exporter: {
+    json: (results, code) => { saved.patchCode(protocolSavedId, code); return exportJson({ results, code, capture: liveCapture({ camera, results }), appVersion: __APP_VERSION__, flowConfig: flow?.config.key }); },
+    csv: (results, code) => { saved.patchCode(protocolSavedId, code); return exportCsv({ results, code }); },
+  },
 });
 /** Las dos tarjetas reciben todas las medidas; solo la que está grabando un paso las guarda. */
 const recorders = [assistant, protocol];
@@ -289,6 +396,8 @@ function setPressed(attr, value) {
 
 function renderDetails(info, frame) {
   const rows = [
+    // El pie (con la versión) se oculta en modo alojado: aquí sigue pudiéndose comprobar qué versión se abrió.
+    ['Versión', `v${__APP_VERSION__} · ${__BRANCH__}@${__COMMIT__}`],
     ['Dispositivo', info.label || '—'],
     ['Cámara obtenida', info.facing === 'front' ? 'frontal (vista en espejo)' : 'trasera'],
     ['Pedido', `${PRIORITIES[state.priority].width} × ${PRIORITIES[state.priority].height} · ${REQUESTED_FPS} fps`],
@@ -482,6 +591,7 @@ function updateAnalysisWarning(now) {
 }
 
 function updateAnalysisUi(r, now) {
+  if (releasedByHub) return; // la cámara está apagada: los indicadores no se vuelven a pintar
   if (now - lastAnaUi < 250) return;
   lastAnaUi = now;
   updateAnalysisWarning(now);
@@ -543,7 +653,7 @@ function onResult(r) {
 
   flow?.setFace(r);
   flowProcessor.pushFace(r.t, r);
-  if (r.face && state.showRoi) overlay.draw(r, { displayMirrored: state.displayMirrored });
+  if (r.face && state.showRoi && !releasedByHub) overlay.draw(r, { displayMirrored: state.displayMirrored });
   else overlay.clear();
   if (r.face && state.showFlow && flow?.strip) overlay.drawStrip(flow.strip, r.frame, { displayMirrored: state.displayMirrored });
   if (r.face && state.showFlow && state.showField && lastField) overlay.drawField(lastField, r.frame, { displayMirrored: state.displayMirrored });
@@ -698,6 +808,7 @@ async function refreshDevices() {
 }
 
 async function start() {
+  releasedByHub = false;
   showError('');
   els.startBtn.disabled = true;
   lowSince = null;
@@ -829,7 +940,8 @@ document.querySelectorAll('[data-facing]').forEach((b) =>
     state.facing = b.dataset.facing;
     state.deviceId = null;
     setPressed('facing', state.facing);
-    start();
+    // Desde la tarjeta de inicio (cámara aún apagada) solo se elige: la cámara se enciende con «Activar cámara».
+    if (state.running) start();
   }),
 );
 
@@ -859,4 +971,14 @@ document.addEventListener('visibilitychange', () => {
 // Solo lectura en la propia página; no envía nada.
 if (new URLSearchParams(location.search).has('debug')) {
   window.__orbicula = { series, flowSeries, get flow() { return flow; }, get analysis() { return analysis; } };
+}
+
+// Empieza a escuchar al hub y le avisa con `orbicula:ready` (si va en un iframe). Al final: ya existe todo lo que usa.
+hub.start();
+if (hub.embedded && !hub.blocked) {
+  document.getElementById('prHubRow')?.removeAttribute('hidden');
+  document.getElementById('prSendHub')?.addEventListener('click', () => {
+    if (lastHubResult) sendToHub({ ...lastHubResult, code: document.getElementById('prExportCode')?.value.trim() ?? '' });
+    else hubStatus('Todavía no hay ningún resultado que enviar.');
+  });
 }

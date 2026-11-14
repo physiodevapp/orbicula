@@ -8,6 +8,9 @@ import { summarizeProtocol } from '../protocol/summary.js';
 import { buildReport } from '../assistant/report.js';
 import { renderSummary } from './summary.js';
 import { downloadJson, stamp } from './share.js';
+import { exportJson, exportCsv, fileCapture } from './export.js';
+import { showMessage } from './code-field.js';
+import { requestWake } from './wake.js';
 
 const $ = (id) => document.getElementById(id);
 const nf = (v, d = 0) => (Number.isFinite(v) ? v.toFixed(d).replace('.', ',') : '—');
@@ -17,19 +20,23 @@ const MARGIN_MS = 1000;
 
 /**
  * @param {{getStream: () => MediaStream|null,
- *          analyzeVideoFile: (o: object) => Promise<{results: object[], stats: object, context: object}>}} deps
+ *          analyzeVideoFile: (o: object) => Promise<{results: object[], stats: object, context: object}>,
+ *          saved?: ReturnType<import('./saved.js').createSavedCard>|null,
+ *          onResult?: (r: {sessionId: string, results: object[], capture: object, flowConfig?: string, code: string}) => void}} deps
  */
-export function createProtocolVideo({ getStream, analyzeVideoFile }) {
+export function createProtocolVideo({ getStream, analyzeVideoFile, saved = null, onResult = null }) {
   const el = {
     record: $('prRecord'), recordRow: $('prRecordRow'), block: $('prRecBlock'), info: $('prRecInfo'), analyze: $('prRecAnalyze'),
     cancel: $('prRecCancel'), discard: $('prRecDiscard'), cap: $('prRecCap'), barWrap: $('prRecBarWrap'), bar: $('prRecBar'),
     progress: $('prRecProgress'), summary: $('prRecSummary'), download: $('prRecDownload'), msg: $('prRecMsg'),
+    exportRow: $('prRecExport'), exportJson: $('prRecExportJson'), exportCsv: $('prRecExportCsv'), code: $('prExportCode') ?? $('prCode'),
   };
   const recorder = new FrameRecorder();
   const supported = recordingType() != null;
   let recorded = null; // { blob, windows, steps, settings, startedAt, durationMs }
   let abort = null;
   let analysis = null; // resultado del análisis (para el JSON)
+  let savedId = null; // sesión guardada de este análisis
 
   // Sin soporte, la casilla no se ofrece.
   if (el.recordRow) el.recordRow.hidden = !supported;
@@ -39,11 +46,12 @@ export function createProtocolVideo({ getStream, analyzeVideoFile }) {
     recorder.discard();
     recorded = null;
     analysis = null;
+    savedId = null;
     if (el.block) el.block.hidden = true;
     if (el.summary) el.summary.hidden = true;
   }
 
-  function show(msg) { if (el.msg) el.msg.textContent = msg; }
+  function show(msg) { showMessage(el.msg, msg); }
 
   /** Antes de empezar el protocolo: arranca la grabación si la casilla está marcada. */
   async function beforeStart() {
@@ -74,6 +82,7 @@ export function createProtocolVideo({ getStream, analyzeVideoFile }) {
       el.progress.textContent = '';
       el.summary.hidden = true;
       el.download.hidden = true;
+      el.exportRow.hidden = true;
       el.analyze.disabled = false;
       el.cap.checked = false; // todos los fotogramas: es lo que hace más sensible al análisis
       el.block.hidden = false;
@@ -86,10 +95,10 @@ export function createProtocolVideo({ getStream, analyzeVideoFile }) {
     if (!recorded) return;
     abort = new AbortController();
     el.analyze.disabled = true; el.discard.disabled = true; el.cancel.hidden = false; el.barWrap.hidden = false;
-    el.summary.hidden = true; el.download.hidden = true; show('');
+    el.summary.hidden = true; el.download.hidden = true; el.exportRow.hidden = true; show('');
     el.progress.textContent = 'Preparando el análisis (modelo de la cara y flujo óptico)…';
     let wake = null;
-    try { wake = await navigator.wakeLock?.request('screen'); } catch { /* sin bloqueo de pantalla */ }
+    wake = await requestWake();
     try {
       const mp4 = await openRecording(recorded.blob);
       const steps = windowedSteps(recorded.steps, recorded.windows);
@@ -107,7 +116,21 @@ export function createProtocolVideo({ getStream, analyzeVideoFile }) {
       el.progress.textContent = `Hecho: ${s.frames} fotogramas en ${mmss(s.elapsedMs)}. El vídeo se ha borrado de la memoria.`;
       renderSummary(el.summary, summarizeProtocol(out.results), out.results);
       el.download.hidden = false;
+      el.exportRow.hidden = false;
       const keep = recorded;
+      const header = await saved?.save({
+        id: `protocol-video-${keep.startedAt}`, kind: 'protocol-video', code: el.code?.value.trim() || null,
+        appVersion: out.context?.build?.version ?? '', flowConfig: out.context?.flow?.config,
+        capture: fileCapture({ mp4: { timing: mp4.timing, track: mp4.track }, facing: out.context?.capture?.facing, mirrored: false, source: 'live' }),
+        results: out.results, extra: { stats: s },
+        meta: { phases: out.results.filter((r) => r.status === 'completed').length, durationMs: keep.durationMs },
+      });
+      savedId = header?.id ?? null;
+      // Segundo resultado del mismo protocolo, ya con el análisis fotograma a fotograma: el hub lo recibe con el mismo sessionId.
+      onResult?.({
+        sessionId: keep.startedAt, results: out.results, code: el.code?.value.trim() || '', flowConfig: out.context?.flow?.config,
+        capture: fileCapture({ mp4: { timing: mp4.timing, track: mp4.track }, facing: out.context?.capture?.facing, mirrored: false, source: 'live' }),
+      });
       recorder.discard(); // el vídeo ya no hace falta
       recorded = null;
       keep.blob = null;
@@ -122,6 +145,18 @@ export function createProtocolVideo({ getStream, analyzeVideoFile }) {
     }
   });
   el.cancel?.addEventListener('click', () => abort?.abort());
+  // Resultados (fase 7): la captura es la del vídeo que se grabó en directo (no hay archivo ni espejo).
+  const exportInput = () => ({ results: analysis.results, code: el.code?.value, capture: fileCapture({ mp4: { timing: analysis.video.timing, track: analysis.video.track }, facing: analysis.context?.capture?.facing, mirrored: false, source: 'live' }) });
+  el.exportJson?.addEventListener('click', () => {
+    if (!analysis) return;
+    show(exportJson({ ...exportInput(), appVersion: analysis.context?.build?.version ?? '', flowConfig: analysis.context?.flow?.config }));
+    saved?.patchCode(savedId, el.code?.value);
+  });
+  el.exportCsv?.addEventListener('click', () => {
+    if (!analysis) return;
+    show(exportCsv(exportInput()));
+    saved?.patchCode(savedId, el.code?.value);
+  });
   el.discard?.addEventListener('click', () => { forget(); show('Vídeo descartado.'); });
   el.download?.addEventListener('click', () => {
     if (!analysis) return;

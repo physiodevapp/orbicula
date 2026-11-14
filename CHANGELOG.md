@@ -4,6 +4,68 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (fase 7d: cierre de la integración)
+- **`docs/integracion.md`:** la guía para quien programe el hub. Lista de comprobación, cómo cargar el iframe (`allow="camera; screen-wake-lock"`, bajo demanda, `?host=physiq`), los mensajes con sus campos, las reglas de orígenes y privacidad, un ejemplo de código del lado del hub, cómo probarlo, compatibilidad y limitaciones conocidas.
+- **Selector Trasera / Frontal en la tarjeta «Cámara» de inicio** (antes solo aparecía tras activar la cámara). Comparte el estado con el de los controles, y elegir no enciende la cámara: se enciende con «Activar cámara». `scripts/dev/check-facing.cjs` lo comprueba.
+- **Conclusión de la fase 7** en `docs/plan-fase-7.md`, con el estado de los criterios de aceptación.
+
+### Añadido (fase 7c: API postMessage)
+- **`orbicula:ready`** al cargar (con la versión de la app, la del esquema y los permisos que el hub ha concedido al iframe), **`orbicula:result`** al terminar el protocolo en directo y el análisis del protocolo grabado, y **`orbicula:config { theme, lang, protocol }`** de entrada. El resultado lleva `sessionId` fuera del JSON: el protocolo grabado manda un segundo resultado con el mismo, para que el hub reemplace el primero.
+- **Orígenes:** solo el propio y `https://physiodevapp.github.io` (`src/integration/origins.js`), ampliable al construir con `VITE_ORBICULA_ORIGINS`, **nunca por la dirección**. Los mensajes salen solo al origen del padre, **nunca con `"*"`**, y los entrantes solo se aceptan si vienen del marco padre y de un origen permitido. Con un padre no permitido, orbicula no manda ni acepta nada.
+- **Origen del padre:** `location.ancestorOrigins`; si no existe (Firefox, Safari), `document.referrer`; y si tampoco, el primer mensaje válido (lo que haya que enviar espera hasta entonces).
+- **Configuración:** lo válido se aplica y lo malo se ignora con su motivo en la consola. Las duraciones del protocolo solo se cambian si no hay uno en marcha.
+- **El hub oculta orbicula (`PHYSIQ_SAT_HIDDEN`):** se apaga la cámara y se detiene el protocolo en marcha, conservando lo hecho (como «Detener», con «Retomar sesión»). Un análisis de vídeo ya cargado sigue. **Cuando el hub la vuelve a mostrar (`PHYSIQ_SAT_VISIBLE`), la cámara se reabre sola** con la misma configuración, como al volver a la pestaña. Con la cámara apagada, los indicadores dicen «cámara apagada» y no se quedan congelados (los contornos de los ojos y las cifras de fps y análisis seguían pintados y parecía que seguía midiendo).
+- **Botón «Enviar al hub»** en Resultados (solo dentro de un iframe), para reenviar con el código corregido. Un código que parece un nombre no viaja: se manda sin código.
+- **Bloqueo de pantalla:** se comprueba el permiso antes de pedirlo. Dentro de un iframe sin `allow="screen-wake-lock"`, el navegador lo bloqueaba y dejaba un error en la consola.
+- **`/hub-prueba/`:** página que hace de hub para probar la integración a mano (acepta `?orbicula=<dirección>`). Oculta y muestra el iframe como el hub de verdad: un iframe de otro origen que queda fuera de la pantalla se frena y no procesa el vídeo.
+- `scripts/dev/check-hub.cjs`: un «hub» en otro origen frente a orbicula con y sin ese origen permitido; protocolo completo con resultado válido contra el esquema.
+- 19 tests nuevos.
+
+### Añadido (fase 7b: modo alojado)
+- **`?host=physiq`:** orbicula oculta su cabecera y su pie y adopta los tokens del hub: su texto (`#e8edf2`, `#8aa4bc`) y su rojo de error (`#ef4444`). El fondo, las superficies, los bordes y las fuentes ya coincidían. El acento sigue siendo el de orbicula: cada satélite del hub tiene el suyo.
+- **Tema oscuro forzado**, como hace `assessment` dentro del hub (el hub es solo oscuro). Un tema elegido después (`orbicula:config`, en 7c) se respeta.
+- **`public/host.js`:** aplica el modo antes de pintar, para que no se vea un instante la cabecera ni el tema claro. Un test comprueba que decide igual que `src/integration/host.js`.
+- La versión y el commit pasan también a «Detalle técnico de la captura», porque el pie se oculta.
+- Sin guardado de sesiones en modo alojado (ya estaba).
+- `scripts/dev/check-host.cjs`: autónomo frente a alojado, con el sistema en claro y en oscuro, a 380 px.
+- Arreglo menor: separación sobre el campo «Código» en los resultados.
+- 7 tests nuevos.
+
+### Corregido (fase 7a: el código del participante)
+- **Un código no válido no daba ningún aviso:** el mensaje se escribía debajo de los botones, fuera de la pantalla del móvil. Ahora el campo del código **avisa al escribir** (borde rojo y un texto justo debajo), y los mensajes de exportar se traen a la vista.
+- **Campo «Código» en Resultados del protocolo:** antes solo se podía escribir antes de empezar y no se podía corregir al exportar. Arranca con el código escrito antes. También se usa para el protocolo grabado.
+- **Cierre por flujo (`docs/schema.md`):** se documenta que es una integral con fuga (nivel absoluto sin significado) y se exporta `analysis.closureTauMs`; y que un desfase de co-activación de ±300 ms está en el borde de la ventana.
+
+### Añadido (fase 7a bis: sesiones guardadas en el dispositivo)
+- **Recuperar el trabajo tras recargar la página.** Al terminar un protocolo (en directo o grabado) o el análisis de un vídeo, las medidas se guardan en IndexedDB (`src/persistence/`), sin el vídeo ni imágenes ni el nombre del archivo.
+- **Tarjeta «Sesiones guardadas en este dispositivo»:** abrir una sesión (resumen, JSON y CSV), borrarla o borrar todo. Se conservan 5 y caducan a los 30 días.
+- **Un vídeo ya analizado se reconoce al volver a elegirlo** («Recuperar el análisis»), por su huella (tamaño, fotogramas y duración, sin el nombre). Mismo criterio que `dualkinema`.
+- **La procedencia (`analysis`) del JSON de una sesión recuperada es la de cuando se analizó**, aunque la app se haya actualizado después.
+- Modo alojado (`?host=physiq`): no se guarda nada.
+- `scripts/dev/check-saved.cjs`: protocolo → recarga → abrir → mismo JSON; huella con otro nombre; borrado; modo alojado.
+- 14 tests nuevos.
+
+### Cambiado (fase 7a: revisión del esquema antes de fijar `"1"`)
+- **Compatibilidad hacia delante:** el esquema admite campos nuevos; añadirlos no cambia `schemaVersion`.
+- **Nombres de las métricas** definidos en el esquema, con un test que los compara con el código y con `docs/schema.md`.
+- **Bloque `analysis`:** versiones de MediaPipe, del modelo y de OpenCV, configuración del flujo y parámetros del detector. Sin datos del dispositivo.
+- **`timeseries.frozen`** (y columna `closure_frozen` en el CSV de la cara): dónde el cierre por flujo estaba congelado.
+- **Códigos estables** (`reasonCode`, y `{ code, text }` en avisos y notas) para poder traducirlos en el hub.
+- **`tPeak`** en las contracciones.
+- **`participantCode`** solo con letras sin tilde, números, `-` y `_` (hasta 24). Si no cumple, no se descarga nada y se avisa.
+- 7 tests nuevos.
+
+### Añadido (fase 7a: resultados en JSON y CSV)
+- **JSON público de resultados** (`schemaVersion: "1"`; `src/export/result.js`). Es el formato estable de orbicula, distinto del de diagnóstico:
+  - **Contenido:** captura, fases con su inicio y fin, calibración, métricas por lado y fase con su asimetría, calidad de cada fase, eventos y las series de la cara.
+  - **Formato:** tiempos en milisegundos, lados del paciente y sin ninguna identificación; solo el código opcional.
+  - **Documentación:** `docs/schema.md`, con las unidades de cada métrica, y esquema formal en `docs/orbicula-result.schema.json` (JSON Schema 2020-12).
+  - **Validación:** un test la hace con `ajv` (dependencia de desarrollo, versión fija).
+- **CSV de las series temporales**, en dos archivos: cara (EAR, apertura, parpadeo, sonrisa y cierre) y flujo (cierre por flujo, congelado y cabeza).
+- **Botones «Resultados (JSON)» y «CSV de las series»** en los tres resultados: el protocolo en directo, el protocolo grabado y el análisis de un vídeo. La tarjeta del vídeo tiene ahora el código opcional.
+- `scripts/dev/check-export.cjs`: protocolo → JSON y CSV → validación contra el esquema.
+- 14 tests nuevos.
+
 ### Añadido (fase 6d: aviso y velocidad)
 - **Aviso en directo (criterio 1):** si el análisis de la cara va por debajo de 24 por segundo durante 5 s seguidos, la app lo dice con la velocidad actual y propone el vídeo grabado.
 - **El análisis del vídeo va más rápido:** dos fotogramas en vuelo a la vez. En la nube, 1,28 veces más rápido con los mismos resultados.

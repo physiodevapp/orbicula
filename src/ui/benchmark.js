@@ -1,6 +1,7 @@
 // Prueba de rendimiento del flujo óptico: ejecuta sola las pasadas (una por configuración del
 // flujo, más una sin flujo), con el análisis de la cara a la vez, registra cada resultado y exporta
 // un JSON. Ver src/assistant/benchmark.js.
+import { requestWake } from './wake.js';
 import { buildPlan, summarizeRun, buildBenchmarkReport, groupSummary, flowRaw } from '../assistant/benchmark.js';
 import { FLOW_CONFIGS, OPENCV_VERSION, FARNEBACK, FARNEBACK_LITE, LUCAS_KANADE } from '../flow/config.js';
 import { downloadJson, shareJson, copyJson, stamp } from './share.js';
@@ -162,7 +163,7 @@ export function createBenchmark({ camera, video, ensureAnalysis, ensureFlow, get
     }
     document.body.dataset.busy = 'bench';
     cues.unlock(); // dentro del clic: si no, el navegador no deja sonar
-    try { wake = await navigator.wakeLock?.request('screen'); } catch { wake = null; } // si la pantalla se apaga, la cámara se para
+    wake = await requestWake(); // si la pantalla se apaga, la cámara se para
     cancelled = null;
     runs = [];
     ({ runMs, warmupMs, leadMs } = params());

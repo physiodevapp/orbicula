@@ -181,13 +181,16 @@ function quality(step, v, cal) {
   const known = speeds.filter(Number.isFinite);
   const moving = known.length && cal?.headStill ? known.filter((s) => s > cal.headStill).length / known.length : null;
   const fps = step.perf?.analysisFps ?? null;
+  // `notes` (texto, para la pantalla) y `noteCodes` (para el JSON y el hub) van en paralelo.
   const notes = [];
-  if (face < SUMMARY.minFace) notes.push('se ha perdido la cara');
-  if (moving != null && moving > SUMMARY.maxHeadMoving) notes.push('la cabeza se ha movido');
+  const noteCodes = [];
+  const note = (code, text) => { noteCodes.push(code); notes.push(text); };
+  if (face < SUMMARY.minFace) note('face-lost', 'se ha perdido la cara');
+  if (moving != null && moving > SUMMARY.maxHeadMoving) note('head-moving', 'la cabeza se ha movido');
   const slow = fps != null && fps < SUMMARY.unreliableFps;
-  if (fps != null && fps < SUMMARY.minAnalysisFps) notes.push(`análisis a ${String(fps).replace('.', ',')}/s (< ${SUMMARY.minAnalysisFps})`);
+  if (fps != null && fps < SUMMARY.minAnalysisFps) note('low-fps', `análisis a ${String(fps).replace('.', ',')}/s (< ${SUMMARY.minAnalysisFps})`);
   const reliable = face >= SUMMARY.minFace && !(moving > SUMMARY.maxHeadMoving) && !slow;
-  return { face: r3(face), headMoving: r3(moving), analysisFps: fps, reliable, notes };
+  return { face: r3(face), headMoving: r3(moving), analysisFps: fps, reliable, notes, noteCodes };
 }
 
 /** Eventos del paso por lado: contracciones que cuentan, breves y parpadeos/cierres. */
@@ -267,7 +270,7 @@ const ASYM_KEYS = ['ear', 'aperture', 'blinksPerMin', 'blinkCompleteness', 'blin
 /**
  * Resumen del protocolo.
  * @param {object[]} steps pasos grabados (results de la sesión o steps del JSON)
- * @returns {{calibration: object|null, phases: object, warnings: string[]}}
+ * @returns {{calibration: object|null, phases: object, warnings: string[], warningCodes: string[]}}
  */
 export function summarizeProtocol(steps) {
   const byId = Object.fromEntries(steps.filter((s) => s.status === 'completed').map((s) => [s.id, s]));
@@ -294,9 +297,12 @@ export function summarizeProtocol(steps) {
     }
     phases[id] = { title: step.title, left, right, asymmetry: asym, quality: quality(step, v, cal) };
   }
+  // `warnings` (texto) y `warningCodes` (no-calibration, invalid-rest, high-threshold) van en paralelo.
   const warnings = [];
-  if (!cal) warnings.push('Sin calibración: falta el reposo.');
-  else if (!cal.valid) warnings.push(`Reposo no válido: ${cal.reason}.`);
-  if (cal?.warning) warnings.push(cal.warning);
-  return { calibration: cal, phases, warnings };
+  const warningCodes = [];
+  const warn = (code, text) => { warningCodes.push(code); warnings.push(text); };
+  if (!cal) warn('no-calibration', 'Sin calibración: falta el reposo.');
+  else if (!cal.valid) warn('invalid-rest', `Reposo no válido: ${cal.reason}.`);
+  if (cal?.warning) warn('high-threshold', cal.warning);
+  return { calibration: cal, phases, warnings, warningCodes };
 }
