@@ -122,6 +122,9 @@ Recargar la página perdía un protocolo o 2 minutos de análisis de vídeo. Se 
 ### Pendiente para 7d (pedido por el autor)
 - **Selector Trasera / Frontal en la tarjeta «Cámara» de antes de encender.** Hoy solo aparece después de activar la cámara y cuesta encontrarlo (lo notó al probar 7c con la webcam del ordenador, que no dice si es frontal o trasera). Debe ir con el mismo estado que el selector actual, sin duplicar la lógica.
 
+### Pendiente para después de 7d (hallazgo de la prueba en el ordenador)
+- **Aviso de cara pequeña mejor, y también por voz.** En la webcam del ordenador, con «ojo ≈ 50 px» el reposo falló siempre («la cabeza se ha movido»); a 70 px y con más luz calibró a la primera. El aviso actual no saltó porque usa una proporción del encuadre (cara < 30 % del lado corto), no los píxeles del ojo, que es lo que importa: el ruido de la cámara es casi fijo en píxeles y con el ojo pequeño parece movimiento. Cambiarlo a píxeles del ojo (umbral provisional, ~60 px: solo hay dos observaciones), avisar también por voz antes del reposo y, si el reposo falla por movimiento con el ojo pequeño, decirlo. **No tocar los umbrales de movimiento de la cabeza.** Para fijar el umbral: probar en el ordenador a 55–60 px.
+
 ## Pasos (me detengo al final de cada uno para que lo pruebes en el móvil)
 1. **7a. JSON público, esquema y CSV.** Botones en los tres resultados, el esquema en JSON Schema, `docs/schema.md`, los tests de validación y la revisión del esquema con Opus.
    - **Tu prueba:** hacer un protocolo, descargar el JSON público y el CSV, abrir el CSV en la hoja de cálculo del móvil y pasármelos.
