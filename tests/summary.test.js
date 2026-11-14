@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resample, spectralPeak, FS } from '../src/protocol/spectrum.js';
-import { bestCorrelation, summarizeProtocol, repWindows } from '../src/protocol/summary.js';
+import { bestCorrelation, summarizeProtocol, repWindows, cornerExcursion } from '../src/protocol/summary.js';
 
 function rng(seed = 1) {
   let s = seed >>> 0;
@@ -156,5 +156,50 @@ describe('resumen del protocolo', () => {
   it('avisa si falta la calibración o no vale', () => {
     expect(summarizeProtocol([steps[1]]).warnings[0]).toMatch(/Sin calibración/);
     expect(summarizeProtocol([{ ...steps[0], calibration: { ...CAL, valid: false, reason: 'x' } }]).warnings[0]).toMatch(/no válido/);
+  });
+});
+
+describe('sonrisa medida con la comisura de la boca', () => {
+  // Reposo de la comisura: 0,6 DI hacia fuera y 0,9 por debajo. Con la sonrisa, la izquierda se va 0,2 fuera y
+  // 0,1 arriba; la derecha, la mitad. El ojo izquierdo se cierra con ella; el derecho, no.
+  const REST = { out: 0.6, up: -0.9 };
+  const MOVE = { left: { out: 0.2, up: 0.1 }, right: { out: 0.1, up: 0.05 } };
+  const withCorners = (s, { onlyHolds = false } = {}) => {
+    for (const side of ['left', 'right']) {
+      const m = (x) => (inHold(x) ? 1 : 0);
+      const ok = (x) => !onlyHolds || m(x);
+      s.series[side].cornerOut = s.series.t.map((x) => (ok(x) ? REST.out + MOVE[side].out * m(x) : null));
+      s.series[side].cornerUp = s.series.t.map((x) => (ok(x) ? REST.up + MOVE[side].up * m(x) : null));
+    }
+    return s;
+  };
+  const rest = () => withCorners({ ...step('rest', 30000), calibration: CAL });
+  const smileStep = (o) => withCorners(step('smile', 23500, { reps: true, ear: (x, s) => (s === 'left' && inHold(x) ? BASE[s] * 0.7 : BASE[s]) }), o);
+
+  it('desplazamiento y subida de cada comisura, con su asimetría', () => {
+    const P = summarizeProtocol([rest(), smileStep()]).phases.smile;
+    expect(P.left.commissure).toBeCloseTo(Math.hypot(0.2, 0.1), 3);
+    expect(P.right.commissure).toBeCloseTo(Math.hypot(0.1, 0.05), 3);
+    expect(P.left.commissureLift).toBeCloseTo(0.1, 3);
+    expect(P.asymmetry.commissure).toBeCloseTo(1 / 3, 2); // (2 − 1) / (2 + 1)
+  });
+
+  it('co-activación con la comisura: alta en el lado cuyo ojo se cierra con la sonrisa', () => {
+    const P = summarizeProtocol([rest(), smileStep()]).phases.smile;
+    expect(P.left.coactivationCorner).toBeGreaterThan(0.8);
+    expect(P.right.coactivationCorner ?? 0).toBeLessThan(0.3);
+  });
+
+  it('sin reposo propio en la fase, usa la posición del paso de reposo', () => {
+    const steps = [rest(), smileStep({ onlyHolds: true })];
+    const ex = cornerExcursion({ st: steps[1].series.t, s: steps[1].series }, 'left', repWindows(steps[1]), { out: REST.out, up: REST.up, n: 99 });
+    expect(ex.from).toBe('rest');
+    expect(summarizeProtocol(steps).phases.smile.left.commissure).toBeCloseTo(Math.hypot(0.2, 0.1), 3);
+  });
+
+  it('sin series de la comisura (exportaciones anteriores) no hay métrica, sin errores', () => {
+    const P = summarizeProtocol([{ ...step('rest', 30000), calibration: CAL }, step('smile', 23500, { reps: true })]).phases.smile;
+    expect(P.left.commissure).toBeUndefined();
+    expect(P.left.smile).not.toBeUndefined();
   });
 });

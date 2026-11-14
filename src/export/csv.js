@@ -6,13 +6,19 @@ import { seriesOf } from './result.js';
 const cell = (v) => (v === null || v === undefined || (typeof v === 'number' && !Number.isFinite(v)) ? '' : String(v));
 const line = (cols) => `${cols.map(cell).join(',')}\n`;
 
-/** CSV de la cara: t_ms, phase y, por lado, EAR, apertura, blendshape de parpadeo, sonrisa y cierre por flujo; al final, si el cierre estaba congelado. */
+/**
+ * CSV de la cara: t_ms, phase y, por lado, EAR, apertura, blendshape de parpadeo, sonrisa y cierre por flujo;
+ * luego, si el cierre estaba congelado, y al final la posición de las comisuras de la boca (añadidas después:
+ * al final para no mover las columnas de antes).
+ */
 export function faceCsv(results) {
   const { face } = seriesOf(results);
   const cols = ['ear', 'aperture', 'blink', 'smile', 'closure'];
-  let out = line(['t_ms', 'phase', ...['left', 'right'].flatMap((s) => cols.map((c) => `${s}_${c}`)), 'closure_frozen']);
+  const extra = ['cornerOut', 'cornerUp'];
+  const sides = ['left', 'right'];
+  let out = line(['t_ms', 'phase', ...sides.flatMap((s) => cols.map((c) => `${s}_${c}`)), 'closure_frozen', ...sides.flatMap((s) => extra.map((c) => `${s}_${c}`))]);
   face.t.forEach((t, i) => {
-    out += line([t, face.phase[i], ...['left', 'right'].flatMap((s) => cols.map((c) => face[s][c][i])), face.frozen[i]]);
+    out += line([t, face.phase[i], ...sides.flatMap((s) => cols.map((c) => face[s][c][i])), face.frozen[i], ...sides.flatMap((s) => extra.map((c) => face[s][c][i]))]);
   });
   return out;
 }

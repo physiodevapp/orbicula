@@ -626,6 +626,20 @@
             "$ref": "#/$defs/nullableNumber"
           },
           "description": "Cierre por flujo (DI, + = se cierra), de la muestra de flujo más cercana (≤ 40 ms), o null."
+        },
+        "cornerOut": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nullableNumber"
+          },
+          "description": "Comisura de la boca de ese lado hacia fuera, en el sistema de la cara (DI desde el punto medio de las comisuras internas de los ojos). Opcional: no está en exportaciones anteriores."
+        },
+        "cornerUp": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nullableNumber"
+          },
+          "description": "Comisura de la boca hacia arriba en el sistema de la cara (DI; negativa: queda por debajo de los ojos). Opcional."
         }
       }
     },
@@ -774,6 +788,34 @@
             "number",
             "null"
           ]
+        },
+        "commissure": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Sonrisa: desplazamiento máximo de la comisura de la boca desde su reposo (DI), media de las repeticiones."
+        },
+        "commissureLift": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Sonrisa: subida máxima de la comisura (DI, + = hacia arriba)."
+        },
+        "coactivationCorner": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Sonrisa: correlación entre el desplazamiento de la comisura y el cierre del ojo del mismo lado."
+        },
+        "coactivationCornerLagMs": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Desfase de esa correlación (ms, −300 a +300)."
         },
         "contractions": {
           "type": [

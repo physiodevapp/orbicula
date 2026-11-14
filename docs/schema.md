@@ -105,8 +105,12 @@ Sale del reposo del propio paciente; `null` si no hubo reposo.
 | `browLift` | `brows` | DI | Desplazamiento de la ceja hacia arriba (flujo integrado). |
 | `browPeak` | `brows` | × | Pico de movimiento de la ceja, en veces su p99 del reposo. |
 | `smile` | `smile` | 0–1 | Blendshape `mouthSmile` de ese lado. **Casi satura** con una sonrisa amplia: da la dirección, no la magnitud. |
-| `coactivation` | `smile` | r | Correlación entre la sonrisa y el cierre del ojo del mismo lado. |
+| `coactivation` | `smile` | r | Correlación entre la sonrisa (blendshape) y el cierre del ojo del mismo lado. Se mantiene por compatibilidad; la app muestra `coactivationCorner`. |
 | `coactivationLagMs` | `smile` | ms | Desfase de esa correlación (−300 a +300). **Si vale ±300, el máximo está en el borde de la ventana**: con un desfase mayor la correlación podría ser más alta; tómala como una cota inferior. |
+| `commissure` | `smile` | DI | **Sonrisa medida con la comisura de la boca** (landmarks 61/291): desplazamiento máximo desde su reposo, en distancias intercantales, media de las repeticiones. El reposo es el de la propia fase (las muestras fuera de las repeticiones) o, si no hay bastantes, el del paso de reposo. Se mide en 3D en un sistema de la propia cara, así que no cambia con la distancia a la cámara, la inclinación ni, en primera aproximación, el giro de la cabeza. A diferencia de `smile`, no satura y da la magnitud de cada lado. |
+| `commissureLift` | `smile` | DI | Subida máxima de la comisura (+ = hacia arriba). |
+| `coactivationCorner` | `smile` | r | Correlación entre el desplazamiento de la comisura y el cierre del ojo del mismo lado. **Es la co-activación que muestra la app.** |
+| `coactivationCornerLagMs` | `smile` | ms | Desfase de esa correlación, como `coactivationLagMs`. |
 | `contractions` | todas menos `rest` | recuento | Contracciones finas que cuentan en la fase (estado `ok`). |
 | `brief` | ídem | recuento | Movimientos breves del párpado (< 0,5 s) que no cuentan como contracción. |
 
@@ -132,6 +136,7 @@ Un solo eje `t` (ms) con las señales de la cara de todas las fases, y los array
 | `aperture` | Apertura palpebral / distancia intercantal. |
 | `blink` | Blendshape de parpadeo (0 abierto, 1 cerrado). |
 | `smile` | Blendshape de sonrisa de ese lado (0–1). |
+| `cornerOut`, `cornerUp` | Posición de la comisura de la boca de ese lado en el sistema de la cara: hacia fuera y hacia arriba, en DI desde el punto medio de las comisuras internas de los ojos (`cornerUp` es negativa: la boca queda por debajo). La sonrisa es su cambio respecto al reposo. **Opcionales:** no están en las exportaciones anteriores. |
 | `closure` | Cierre por flujo (DI, + = se cierra), de la muestra de flujo más cercana (≤ 40 ms) o `null`. Es una **integral con fuga** (`analysis.closureTauMs`, 5 s): solo importan los cambios en unos segundos; **el nivel absoluto no significa nada**, y las primeras muestras de la grabación arrastran lo que pasó antes (en una prueba real empezó en −0,47 y tardó ~15 s en asentarse hacia 0). |
 
 Además, `frozen` (compartido por los dos lados): `1` si en esa muestra el cierre por flujo estaba **congelado** (un ojo cerrado más de la mitad, más el margen de `analysis.closureFreeze`; el `closure` no se integra en esa muestra: queda casi constante, decae despacio, y no es una medida), `0` si no y `null` si no hay muestra de flujo cercana. **Quien reanalice el `closure` debe excluir las muestras con `frozen = 1`.**
@@ -140,7 +145,7 @@ Las series del **flujo** muestra a muestra (cierre de cada ojo, congelado y velo
 
 ## CSV
 Dos archivos por resultado, con coma como separador, punto decimal, cabecera, tiempos en ms y sin datos del paciente; los valores que faltan, vacíos.
-- **`orbicula-cara-….csv`:** `t_ms, phase` y, por lado, `left_ear, left_aperture, left_blink, left_smile, left_closure, right_…` y, al final, `closure_frozen`. Las mismas filas que `timeseries`.
+- **`orbicula-cara-….csv`:** `t_ms, phase` y, por lado, `left_ear, left_aperture, left_blink, left_smile, left_closure, right_…`, luego `closure_frozen` y, al final, `left_cornerOut, left_cornerUp, right_cornerOut, right_cornerUp` (añadidas al final para no mover las columnas anteriores). Las mismas filas que `timeseries`.
 - **`orbicula-flujo-….csv`:** `t_ms, phase, left_closure, right_closure, closure_frozen, head_u, head_v`. Cierre por flujo de cada ojo (DI), si estaba congelado (1 = algún ojo cerrado más de la mitad) y velocidad de la cabeza que se resta (DI/s). El primer `t_ms` puede ser algo negativo (−33): el par de flujo de ese fotograma llega antes que su análisis de la cara.
 
 ## Qué cambia respecto al JSON de diagnóstico

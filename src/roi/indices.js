@@ -68,6 +68,12 @@ export const IRIS_CENTERS = [468, 473];
  */
 export const POSE_POINTS = [...NASAL_DORSUM, 234, 454, 10];
 
+/**
+ * Comisuras de la boca: 61 y 291, los extremos de FACEMESH_LIPS (las cadenas exterior superior e inferior de
+ * los labios empiezan en 61 y acaban en 291). El lado de cada una no se toma del índice: se asigna al ojo más
+ * cercano (como el iris), así que no depende del nombre del lado del mallado.
+ */
+export const MOUTH_CORNERS = [61, 291];
 /** Número de landmarks que devuelve el modelo (468 del mallado + 10 del iris). */
 export const LANDMARK_COUNT = 478;
 
@@ -80,5 +86,6 @@ export const ALL_USED = [
     FACE_WIDTH.left,
     ...IRIS_CENTERS,
     ...POSE_POINTS,
+    ...MOUTH_CORNERS,
   ]),
 ];

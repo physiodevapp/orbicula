@@ -16,6 +16,11 @@
 //  - Co-activación ojo–boca: correlación entre la sonrisa de un lado (blendshape mouthSmile) y el cierre
 //    del ojo del mismo lado, con el mejor desfase en ±0,3 s. Una sonrisa amplia sana también cierra algo
 //    el ojo: lo que informa es la diferencia entre lados y su evolución, no el valor solo.
+//  - Sonrisa medida con la COMISURA de la boca (landmarks 61/291 en el sistema de la propia cara, ver
+//    src/roi/geometry.js): desplazamiento respecto a la posición de reposo de la propia fase (las muestras fuera
+//    de las repeticiones; si no hay bastantes, la mediana del reposo), en distancias intercantales. El
+//    blendshape mouthSmile casi satura con una sonrisa amplia y el modelo tiende a darlo simétrico; la
+//    comisura da la magnitud de cada lado. `smile` y `coactivation` (blendshape) se mantienen por compatibilidad.
 //  - Asimetría = (I − D) / (I + D), solo para magnitudes positivas.
 //  - Eventos de ceja y canto: experimentales, no se resumen (demasiados con parpadeos y gestos).
 import { asymmetry } from '../metrics/asymmetry.js';
@@ -28,6 +33,7 @@ export const SUMMARY = {
   repLagMs: 1000, // margen tras el «suelta»
   incompleteRatio: 0.8, // parpadeo incompleto: < 80 % del cierre forzado
   coactLagMs: 300, // desfase máximo de la co-activación
+  cornerMinRest: 10, // muestras de reposo (fuera de las repeticiones) para fijar la posición de la comisura
   gridHz: 10, // rejilla común de la co-activación
   minAnalysisFps: 24, // por debajo, nota en la fase (criterio 1)…
   unreliableFps: 20, // …y por debajo de esto, poco fiable
@@ -122,6 +128,32 @@ function browLift(v, side, a, b) {
     best = Math.max(best, acc);
   });
   return best;
+}
+
+/** Mediana de la posición de la comisura de un lado en las muestras que cumplen `keep(t)`. */
+function cornerRest(v, side, keep) {
+  const o = v.s[side]?.cornerOut ?? [];
+  const u = v.s[side]?.cornerUp ?? [];
+  const idx = v.st.map((t, i) => i).filter((i) => keep(v.st[i]) && Number.isFinite(o[i]) && Number.isFinite(u[i]));
+  if (idx.length < SUMMARY.cornerMinRest) return null;
+  return { out: median(idx.map((i) => o[i])), up: median(idx.map((i) => u[i])), n: idx.length };
+}
+
+/**
+ * Desplazamiento de la comisura de un lado respecto a su reposo, muestra a muestra (DI): `dist` es el total y
+ * `lift` la subida (+ = hacia arriba). El reposo es el de la propia fase (fuera de las repeticiones) o, si no
+ * hay bastantes muestras, el del paso de reposo (`fallback`).
+ * @returns {{dist:number[], lift:number[], rest:{out:number, up:number, n:number}, from:'phase'|'rest'} | null}
+ */
+export function cornerExcursion(v, side, reps, fallback = null) {
+  const own = cornerRest(v, side, (t) => !reps.some((r) => t >= r.from && t <= r.to));
+  const rest = own ?? fallback;
+  if (!rest) return null;
+  const o = v.s[side]?.cornerOut ?? [];
+  const u = v.s[side]?.cornerUp ?? [];
+  const dist = v.st.map((_, i) => (Number.isFinite(o[i]) && Number.isFinite(u[i]) ? Math.hypot(o[i] - rest.out, u[i] - rest.up) : NaN));
+  const lift = v.st.map((_, i) => (Number.isFinite(u[i]) ? u[i] - rest.up : NaN));
+  return { dist, lift, rest, from: own ? 'phase' : 'rest' };
 }
 
 /**
@@ -264,12 +296,21 @@ function sideMetrics(phase, step, v, side, cal, ctx) {
     const c = bestCorrelation(v.st, v.s[side]?.smile ?? [], eyeClosure);
     out.coactivation = c ? r3(c.r) : null;
     out.coactivationLagMs = c ? c.lagMs : null;
+    // Con la comisura: cuánto se desplaza (total y hacia arriba) y su correlación con el cierre del ojo.
+    const ex = cornerExcursion(v, side, reps, ctx.cornerRest?.[side]);
+    if (ex) {
+      out.commissure = r3(mean(reps.map((r) => maxOf(within(v.st, ex.dist, r.from, r.to)))));
+      out.commissureLift = r3(mean(reps.map((r) => maxOf(within(v.st, ex.lift, r.from, r.to)))));
+      const cc = bestCorrelation(v.st, ex.dist, eyeClosure);
+      out.coactivationCorner = cc ? r3(cc.r) : null;
+      out.coactivationCornerLagMs = cc ? cc.lagMs : null;
+    }
   }
   return out;
 }
 
 /** Métricas en las que tiene sentido la asimetría (magnitudes positivas). */
-const ASYM_KEYS = ['ear', 'aperture', 'blinksPerMin', 'blinkCompleteness', 'blinkVsMax', 'closure', 'eyeOpening', 'browRecruit', 'canthusRecruit', 'browLift', 'browPeak', 'smile'];
+const ASYM_KEYS = ['ear', 'aperture', 'blinksPerMin', 'blinkCompleteness', 'blinkVsMax', 'closure', 'eyeOpening', 'browRecruit', 'canthusRecruit', 'browLift', 'browPeak', 'smile', 'commissure', 'commissureLift'];
 // (los recuentos de contracciones no llevan asimetría: con 1 o 2 eventos, 2 frente a 1 sería +0,33 sin significar nada)
 
 /**
@@ -289,13 +330,19 @@ export function summarizeProtocol(steps) {
     });
     maxClosure[side] = maxOf(c);
   }
+  // Posición de reposo de las comisuras (todo el paso de reposo): respaldo si la fase de sonrisa no tiene bastante.
+  const cornerRestOf = {};
+  if (byId.rest) {
+    const v = view(byId.rest);
+    for (const side of SIDES) cornerRestOf[side] = cornerRest(v, side, () => true);
+  }
   const phases = {};
   for (const id of PHASES) {
     const step = byId[id];
     if (!step) continue;
     const v = view(step);
-    const left = sideMetrics(id, step, v, 'left', cal, { maxClosure });
-    const right = sideMetrics(id, step, v, 'right', cal, { maxClosure });
+    const left = sideMetrics(id, step, v, 'left', cal, { maxClosure, cornerRest: cornerRestOf });
+    const right = sideMetrics(id, step, v, 'right', cal, { maxClosure, cornerRest: cornerRestOf });
     const asym = {};
     for (const k of ASYM_KEYS) {
       if (Number.isFinite(left[k]) && Number.isFinite(right[k]) && left[k] >= 0 && right[k] >= 0) asym[k] = r3(asymmetry(left[k], right[k]));
