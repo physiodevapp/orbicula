@@ -20,6 +20,7 @@ import { createVideoCard } from './ui/video.js';
 import { createProtocolVideo } from './ui/protocol-video.js';
 import { createSavedCard } from './ui/saved.js';
 import { createUpdateNotice } from './ui/update-notice.js';
+import { AnalysisPool } from './landmarks/pool.js';
 import { hostFrom } from './integration/host.js';
 import { allowedOrigins } from './integration/origins.js';
 import { createBridge } from './integration/bridge.js';
@@ -210,11 +211,70 @@ const assistant = createAssistant(sessionDeps);
  * flujo sin límite de ritmo, y registra las medidas con el reloj del vídeo (src/video/offline.js). La
  * cámara se apaga mientras tanto (si no, sus frames se mezclarían con los del vídeo).
  */
+// ── Análisis de la cara en paralelo, solo para el vídeo grabado ─────────────────────────────────────────────
+// En modo IMAGE cada fotograma es independiente: un segundo análisis puede llevarse la mitad. Los análisis de un
+// mismo vídeo usan SIEMPRE el mismo acelerador: la GPU y la CPU no dan los mismos números para el mismo
+// fotograma (en la nube, el EAR difería 0,004 de mediana y hasta 0,014, de 2 a 5 veces el ruido del reposo), y
+// alternarlas metería ese ruido en la señal. Cuál conviene depende del móvil: por eso se elige en la tarjeta del
+// vídeo y se mide. Los análisis de más viven solo mientras dura el vídeo (cada uno es otro modelo en memoria).
+const FACE_LANES = {
+  '1': { reuse: true, extra: [] }, // el de siempre (GPU si la hay)
+  'gpu+gpu': { reuse: true, extra: [['GPU']] }, // otro en la GPU; si no hay GPU para él, no se usa
+  cpu: { reuse: false, extra: [['CPU']] }, // uno en la CPU
+  'cpu+cpu': { reuse: false, extra: [['CPU'], ['CPU']] }, // dos en la CPU
+};
+// Por defecto, 1 CPU: en el móvil del autor (2026-11-14, vídeo de 68 s a 1080p) iba a 27,4 fotogramas/s frente a
+// 12,6–13,5 con 1 GPU (la CPU analiza en 33 ms y la GPU en 63–76: subir y bajar el fotograma de la GPU pesa más
+// de lo que gana). CPU + CPU solo ganaba un 8 % (29,6) a cambio de otro modelo en memoria. Ver docs/plan-fase-6.md.
+const DEFAULT_FACE_LANES = 'cpu';
+const faceLanesChoice = () => {
+  const v = document.getElementById('vidLanes')?.value;
+  return v in FACE_LANES ? v : DEFAULT_FACE_LANES;
+};
+
+/** Análisis de la cara para un vídeo: el de siempre, o un pool con otros que usan el mismo acelerador. */
+async function videoFaceAnalysis(choice) {
+  const single = { used: analysis, choice: '1', release() {} };
+  if (choice === '1' || analysis.mode !== 'worker') return single;
+  const cfg = FACE_LANES[choice];
+  const extras = [];
+  const drop = () => extras.forEach((w) => w.dispose());
+  try {
+    for (const delegates of cfg.extra) {
+      const w = new WorkerAnalysis();
+      extras.push(w);
+      await w.load(els.blendToggle.checked, { delegates });
+      w.swapNames = analysis.swapNames;
+    }
+  } catch (err) {
+    drop();
+    return { ...single, fallback: `no se pudo cargar otro análisis (${err?.message ?? err})` };
+  }
+  const workers = cfg.reuse ? [analysis, ...extras] : extras;
+  const kinds = [...new Set(workers.map((w) => w.delegate))];
+  if (kinds.length > 1) {
+    drop();
+    return { ...single, fallback: `los análisis no usarían el mismo acelerador (${kinds.join(' y ')}), y mezclarlos mete ruido en la señal` };
+  }
+  const pool = new AnalysisPool(workers);
+  pool.onResult = onResult;
+  return {
+    used: pool,
+    choice,
+    release() {
+      pool.detach();
+      analysis.onResult = onResult; // el análisis de siempre vuelve a entregar directamente
+      drop(); // libera los modelos de más
+    },
+  };
+}
+
 async function analyzeVideoFile({ mp4, mirrored, restSec, maxFps, steps = null, fromMs = 0, toMs = Infinity, signal, onProgress }) {
   const busy = document.body.dataset.busy;
   if (busy) throw new Error(busy === 'video' ? 'ya hay un vídeo analizándose' : 'hay otra prueba en marcha');
   document.body.dataset.busy = 'video';
   const video = createVideoSession(steps ?? videoSteps(mp4.timing.durationMs, restSec), { onStepEnd: sessionDeps.onStepEnd, onStepStart: sessionDeps.onStepStart });
+  let face = null;
   try {
     if (camera.stream) {
       for (const a of recorders) a.interrupt('se ha empezado a analizar un vídeo grabado');
@@ -223,14 +283,18 @@ async function analyzeVideoFile({ mp4, mirrored, restSec, maxFps, steps = null, 
     }
     await loadModel();
     if (!analysis) throw new Error('no se pudo cargar el modelo de la cara');
+    face = await videoFaceAnalysis(faceLanesChoice());
     await sessionDeps.onStart({ flow: true }); // medidas a cero y flujo encendido
     flow.resetStrip();
+    flow.resetCounts(); // los contadores del diagnóstico, solo de este análisis
     flow.setUnlimited(true);
-    analysis.frameMirrored = !!mirrored;
-    await analysis.setImageMode(true);
+    face.used.frameMirrored = !!mirrored;
+    await face.used.setImageMode(true);
     els.curvesView.hidden = false;
     recorders.push(video.recorder);
-    const stats = await processVideo({ mp4, analysis, flow, video, maxFps, fromMs, toMs, signal, onProgress });
+    const stats = await processVideo({ mp4, analysis: face.used, flow, video, maxFps, fromMs, toMs, signal, onProgress, beforeFinish: () => flowProcessor.flush() });
+    stats.face.choice = face.choice;
+    if (face.fallback) stats.face.fallback = face.fallback;
     // Pares de flujo que llegaron a registrarse y lo que contó el cliente del flujo (para diagnosticar).
     const pairs = video.session.results.reduce((n, r) => n + (r.flow?.rel.length ?? 0), 0);
     stats.flow = { pairs, ...flow.counts };
@@ -243,6 +307,7 @@ async function analyzeVideoFile({ mp4, mirrored, restSec, maxFps, steps = null, 
     if (k >= 0) recorders.splice(k, 1);
     flow?.setUnlimited(false);
     flow?.resetStrip();
+    face?.release();
     if (analysis) {
       analysis.frameMirrored = false;
       try { await analysis.setImageMode(false); } catch { /* se recarga al volver a la cámara */ }

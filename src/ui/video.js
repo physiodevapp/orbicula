@@ -38,6 +38,24 @@ export function createVideoCard({ getContext, analyzeVideoFile = null, saved = n
   // Un archivo elegido antes de recargar la página puede seguir en el selector sin permiso para leerlo.
   el.file.value = '';
   let mp4 = null;
+  let currentFile = null; // el archivo elegido: se vuelve a abrir antes de cada lectura completa
+  /**
+   * Vuelve a abrir el archivo (solo el índice: milisegundos) antes de cada prueba o análisis. En un móvil Android,
+   * analizar otra vez el mismo vídeo sin volver a elegirlo fallaba con «Decoder error» (el decodificador por
+   * hardware y el archivo de la galería no aguantan bien que se reutilice lo de la lectura anterior); al elegirlo
+   * de nuevo funcionaba. Esto hace lo mismo que volver a elegirlo.
+   */
+  async function reopen() {
+    if (!currentFile) return false;
+    try {
+      mp4 = await openMp4(currentFile);
+      return true;
+    } catch (err) {
+      return err;
+    }
+  }
+  const DECODER_HINT = 'El decodificador del móvil ha fallado al leer el vídeo. Vuelve a elegirlo con «Seleccionar archivo» y prueba de nuevo.';
+  const isDecoderError = (err) => err?.name === 'EncodingError' || /decoder error/i.test(String(err?.message ?? err));
   let fileMeta = null;
   let support = null;
   let probe = null;
@@ -70,6 +88,7 @@ export function createVideoCard({ getContext, analyzeVideoFile = null, saved = n
 
   el.file.addEventListener('change', async () => {
     const file = el.file.files?.[0];
+    currentFile = file ?? null;
     mp4 = null; probe = null; support = null; analysis = null; fpKey = null; savedId = null; foundSaved = null; restoredProv = null;
     el.saved.hidden = true;
     el.summary.hidden = true; el.progress.textContent = ''; el.exportRow.hidden = true;
@@ -128,6 +147,9 @@ export function createVideoCard({ getContext, analyzeVideoFile = null, saved = n
 
   el.probe.addEventListener('click', async () => {
     if (!mp4) return;
+    el.result.textContent = 'Abriendo el vídeo…';
+    const opened = await reopen();
+    if (opened !== true) { el.result.textContent = `No se pudo volver a leer el archivo (${opened?.message ?? opened}). Vuelve a elegirlo.`; return; }
     abort = new AbortController();
     el.probe.disabled = true; el.cancel.hidden = false; el.barWrap.hidden = false; el.result.textContent = 'Decodificando…';
     let wake = null;
@@ -154,6 +176,7 @@ export function createVideoCard({ getContext, analyzeVideoFile = null, saved = n
       const unreadable = err?.name === 'NotReadableError';
       el.result.textContent = err?.name === 'AbortError' ? 'Cancelado.'
         : unreadable ? 'El móvil no deja leer el archivo (el permiso ha caducado o es una copia temporal). Vuelve a elegirlo con «Seleccionar archivo» y prueba enseguida; si sigue, elígelo desde la app «Archivos» en vez de desde Fotos o la Galería.'
+        : isDecoderError(err) ? DECODER_HINT
         : `Error al decodificar: ${err?.message ?? err}`;
       if (err?.name !== 'AbortError') probe = { error: String(err?.message ?? err), errorName: err?.name ?? null, readStats: { ...mp4.readStats } };
     } finally {
@@ -176,6 +199,10 @@ export function createVideoCard({ getContext, analyzeVideoFile = null, saved = n
 
   el.analyze.addEventListener('click', async () => {
     if (!mp4 || !analyzeVideoFile) return;
+    el.progress.textContent = 'Abriendo el vídeo…';
+    el.summary.hidden = true; el.exportRow.hidden = true;
+    const opened = await reopen();
+    if (opened !== true) { el.progress.textContent = `No se pudo volver a leer el archivo (${opened?.message ?? opened}). Vuelve a elegirlo.`; return; }
     abort = new AbortController();
     const settings = { restSec: Number(el.rest.value) || 30, maxFps: el.cap.checked ? 30 : 0, facing: el.facing.value, mirrored: el.mirror.checked };
     el.analyze.disabled = true; el.probe.disabled = true; el.aCancel.hidden = false; el.aBarWrap.hidden = false;
@@ -194,7 +221,8 @@ export function createVideoCard({ getContext, analyzeVideoFile = null, saved = n
       });
       analysis = { ...out, settings, startedAt };
       const s = out.stats;
-      el.progress.textContent = `Hecho: ${s.frames} fotogramas en ${mmss(s.elapsedMs)} (${nf(s.framesPerSecond, 1)}/s)${s.every > 1 ? `, uno de cada ${s.every}` : ''}.`;
+      const lanes = s.face?.choice && s.face.choice !== '1' ? ` · análisis de la cara: ${s.face.lanes} a la vez en ${s.face.workers[0]?.delegate ?? '?'}` : '';
+      el.progress.textContent = `Hecho: ${s.frames} fotogramas en ${mmss(s.elapsedMs)} (${nf(s.framesPerSecond, 1)}/s)${s.every > 1 ? `, uno de cada ${s.every}` : ''}${lanes}.${s.face?.fallback ? ` (${s.face.fallback}; se usó uno)` : ''}`;
       renderSummary(el.summary, summarizeProtocol(out.results), out.results);
       el.exportRow.hidden = false;
       const header = await saved?.save({
@@ -208,6 +236,7 @@ export function createVideoCard({ getContext, analyzeVideoFile = null, saved = n
     } catch (err) {
       el.progress.textContent = err?.name === 'AbortError' ? 'Cancelado.'
         : err?.name === 'NotReadableError' ? 'El móvil no deja leer el archivo. Vuelve a elegirlo y analiza enseguida.'
+        : isDecoderError(err) ? DECODER_HINT
         : `No se pudo analizar: ${err?.message ?? err}`;
     } finally {
       wake?.release?.().catch(() => {});

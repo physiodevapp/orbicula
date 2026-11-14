@@ -4,6 +4,20 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (análisis de la cara en paralelo para el vídeo grabado)
+- **Varios análisis de la cara a la vez** al analizar un vídeo, en un «pool» que reparte los fotogramas y entrega los resultados en su orden (`src/landmarks/pool.js`, `src/landmarks/in-order.js`). Solo para el vídeo (modo IMAGE); el directo sigue con uno.
+- **Variantes elegibles en la tarjeta del vídeo:** 1 CPU (**por defecto**), CPU + CPU, 1 GPU (como antes) y GPU + GPU. **Nunca se mezclan GPU y CPU:** no dan los mismos números para el mismo fotograma (el EAR difería de 2 a 5 veces el ruido del reposo). Si el segundo análisis no consigue el mismo acelerador, se usa uno y se dice.
+- El informe del vídeo guarda los análisis usados, su acelerador, su tiempo y cuántos fotogramas hizo cada uno.
+- **Medido en el móvil del autor** (vídeo de 68 s a 1080p, cámara trasera): 1 GPU 12,6–13,5 fotogramas/s, GPU + GPU 21,9, **1 CPU 27,4**, CPU + CPU 29,6. Por eso **el vídeo se analiza ahora con 1 CPU por defecto: unas dos veces más rápido** (68 s de vídeo en 75 s). GPU + GPU da resultados idénticos a 1 GPU, y CPU + CPU idénticos a 1 CPU. Entre CPU y GPU el EAR cambia unas centésimas y algún cierre que está justo en el umbral.
+- Los contadores de diagnóstico del flujo se ponen a cero en cada análisis (acumulaban los de la cámara o de un análisis anterior).
+
+### Corregido (análisis de vídeo)
+- **El reloj de la sesión avanza con los resultados de la cara, no al enviar los fotogramas:** con varios en vuelo, las últimas muestras de un tramo caían en el siguiente.
+- **La muestra de la frontera entre tramos ya no se pierde:** la sesión necesitaba tres pasos para cruzarla y se le daban dos. La variante de siempre pasa de 1439 a 1440 muestras de 1440.
+- Los pares de flujo que esperan su pose al final del vídeo se registran antes de cerrar el último tramo.
+- **Analizar otra vez el mismo vídeo sin volver a elegirlo fallaba en Android con «Decoder error»** (en la nube no). Ahora el archivo se vuelve a abrir (solo el índice) antes de cada análisis y de cada prueba de lectura, que es lo que hacía elegirlo de nuevo. Si aun así falla el decodificador, el mensaje dice que se vuelva a elegir el vídeo. Si Android ya no deja leer el archivo (el permiso de la galería caduca al salir de Chrome o pasado un rato), se avisa antes de empezar y se pide elegirlo otra vez.
+- 12 tests nuevos.
+
 ### Añadido (aviso de versión nueva)
 - **Aviso flotante «Hay una versión nueva»** con «Recargar» y «✕». Cada build publica `version.json` (`{ commit, branch }`, el mismo commit que el pie, servido sin caché); la app lo pide al abrir, al volver a ella (`visibilitychange`, `pageshow`) y cada 10 minutos mientras se ve. Resuelve el caso de una versión vieja que se queda abierta en las recientes de Android.
 - **No interrumpe lo que está en marcha:** es `fixed` (no mueve la maquetación) y «Recargar» queda desactivado, con el motivo, mientras haya un protocolo, una prueba, un análisis de vídeo o un vídeo grabado sin analizar; se activa solo al acabar.
