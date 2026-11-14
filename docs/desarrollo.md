@@ -70,6 +70,12 @@ node scripts/dev/check-version.cjs
 ```
 Sirve la build y simula que se publica otro commit (la respuesta de `version.json` se sustituye en el navegador). Comprueba el aviso, el cierre, que no vuelve por la misma versión pero sí por otra, que no deja recargar con algo en marcha, que no mueve la maquetación, el modo alojado (ni se pide `version.json`) y el fallo de red. Guarda `/tmp/version/aviso-380.png`. Tarda unos 30 s. La lógica sin navegador está en `tests/version.test.js`.
 
+## Aviso de cara pequeña
+```bash
+node scripts/dev/check-smallface.cjs --small /tmp/caras/portrait.y4m --big /tmp/caras/crop.y4m
+```
+Con la foto entera (cara pequeña, ojo ≈ 35 px) comprueba el aviso en pantalla y por voz (la voz del navegador se sustituye por una simulada que apunta lo que dice); con la cara ampliada (ojo ≈ 72 px), que no avisa. Tarda unos 2 min. La lógica sin navegador está en `tests/face-size.test.js`.
+
 ## Selector de cámara de la tarjeta de inicio (fase 7d)
 ```bash
 node scripts/dev/check-facing.cjs --video /tmp/caras/lid.y4m

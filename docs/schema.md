@@ -111,7 +111,7 @@ Sale del reposo del propio paciente; `null` si no hubo reposo.
 | `brief` | ídem | recuento | Movimientos breves del párpado (< 0,5 s) que no cuentan como contracción. |
 
 ### `quality`
-Por fase: `reliable`, `faceFraction` (0–1), `headMoving` (fracción del tiempo con la cabeza en movimiento), `analysisFps` (análisis de la cara por segundo; `null` en un vídeo analizado) y `notes` (cada una `{ code, text }`: `face-lost`, `head-moving`, `low-fps`). Una fase es **poco fiable** si el análisis fue a menos de 20/s, se perdió la cara o la cabeza se movió más del 20 % del tiempo.
+Por fase: `reliable`, `faceFraction` (0–1), `headMoving` (fracción del tiempo con la cabeza en movimiento), `analysisFps` (análisis de la cara por segundo; `null` en un vídeo analizado), `eyePx` (mediana del ancho del ojo en la imagen, en píxeles; `null` si no se registró) y `notes` (cada una `{ code, text }`: `face-lost`, `head-moving`, `low-fps`, `small-face`). **`small-face`** es una nota, no cambia si la fase es fiable: con el ojo por debajo de 60 px (umbral provisional) el ruido de la cámara se confunde con movimiento de la cabeza. Una fase es **poco fiable** si el análisis fue a menos de 20/s, se perdió la cara o la cabeza se movió más del 20 % del tiempo.
 
 ### `events`
 En orden de tiempo. `t` es el inicio y `duration` la duración, en ms.

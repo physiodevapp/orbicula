@@ -36,5 +36,7 @@ export function sampleOf(result) {
     // Sonrisa de ese lado de la boca (blendshape mouthSmile): para la co-activación ojo–boca (fase 5).
     smile: result.blend[s].mouthSmile ?? NaN,
   });
-  return { left: side('left'), right: side('right') };
+  // Tamaño del ojo en píxeles (media de los dos): con la cara pequeña, el ruido parece movimiento de la cabeza.
+  const eyePx = (result.rois.left.eyeWidth + result.rois.right.eyeWidth) / 2;
+  return { left: side('left'), right: side('right'), eyePx: Number.isFinite(eyePx) ? eyePx : NaN };
 }

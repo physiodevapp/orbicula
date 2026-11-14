@@ -21,6 +21,7 @@
 import { asymmetry } from '../metrics/asymmetry.js';
 import { headSpeedOf } from './events.js';
 import { spectralPeak } from './spectrum.js';
+import { medianEyePx, isSmallFace, MIN_EYE_PX } from './face-size.js';
 
 export const SIDES = ['left', 'right'];
 export const SUMMARY = {
@@ -56,6 +57,7 @@ function view(step) {
   const f = step.flow ?? {};
   return {
     st: step.series?.t ?? step.rel ?? [],
+    eyePx: step.series?.eyePx ?? step.eyePx ?? [],
     s: step.series ?? { left: {}, right: {} },
     ft: f.t ?? f.rel ?? [],
     f,
@@ -187,10 +189,13 @@ function quality(step, v, cal) {
   const note = (code, text) => { noteCodes.push(code); notes.push(text); };
   if (face < SUMMARY.minFace) note('face-lost', 'se ha perdido la cara');
   if (moving != null && moving > SUMMARY.maxHeadMoving) note('head-moving', 'la cabeza se ha movido');
+  // Tamaño del ojo: solo una nota (no cambia si la fase es fiable); el umbral es provisional (face-size.js).
+  const eyePx = medianEyePx(v.eyePx);
+  if (isSmallFace(eyePx)) note('small-face', `cara pequeña (el ojo mide ${eyePx} px; conviene más de ${MIN_EYE_PX})`);
   const slow = fps != null && fps < SUMMARY.unreliableFps;
   if (fps != null && fps < SUMMARY.minAnalysisFps) note('low-fps', `análisis a ${String(fps).replace('.', ',')}/s (< ${SUMMARY.minAnalysisFps})`);
   const reliable = face >= SUMMARY.minFace && !(moving > SUMMARY.maxHeadMoving) && !slow;
-  return { face: r3(face), headMoving: r3(moving), analysisFps: fps, reliable, notes, noteCodes };
+  return { face: r3(face), headMoving: r3(moving), analysisFps: fps, eyePx, reliable, notes, noteCodes };
 }
 
 /** Eventos del paso por lado: contracciones que cuentan, breves y parpadeos/cierres. */

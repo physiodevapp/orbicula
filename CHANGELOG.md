@@ -11,6 +11,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - **Privacidad:** petición relativa al propio origen (`connect-src 'self'` y la barrera de `src/privacy/` la permiten); no sale ningún dato del paciente. Sin cambios en la CSP.
 - **En modo alojado (`?host=physiq`) no se muestra:** allí decide el hub cuándo actualizar.
 - `scripts/dev/check-version.cjs`: el aviso, el cierre, que no vuelve por lo mismo, que no deja recargar con algo en marcha, que no mueve la maquetación, el modo alojado y el fallo de red.
+
+### Añadido (aviso de cara pequeña)
+- **El aviso usa los píxeles del ojo, no una proporción del encuadre.** Con una webcam, con el ojo a ~50 px el reposo fallaba siempre («la cabeza se ha movido»); a ~70 px y con más luz calibró a la primera. El aviso anterior (cara < 30 % del lado corto) no saltó. Ahora avisa por debajo de **60 px** (provisional), con histéresis para que no parpadee, y dice cuánto mide el ojo.
+- **También por voz:** «Cara pequeña. Acércate un poco», un tono grave y vibración, solo antes y durante el reposo (donde decide si la calibración vale), como mucho cada 15 s y **sin cortar la instrucción del paso**. Respeta las casillas de voz y de sonidos.
+- **Si el reposo falla por movimiento y la cara es pequeña, lo dice** (en pantalla y por voz): «la cara es pequeña y eso se confunde con movimiento: acércate».
+- **Cada sesión guarda el tamaño del ojo** (`eyePx` por muestra en el diagnóstico y `quality.<fase>.eyePx` en el JSON público, más la nota `small-face`), para ajustar el umbral con datos reales. Campos nuevos, sin cambiar `schemaVersion`.
+- No se tocan los umbrales de movimiento de la cabeza.
+- `scripts/dev/check-smallface.cjs`: con una cara pequeña y otra grande, el aviso en pantalla, la voz (simulada), que no habla sin protocolo, que no corta la instrucción y que no se repite a cada rato.
 - 11 tests nuevos.
 
 ### Añadido (fase 7d: cierre de la integración)

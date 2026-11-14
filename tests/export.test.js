@@ -25,7 +25,7 @@ function step(id, { t0, ms, hz = 30, ear = { left: 0.3, right: 0.3 }, smile = 0.
   const flowSide = { upperLid: {}, lowerLid: {}, brow: { eR: frel.map(() => 0.0001) }, canthus: { eR: frel.map(() => 0.0001) } };
   return {
     id, title: id, status: 'completed', t0, durationMs: ms, plannedMs: ms, perf, events, detections, marks, calibration,
-    rel, series: { left: side('left'), right: side('right') },
+    rel, eyePx: rel.map(() => 64), series: { left: side('left'), right: side('right') },
     flow: { rel: frel, dt: frel.map(() => 36), closure: { left: frel.map((_, i) => i * 0.0001), right: frel.map(() => 0) }, frozen: frel.map((_, i) => (i === 3 ? 1 : 0)), head: { rU: frel.map(() => 0.01), rV: frel.map(() => 0.02) }, left: flowSide, right: flowSide },
   };
 }
@@ -103,7 +103,8 @@ describe('JSON público', () => {
 
   it('calibración y calidad: umbrales por lado, referencia del EAR y avisos', () => {
     expect(doc.calibration).toMatchObject({ valid: true, reasonCode: null, thresholds: { left: 0.04, right: 0.05 }, earBaseline: { left: 0.3, right: 0.3 }, warnings: [] });
-    expect(doc.quality.natural).toMatchObject({ reliable: true, faceFraction: 1 });
+    expect(doc.quality.natural).toMatchObject({ reliable: true, faceFraction: 1, eyePx: 64 });
+    expect(doc.quality.natural.notes).toEqual([]); // 64 px: no es una cara pequeña
   });
 
   it('sin ninguna identificación del paciente: ni nombres, ni archivos, ni imágenes', () => {
