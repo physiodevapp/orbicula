@@ -282,6 +282,7 @@ async function analyzeVideoFile({ mp4, mirrored, restSec, maxFps, steps = null, 
     face = await videoFaceAnalysis(faceLanesChoice());
     await sessionDeps.onStart({ flow: true }); // medidas a cero y flujo encendido
     flow.resetStrip();
+    flow.resetCounts(); // los contadores del diagnóstico, solo de este análisis
     flow.setUnlimited(true);
     face.used.frameMirrored = !!mirrored;
     await face.used.setImageMode(true);
