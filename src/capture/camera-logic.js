@@ -51,6 +51,25 @@ export function resolveFacing(settings = {}, label = '', requested = 'rear') {
   return requested;
 }
 
+/**
+ * Qué recordar de la cámara obtenida para la próxima vez. Solo se recuerda que el navegador dio la frontal
+ * cuando se pidió la trasera (un ordenador con una sola cámara): así la tarjeta de inicio la preselecciona y no
+ * parece que la elección no sirva. Si alguna vez da la trasera, se olvida. Una elección del clínico no se
+ * recuerda: en el móvil, por defecto, siempre la trasera.
+ * @returns {'front'|null|undefined} 'front' = recordar; null = olvidar; undefined = dejar como esté
+ */
+export function facingToRemember(requested, obtained, byDevice = false) {
+  if (byDevice) return undefined; // con un dispositivo concreto elegido no se pedía un lado
+  if (obtained === 'rear') return null;
+  if (requested === 'rear' && obtained === 'front') return 'front';
+  return undefined;
+}
+
+/** Cámara preseleccionada al cargar: la trasera, salvo que este navegador solo diera la frontal. */
+export function initialFacing(remembered) {
+  return remembered === 'front' ? 'front' : 'rear';
+}
+
 /** Mensaje en español para un error de getUserMedia. */
 export function describeError(err) {
   switch (err?.name) {

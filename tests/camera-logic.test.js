@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   buildConstraints,
   resolveFacing,
+  facingToRemember,
+  initialFacing,
   describeError,
   fpsLevel,
   FpsMeter,
@@ -129,5 +131,25 @@ describe('FpsMeter', () => {
     expect(m.fps).toBe(0);
     m.push(10);
     expect(m.fps).toBe(0);
+  });
+});
+
+
+describe('cámara recordada', () => {
+  it('recuerda la frontal si se pidió la trasera y el navegador dio la frontal', () => {
+    expect(facingToRemember('rear', 'front')).toBe('front');
+  });
+  it('olvida en cuanto da la trasera', () => {
+    expect(facingToRemember('rear', 'rear')).toBeNull();
+    expect(facingToRemember('front', 'rear')).toBeNull();
+  });
+  it('no recuerda una elección de la frontal ni un dispositivo concreto', () => {
+    expect(facingToRemember('front', 'front')).toBeUndefined();
+    expect(facingToRemember('rear', 'front', true)).toBeUndefined();
+  });
+  it('preselecciona la trasera salvo que se recordara la frontal', () => {
+    expect(initialFacing(null)).toBe('rear');
+    expect(initialFacing('front')).toBe('front');
+    expect(initialFacing('otra cosa')).toBe('rear');
   });
 });
