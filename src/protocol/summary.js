@@ -34,6 +34,9 @@ export const SUMMARY = {
   incompleteRatio: 0.8, // parpadeo incompleto: < 80 % del cierre forzado
   coactLagMs: 300, // desfase máximo de la co-activación
   cornerMinRest: 10, // muestras de reposo (fuera de las repeticiones) para fijar la posición de la comisura
+  // Sin asimetría de la comisura si ninguno de los dos lados se mueve al menos esto (DI): el ruido en reposo es
+  // ~0,008 DI (vídeo real) y la asimetría de dos ruidos no significa nada. Provisional.
+  minCommissure: 0.03,
   gridHz: 10, // rejilla común de la co-activación
   minAnalysisFps: 24, // por debajo, nota en la fase (criterio 1)…
   unreliableFps: 20, // …y por debajo de esto, poco fiable
@@ -345,6 +348,7 @@ export function summarizeProtocol(steps) {
     const right = sideMetrics(id, step, v, 'right', cal, { maxClosure, cornerRest: cornerRestOf });
     const asym = {};
     for (const k of ASYM_KEYS) {
+      if (k.startsWith('commissure') && !(Math.max(left[k] ?? 0, right[k] ?? 0) >= SUMMARY.minCommissure)) continue;
       if (Number.isFinite(left[k]) && Number.isFinite(right[k]) && left[k] >= 0 && right[k] >= 0) asym[k] = r3(asymmetry(left[k], right[k]));
     }
     phases[id] = { title: step.title, left, right, asymmetry: asym, quality: quality(step, v, cal) };

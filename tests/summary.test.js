@@ -203,3 +203,19 @@ describe('sonrisa medida con la comisura de la boca', () => {
     expect(P.left.smile).not.toBeUndefined();
   });
 });
+
+describe('asimetría de la comisura', () => {
+  it('no se calcula si ninguno de los dos lados se mueve (solo ruido)', () => {
+    const s = step('smile', 23500, { reps: true });
+    const rest = { ...step('rest', 30000), calibration: CAL };
+    for (const st of [s, rest]) {
+      for (const side of ['left', 'right']) {
+        st.series[side].cornerOut = st.series.t.map((x, i) => 0.6 + (side === 'left' ? 0.004 : 0.002) * (i % 2));
+        st.series[side].cornerUp = st.series.t.map(() => -0.9);
+      }
+    }
+    const P = summarizeProtocol([rest, s]).phases.smile;
+    expect(P.left.commissure).toBeLessThan(0.03);
+    expect(P.asymmetry.commissure).toBeUndefined();
+  });
+});

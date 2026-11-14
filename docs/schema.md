@@ -108,7 +108,7 @@ Sale del reposo del propio paciente; `null` si no hubo reposo.
 | `coactivation` | `smile` | r | Correlación entre la sonrisa (blendshape) y el cierre del ojo del mismo lado. Se mantiene por compatibilidad; la app muestra `coactivationCorner`. |
 | `coactivationLagMs` | `smile` | ms | Desfase de esa correlación (−300 a +300). **Si vale ±300, el máximo está en el borde de la ventana**: con un desfase mayor la correlación podría ser más alta; tómala como una cota inferior. |
 | `commissure` | `smile` | DI | **Sonrisa medida con la comisura de la boca** (landmarks 61/291): desplazamiento máximo desde su reposo, en distancias intercantales, media de las repeticiones. El reposo es el de la propia fase (las muestras fuera de las repeticiones) o, si no hay bastantes, el del paso de reposo. Se mide en 3D en un sistema de la propia cara, así que no cambia con la distancia a la cámara, la inclinación ni, en primera aproximación, el giro de la cabeza. A diferencia de `smile`, no satura y da la magnitud de cada lado. |
-| `commissureLift` | `smile` | DI | Subida máxima de la comisura (+ = hacia arriba). |
+| `commissureLift` | `smile` | DI | Subida máxima de la comisura (+ = hacia arriba). La asimetría de las dos solo se da si algún lado se mueve al menos 0,03 DI (con menos, es ruido). |
 | `coactivationCorner` | `smile` | r | Correlación entre el desplazamiento de la comisura y el cierre del ojo del mismo lado. **Es la co-activación que muestra la app.** |
 | `coactivationCornerLagMs` | `smile` | ms | Desfase de esa correlación, como `coactivationLagMs`. |
 | `contractions` | todas menos `rest` | recuento | Contracciones finas que cuentan en la fase (estado `ok`). |
