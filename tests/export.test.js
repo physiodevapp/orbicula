@@ -151,11 +151,18 @@ describe('procedencia (analysis)', () => {
   it('las versiones y el modelo son los que sirve la app', () => {
     expect(doc.analysis.mediapipe).toEqual({ version: pkg.dependencies['@mediapipe/tasks-vision'], model: MODEL_NAME });
     expect(existsSync(here(`public/modelos/${MODEL_NAME}.task`))).toBe(true);
-    expect(existsSync(here(`public/mediapipe/${doc.analysis.mediapipe.version}`))).toBe(true);
     expect(readFileSync(here('src/landmarks/landmarker.js'), 'utf8')).toContain(`modelos/${MODEL_NAME}.task`);
     expect(doc.analysis.opencv.version).toBe(OPENCV_VERSION);
-    expect(existsSync(here(`public/opencv/${OPENCV_VERSION}`))).toBe(true);
     expect(pkg.dependencies['@techstark/opencv-js']).toBe(OPENCV_VERSION);
+    // `public/mediapipe/` y `public/opencv/` NO están en el repo: los genera `prebuild` (scripts/copy-wasm.mjs) con las
+    // versiones de los paquetes instalados. Se comprueba la fuente (los paquetes y el script), no la carpeta generada,
+    // que en la CI no existe cuando se pasan los tests.
+    const installed = (name) => JSON.parse(readFileSync(here(`node_modules/${name}/package.json`), 'utf8')).version;
+    expect(installed('@mediapipe/tasks-vision')).toBe(doc.analysis.mediapipe.version);
+    expect(installed('@techstark/opencv-js')).toBe(OPENCV_VERSION);
+    const copy = readFileSync(here('scripts/copy-wasm.mjs'), 'utf8');
+    expect(copy).toContain('public/mediapipe/${mp}');
+    expect(copy).toContain('public/opencv/${cv}');
   });
 
   it('los parámetros del detector, del congelado y del flujo son los que se usan', () => {
