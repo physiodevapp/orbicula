@@ -44,8 +44,16 @@ const check = (name, ok, extra = '') => { console.log(`${ok ? 'OK ' : 'MAL'} ${n
   await page.reload();
   check('si alguna vez da la trasera, se olvida', (await pressed()) === 'rear');
 
-  // Análisis en directo con la CPU.
+  // Un ordenador con una sola cámara en el que se elige «Frontal» a mano: también se recuerda.
   await page.evaluate(() => localStorage.removeItem('test.facing'));
+  const nCams = await page.evaluate(async () => (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput').length);
+  await page.click('#startCard [data-facing="front"]');
+  await startAndWait();
+  await page.reload();
+  check(`con una sola cámara (${nCams}), elegir «Frontal» a mano también se recuerda`, nCams !== 1 || (await pressed()) === 'front');
+
+  // Análisis en directo con la CPU.
+  await page.evaluate(() => { localStorage.removeItem('test.facing'); localStorage.removeItem('orbicula.onlyFront'); });
   await page.reload();
   await startAndWait();
   await page.evaluate(() => { document.querySelectorAll('details').forEach((d) => (d.open = true)); });

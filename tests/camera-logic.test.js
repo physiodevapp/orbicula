@@ -143,9 +143,14 @@ describe('cámara recordada', () => {
     expect(facingToRemember('rear', 'rear')).toBeNull();
     expect(facingToRemember('front', 'rear')).toBeNull();
   });
-  it('no recuerda una elección de la frontal ni un dispositivo concreto', () => {
+  it('en un móvil (varias cámaras) no recuerda haber elegido la frontal ni un dispositivo concreto', () => {
+    expect(facingToRemember('front', 'front', false, 2)).toBeUndefined();
     expect(facingToRemember('front', 'front')).toBeUndefined();
-    expect(facingToRemember('rear', 'front', true)).toBeUndefined();
+    expect(facingToRemember('rear', 'front', true, 3)).toBeUndefined();
+  });
+  it('con una sola cámara y frontal, la recuerda aunque se eligiera a mano (un ordenador)', () => {
+    expect(facingToRemember('front', 'front', false, 1)).toBe('front');
+    expect(facingToRemember('front', 'front', true, 1)).toBe('front');
   });
   it('preselecciona la trasera salvo que se recordara la frontal', () => {
     expect(initialFacing(null)).toBe('rear');

@@ -910,7 +910,8 @@ async function start() {
     const requested = state.facing;
     const info = await camera.start(state);
     state.running = true;
-    const remember = facingToRemember(requested, info.facing, !!state.deviceId);
+    const cameras = (await Camera.listDevices().catch(() => null))?.length ?? null;
+    const remember = facingToRemember(requested, info.facing, !!state.deviceId, cameras);
     if (remember === 'front') pref.set('onlyFront', 'front');
     else if (remember === null) pref.remove('onlyFront');
     state.facing = info.facing;
