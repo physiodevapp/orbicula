@@ -54,7 +54,7 @@ Se pueden cambiar la duración del reposo y del parpadeo, y las repeticiones de 
 - **Parpadeos:** frecuencia, duración y cierre respecto al **cierre máximo del propio ojo**.
 - **Cierres:** cuánto cierra cada ojo y cuánto se mueven la ceja y el canto externo.
 - **Cejas:** cuánto se abre el ojo y cuánto sube la ceja.
-- **Sonrisa:** la sonrisa de cada lado, cuánto se cierra el ojo con ella y la **co-activación ojo–boca**. Una sonrisa amplia sana también cierra algo el ojo: lo que informa es la **diferencia entre lados** y su evolución entre sesiones, no el valor solo.
+- **Sonrisa:** cuánto se desplaza y cuánto sube la **comisura de la boca** de cada lado desde su reposo (en distancias intercantales; los puntos de color en la boca son las comisuras que se miden), cuánto se cierra el ojo con ella y la **co-activación ojo–boca** (correlación entre el desplazamiento de la comisura y el cierre del ojo del mismo lado). También sale la sonrisa que estima el modelo, que casi satura con una sonrisa amplia. Una sonrisa amplia sana también cierra algo el ojo: lo que informa es la **diferencia entre lados** y su evolución entre sesiones, no el valor solo.
 - **Actividad rítmica** de los párpados (pico espectral, para mioquimias), en el reposo y el parpadeo.
 - **Contracciones finas:** subidas del cierre por flujo por encima del umbral del reposo, de más de 0,5 s, sin parpadeo ni movimiento de la cabeza.
 - **Avisos:** fases «poco fiables» (cabeza movida, cara perdida o análisis lento, por debajo de 24 por segundo) y umbral alto en el reposo.

@@ -63,6 +63,7 @@ const els = {
   roiToggle: $('roiToggle'),
   swapToggle: $('swapToggle'),
   blendToggle: $('blendToggle'),
+  liveDelegate: $('liveDelegate'),
   fpsWarning: $('fpsWarning'),
   analysisWarning: $('analysisWarning'),
   controls: $('controls'),
@@ -749,6 +750,9 @@ function onResult(r) {
 }
 
 /** Crea el análisis en un worker; si no puede arrancar, en el hilo principal. */
+/** Aceleradores a probar en el análisis en directo, según la preferencia (GPU por defecto). */
+const liveDelegates = () => (els.liveDelegate?.value === 'cpu' ? ['CPU'] : ['GPU', 'CPU']);
+
 async function createAnalysis() {
   const blendshapes = els.blendToggle.checked;
   // `?analysis=main` fuerza el hilo principal: sirve para comparar tiempos con y sin worker.
@@ -756,7 +760,8 @@ async function createAnalysis() {
   try {
     if (forceMain) throw new Error('forzado con ?analysis=main');
     const worker = new WorkerAnalysis();
-    await worker.load(blendshapes);
+    // Acelerador elegido para el directo (prueba de velocidad): GPU y, si falla, CPU; o solo la CPU.
+    await worker.load(blendshapes, { delegates: liveDelegates() });
     return worker;
   } catch (err) {
     console.warn('El worker de análisis no arranca, se usa el hilo principal:', err);
@@ -961,6 +966,27 @@ els.swapToggle.addEventListener('change', () => {
 });
 
 els.blendToggle.addEventListener('change', () => analysis?.setBlendshapes(els.blendToggle.checked));
+
+// Acelerador del directo: se recuerda. Cambiarlo recarga el modelo y empieza las medidas de cero (no se mezclan
+// números de la GPU y de la CPU). No mientras se graba una prueba, el protocolo o un vídeo.
+els.liveDelegate.value = pref.get('liveDelegate') === 'cpu' ? 'cpu' : 'gpu';
+els.liveDelegate.addEventListener('change', async () => {
+  const value = els.liveDelegate.value;
+  if (document.body.dataset.busy) {
+    els.liveDelegate.value = value === 'cpu' ? 'gpu' : 'cpu';
+    showError('Termina o cancela lo que está en marcha antes de cambiar el análisis.');
+    return;
+  }
+  pref.set('liveDelegate', value);
+  if (!analysis) return; // aún sin modelo: se cargará con la elección nueva
+  const old = analysis;
+  await modelPromise;
+  analysis = null;
+  modelPromise = null;
+  old.dispose();
+  resetMeasures();
+  await loadModel();
+});
 
 els.flowConfig.replaceChildren(
   ...Object.values(FLOW_CONFIGS)

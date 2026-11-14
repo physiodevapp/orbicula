@@ -4,6 +4,21 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (sonrisa con las comisuras de la boca)
+- **La sonrisa se mide con las comisuras de la boca** (landmarks 61/291, extremos de FACEMESH_LIPS), en un sistema 3D de la propia cara y en distancias intercantales: no cambia con la distancia, la inclinación ni, en primera aproximación, el giro de la cabeza. En la fase de sonrisa, por lado: **desplazamiento** de la comisura desde su reposo (`commissure`), **subida** (`commissureLift`) y **co-activación** con el cierre del ojo (`coactivationCorner`), con su asimetría. El reposo es el de la propia fase (fuera de las repeticiones) o, si no basta, el del paso de reposo.
+- El blendshape `mouthSmile` casi satura con una sonrisa amplia y el modelo tiende a darlo simétrico; se mantiene en el JSON (`smile`, `coactivation`) por compatibilidad y en el resumen como «Sonrisa (modelo)».
+- Las comisuras se dibujan como un punto del color de cada lado en la vista en directo.
+- Series `cornerOut` y `cornerUp` en `timeseries` y cuatro columnas al final del CSV de la cara. Cambios compatibles: `schemaVersion` sigue en `"1"`.
+- En un vídeo real (en la nube), el ruido de la comisura en reposo es de ~0,008 DI (≈ 0,3 mm), muy por debajo de una sonrisa.
+
+### Añadido (cámara y análisis en directo)
+- **La frontal se preselecciona si el navegador solo da esa cámara:** si se pide la trasera y da la frontal (un ordenador), la próxima vez la tarjeta de inicio ya marca «Frontal». Se olvida en cuanto da la trasera. Una elección del clínico no se recuerda: en el móvil, la trasera sigue siendo la de por defecto.
+- **«Análisis en directo» (GPU / CPU)** en «Detalle del análisis», para medir si el directo va más rápido con la CPU, como el vídeo grabado. Se recuerda; cambiarlo recarga el modelo y empieza las medidas de cero. No se puede cambiar con una prueba en marcha. Por defecto, la GPU (como hasta ahora) hasta medirlo en el móvil.
+- `scripts/dev/check-camera-prefs.cjs` comprueba las dos cosas.
+
+### Revisado (umbral del reposo)
+- Se probó apartar la sacudida suelta del reposo solo cuando salta su aviso. Deja igual las sesiones normales, pero en la de la sacudida el umbral cae a 0,0011 DI y aparecen contracciones falsas. **Se mantiene el máximo con el aviso** (`docs/plan-fase-5.md`).
+
 ### Añadido (análisis de la cara en paralelo para el vídeo grabado)
 - **Varios análisis de la cara a la vez** al analizar un vídeo, en un «pool» que reparte los fotogramas y entrega los resultados en su orden (`src/landmarks/pool.js`, `src/landmarks/in-order.js`). Solo para el vídeo (modo IMAGE); el directo sigue con uno.
 - **Variantes elegibles en la tarjeta del vídeo:** 1 CPU (**por defecto**), CPU + CPU, 1 GPU (como antes) y GPU + GPU. **Nunca se mezclan GPU y CPU:** no dan los mismos números para el mismo fotograma (el EAR difería de 2 a 5 veces el ruido del reposo). Si el segundo análisis no consigue el mismo acelerador, se usa uno y se dice.

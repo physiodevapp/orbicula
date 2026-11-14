@@ -90,6 +90,12 @@ node scripts/dev/check-facing.cjs --video /tmp/caras/lid.y4m
 ```
 Elige «Frontal» antes de encender (no debe encender la cámara), comprueba que queda marcado en los controles, que «Activar cámara» usa lo elegido y que con la cámara encendida cambiar de cámara la reinicia. Tarda unos 30 s.
 
+## Cámara recordada y análisis en directo con la CPU
+```bash
+node scripts/dev/check-camera-prefs.cjs
+```
+Simula una cámara que dice ser la frontal (como la de un ordenador): al pedir la trasera da la frontal, y al recargar la tarjeta de inicio ya marca «Frontal»; si después da la trasera, se olvida. Luego elige «CPU» en «Análisis en directo» y comprueba que el modelo se recarga en la CPU y que se recuerda. Tarda unos 40 s.
+
 ## Integración con el hub por postMessage (fase 7c)
 ```bash
 npm run build && npx vite preview --port 4173 --host 127.0.0.1 &
