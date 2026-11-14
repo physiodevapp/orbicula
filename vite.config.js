@@ -19,7 +19,17 @@ const branch = process.env.WORKERS_CI_BRANCH ?? 'local';
 const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
 const mediapipe = JSON.parse(readFileSync('node_modules/@mediapipe/tasks-vision/package.json', 'utf8')).version;
 
+// `version.json` con el commit de este build: la app lo vuelve a pedir (sin caché) para saber si ya hay una versión
+// más nueva publicada (src/app/version.js). Es el mismo commit que muestra el pie.
+const versionJson = {
+  name: 'version-json',
+  generateBundle() {
+    this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ commit, branch }) });
+  },
+};
+
 export default defineConfig({
+  plugins: [versionJson],
   // Rutas relativas: la misma build sirve en la raíz de Cloudflare y en un
   // subdirectorio (p. ej. /physiq/orbicula/ cuando la copie el hub).
   base: './',

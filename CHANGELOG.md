@@ -4,6 +4,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (aviso de versión nueva)
+- **Aviso flotante «Hay una versión nueva»** con «Recargar» y «✕». Cada build publica `version.json` (`{ commit, branch }`, el mismo commit que el pie, servido sin caché); la app lo pide al abrir, al volver a ella (`visibilitychange`, `pageshow`) y cada 10 minutos mientras se ve. Resuelve el caso de una versión vieja que se queda abierta en las recientes de Android.
+- **No interrumpe lo que está en marcha:** es `fixed` (no mueve la maquetación) y «Recargar» queda desactivado, con el motivo, mientras haya un protocolo, una prueba, un análisis de vídeo o un vídeo grabado sin analizar; se activa solo al acabar.
+- **Se puede cerrar** y no vuelve hasta que se publique otra versión distinta. Un fallo (sin conexión, no es JSON, servidor de desarrollo) no avisa de nada.
+- **Privacidad:** petición relativa al propio origen (`connect-src 'self'` y la barrera de `src/privacy/` la permiten); no sale ningún dato del paciente. Sin cambios en la CSP.
+- **En modo alojado (`?host=physiq`) no se muestra:** allí decide el hub cuándo actualizar.
+- `scripts/dev/check-version.cjs`: el aviso, el cierre, que no vuelve por lo mismo, que no deja recargar con algo en marcha, que no mueve la maquetación, el modo alojado y el fallo de red.
+
 ### Añadido (aviso de cara pequeña)
 - **El aviso usa los píxeles del ojo, no una proporción del encuadre.** Con una webcam, con el ojo a ~50 px el reposo fallaba siempre («la cabeza se ha movido»); a ~70 px y con más luz calibró a la primera. El aviso anterior (cara < 30 % del lado corto) no saltó. Ahora avisa por debajo de **60 px** (provisional), con histéresis para que no parpadee, y dice cuánto mide el ojo.
 - **También por voz:** «Cara pequeña. Acércate un poco», un tono grave y vibración, solo antes y durante el reposo (donde decide si la calibración vale), como mucho cada 15 s y **sin cortar la instrucción del paso**. Respeta las casillas de voz y de sonidos.

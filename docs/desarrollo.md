@@ -63,6 +63,13 @@ node scripts/dev/check-protocol-video.cjs --video /tmp/caras/lid.y4m --live en-d
 ```
 Hace el protocolo en directo con la casilla «Grabar el vídeo…» marcada (MediaRecorder; el Chromium de Playwright graba MP4 H.264), descarga el JSON del directo, analiza el vídeo grabado y descarga el JSON del análisis. Con `--full` procesa todos los fotogramas y no uno de cada dos. Tarda unos 10 min con `escala=0.4` (análisis sin GPU).
 
+## Aviso de versión nueva
+```bash
+npm run build && npx vite preview --port 4173 --host 127.0.0.1 &
+node scripts/dev/check-version.cjs
+```
+Sirve la build y simula que se publica otro commit (la respuesta de `version.json` se sustituye en el navegador). Comprueba el aviso, el cierre, que no vuelve por la misma versión pero sí por otra, que no deja recargar con algo en marcha, que no mueve la maquetación, el modo alojado (ni se pide `version.json`) y el fallo de red. Guarda `/tmp/version/aviso-380.png`. Tarda unos 30 s. La lógica sin navegador está en `tests/version.test.js`.
+
 ## Aviso de cara pequeña
 ```bash
 node scripts/dev/check-smallface.cjs --small /tmp/caras/portrait.y4m --big /tmp/caras/crop.y4m
