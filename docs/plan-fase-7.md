@@ -119,6 +119,9 @@ Recargar la página perdía un protocolo o 2 minutos de análisis de vídeo. Se 
 - **Hallazgo (prueba en el móvil):** un iframe de otro origen que queda fuera de la pantalla se frena y no procesa el vídeo. En el hub de verdad no pasa (cada satélite ocupa la pantalla), pero la página de prueba, con el iframe debajo de los botones, lo sufría: «mostrar» parecía no hacer nada. Ahora oculta y muestra el iframe como el hub y lo trae a la vista.
 - **Hallazgo:** dentro de un iframe, el bloqueo de pantalla exige `allow="screen-wake-lock"` en el iframe del hub (ahora se comprueba antes de pedirlo, y el `ready` informa de los permisos).
 
+### Pendiente para 7d (pedido por el autor)
+- **Selector Trasera / Frontal en la tarjeta «Cámara» de antes de encender.** Hoy solo aparece después de activar la cámara y cuesta encontrarlo (lo notó al probar 7c con la webcam del ordenador, que no dice si es frontal o trasera). Debe ir con el mismo estado que el selector actual, sin duplicar la lógica.
+
 ## Pasos (me detengo al final de cada uno para que lo pruebes en el móvil)
 1. **7a. JSON público, esquema y CSV.** Botones en los tres resultados, el esquema en JSON Schema, `docs/schema.md`, los tests de validación y la revisión del esquema con Opus.
    - **Tu prueba:** hacer un protocolo, descargar el JSON público y el CSV, abrir el CSV en la hoja de cálculo del móvil y pasármelos.
