@@ -122,7 +122,8 @@ Recargar la página perdía un protocolo o 2 minutos de análisis de vídeo. Se 
 ### Hecho en 7d (pedido por el autor)
 - **Selector Trasera / Frontal en la tarjeta «Cámara» de inicio.** Antes solo aparecía tras activar la cámara y costaba encontrarlo. Comparte el estado con el de los controles (el mismo `data-facing`), y elegir no enciende la cámara. En su navegador la webcam ya se reconoce sola como frontal (`facingMode: "user"`), así que en el ordenador casi no hace falta; sirve en navegadores que no lo dicen.
 
-### Pendiente para después de 7d (hallazgo de la prueba en el ordenador)
+### Hecho tras 7d: aviso de cara pequeña (hallazgo de la prueba en el ordenador)
+- **Hecho en la rama `feat/aviso-cara-pequena`:** aviso por píxeles del ojo (60 px, provisional, con histéresis), también por voz durante el reposo, motivo del reposo fallido que lo menciona, y `eyePx` guardado en cada sesión para ajustar el umbral con datos. Lo que sigue es la descripción original del problema.
 - **Aviso de cara pequeña mejor, y también por voz.** En la webcam del ordenador, con «ojo ≈ 50 px» el reposo falló siempre («la cabeza se ha movido»); a 70 px y con más luz calibró a la primera. El aviso actual no saltó porque usa una proporción del encuadre (cara < 30 % del lado corto), no los píxeles del ojo, que es lo que importa: el ruido de la cámara es casi fijo en píxeles y con el ojo pequeño parece movimiento. Cambiarlo a píxeles del ojo (umbral provisional, ~60 px: solo hay dos observaciones), avisar también por voz antes del reposo y, si el reposo falla por movimiento con el ojo pequeño, decirlo. **No tocar los umbrales de movimiento de la cabeza.** Para fijar el umbral: probar en el ordenador a 55–60 px.
 
 ## Pasos (me detengo al final de cada uno para que lo pruebes en el móvil)

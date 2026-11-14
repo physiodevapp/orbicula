@@ -63,6 +63,12 @@ node scripts/dev/check-protocol-video.cjs --video /tmp/caras/lid.y4m --live en-d
 ```
 Hace el protocolo en directo con la casilla «Grabar el vídeo…» marcada (MediaRecorder; el Chromium de Playwright graba MP4 H.264), descarga el JSON del directo, analiza el vídeo grabado y descarga el JSON del análisis. Con `--full` procesa todos los fotogramas y no uno de cada dos. Tarda unos 10 min con `escala=0.4` (análisis sin GPU).
 
+## Aviso de cara pequeña
+```bash
+node scripts/dev/check-smallface.cjs --small /tmp/caras/portrait.y4m --big /tmp/caras/crop.y4m
+```
+Con la foto entera (cara pequeña, ojo ≈ 35 px) comprueba el aviso en pantalla y por voz (la voz del navegador se sustituye por una simulada que apunta lo que dice); con la cara ampliada (ojo ≈ 72 px), que no avisa. Tarda unos 2 min. La lógica sin navegador está en `tests/face-size.test.js`.
+
 ## Selector de cámara de la tarjeta de inicio (fase 7d)
 ```bash
 node scripts/dev/check-facing.cjs --video /tmp/caras/lid.y4m

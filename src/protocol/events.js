@@ -14,6 +14,7 @@
 // suelto de ruido no cuente) supera el umbral del reposo, los eventos de alrededor (±0,5 s) se descartan.
 
 import { percentile } from '../metrics/blinks.js';
+import { medianEyePx, isSmallFace } from './face-size.js';
 
 export const EVENT_DEFAULTS = {
   medianMs: 600, // ventana de la mediana de «cómo estaba antes»
@@ -106,6 +107,7 @@ export function stepView(step) {
   const ft = f.t ?? f.rel ?? [];
   return {
     st,
+    eyePx: step.series?.eyePx ?? step.eyePx ?? [],
     ear: { left: step.series?.left?.ear ?? [], right: step.series?.right?.ear ?? [] },
     aperture: { left: step.series?.left?.aperture ?? [], right: step.series?.right?.aperture ?? [] },
     events: { left: step.events?.left ?? [], right: step.events?.right ?? [] },
@@ -219,7 +221,12 @@ export function calibrate(step, options = {}) {
       codes.push('clean');
     }
   }
-  out.diagnosis = { validMs: Math.round(validMs), neededMs: Math.round(o.minValidMs), cleanMs: Math.round(cleanMs), neededCleanMs: o.minCleanMs, movingMs: Math.round(movingMs), blinkedMs: Math.round(blinkedMs), faceFraction: out.faceFraction, headStill: out.headStill };
+  // Si el reposo falla por movimiento y la cara es pequeña, lo más probable es que sea ruido de la cámara y no
+  // movimiento (con el ojo pequeño, el mismo ruido en píxeles pesa más): se dice, para que se acerque.
+  out.eyePx = medianEyePx(v.eyePx);
+  out.smallFace = isSmallFace(out.eyePx);
+  if (codes.includes('head') && out.smallFace) reasons.push(`la cara es pequeña (el ojo mide ${out.eyePx} px) y eso se confunde con movimiento: acércate`);
+  out.diagnosis = { eyePx: out.eyePx, validMs: Math.round(validMs), neededMs: Math.round(o.minValidMs), cleanMs: Math.round(cleanMs), neededCleanMs: o.minCleanMs, movingMs: Math.round(movingMs), blinkedMs: Math.round(blinkedMs), faceFraction: out.faceFraction, headStill: out.headStill };
   if (reasons.length) {
     out.valid = false;
     out.reason = reasons.join('; ');
