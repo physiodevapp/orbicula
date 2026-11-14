@@ -281,7 +281,7 @@ El vídeo de la app de cámara no sabe en qué fase está cada momento. Hay tres
 4. **App de cámara:** se lee del archivo (6a).
 
 ## Análisis de la cara en paralelo (tras la fase 7)
-**Qué se hizo.** Un «pool» de análisis de la cara (`src/landmarks/pool.js`) solo para el vídeo grabado (en modo IMAGE los fotogramas son independientes; en directo, el modo VIDEO suaviza entre fotogramas y exige un solo análisis). Los resultados llegan desordenados y se entregan en orden de envío (`src/landmarks/in-order.js`). Variantes elegibles en la tarjeta del vídeo: 1 GPU (como hasta ahora, por defecto), GPU + GPU, 1 CPU y CPU + CPU. El segundo análisis vive solo mientras dura el vídeo.
+**Qué se hizo.** Un «pool» de análisis de la cara (`src/landmarks/pool.js`) solo para el vídeo grabado (en modo IMAGE los fotogramas son independientes; en directo, el modo VIDEO suaviza entre fotogramas y exige un solo análisis). Los resultados llegan desordenados y se entregan en orden de envío (`src/landmarks/in-order.js`). Variantes elegibles en la tarjeta del vídeo: 1 CPU (por defecto desde la medida en el móvil), CPU + CPU, 1 GPU (como antes) y GPU + GPU. El segundo análisis vive solo mientras dura el vídeo.
 
 **Hallazgo 1: no se pueden mezclar GPU y CPU.** Para el mismo fotograma no dan los mismos números: en la nube, el EAR difería 0,004 de mediana y hasta 0,014 en el 10 % peor, de 2 a 5 veces el ruido del EAR en reposo (0,0015–0,0026). Alternarlos metería ese ruido en la señal fina. GPU + CPU iba 2,5 veces más rápido en la nube y aun así **se descartó**. Ahora, si el segundo análisis no consigue el mismo acelerador que el primero, se usa uno solo y el resultado lo dice.
 
@@ -299,4 +299,21 @@ En la nube GPU + GPU no gana porque la GPU emulada ya ocupa los 4 núcleos (cada
 
 **Lo que queda igual o casi:** con dos análisis se pierden unos pares de flujo más **al principio del vídeo** (los de 0,1–0,2 s: el flujo va por delante mientras arrancan los análisis y sus primeros pares no tienen pose con la que normalizarse; con uno solo ya se perdían los tres primeros). No afecta a ninguna métrica: la subida del cierre necesita 2,1 s de historia.
 
-**Pendiente:** medir en el móvil las cuatro variantes con el mismo vídeo y elegir la de por defecto.
+**Medido en el móvil del autor (2026-11-14).** Android 10, Chrome 157, 9 núcleos. El mismo vídeo de 68,4 s (cámara trasera, 1080p a 30 fps, 2051 fotogramas), con 2 minutos de reposo entre pruebas:
+
+| Variante | Fotogramas/s | Tiempo | Análisis de la cara (ms por fotograma) | Resultados |
+|---|---|---|---|---|
+| 1 GPU, producción (`main@a17bed8`) | 13,5 | 2:31 | 63 | 898 + 1152 muestras (la de la frontera se perdía) |
+| 1 GPU, rama | 12,6 | 2:43 | 76 | 899 + 1152; 7 + 22 parpadeos |
+| GPU + GPU | 21,9 | 1:34 | 84 y 87 (1046 y 1005 fotogramas) | **Idénticos** a 1 GPU |
+| **1 CPU** | **27,4** | **1:15** | **33** | EAR hasta 0,03–0,04 distinto de la GPU; mismos parpadeos claros |
+| CPU + CPU | 29,6 | 1:09 | 51 y 58 (1209 y 842 fotogramas) | **Idénticos** a 1 CPU |
+
+Una primera prueba de 1 GPU en la rama dio 8,1 fotogramas/s; repetida, 12,6, como producción. Fue una medida suelta, no un fallo de la rama.
+
+**Decisión: 1 CPU por defecto.** En este móvil la CPU analiza la cara en la mitad de tiempo que la GPU: a esta resolución, subir y bajar el fotograma de la GPU pesa más de lo que gana. CPU + CPU solo gana un 8 % porque los dos análisis compiten por los mismos núcleos rápidos (cada uno pasa de 33 a 51–58 ms), y no compensa otro modelo en memoria ni más calor. Las demás variantes quedan en el selector.
+
+**Consecuencias:**
+- Un vídeo analizado ahora puede dar valores muy ligeramente distintos de uno analizado antes con la GPU: el EAR, unas centésimas (el ruido del EAR en reposo es igual con las dos, desviación típica 0,015–0,018), y algún cierre del 25–28 % que está justo en el umbral. Cada sesión se compara consigo misma, así que no rompe nada; para comparar dos vídeos, analízalos con la misma opción. El informe guarda la opción usada (`video.processing.face`).
+- El umbral de flujo del reposo salió la mitad con CPU (0,006 frente a 0,013), pero no por la CPU: el percentil 95 del reposo es el mismo con las dos (0,003). El umbral es el **máximo** del reposo limpio, y con GPU entró en él una sacudida suelta del párpado (el propio análisis lo avisaba). **Pendiente aparte:** hacer el umbral más robusto frente a un solo pico.
+- **Idea a medir:** si la CPU analiza en 33 ms, el directo podría ir a ~30 análisis/s con la CPU (criterio 1). No se ha probado: el directo usa el modo VIDEO y la cámara compite por los mismos núcleos.

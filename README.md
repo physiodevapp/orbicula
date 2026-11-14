@@ -77,11 +77,11 @@ La tarjeta **«Vídeo grabado»** (arriba de todo, sin necesidad de activar la c
 - Si grabas con la frontal, comprueba si el vídeo sale **en espejo** (las letras se leen al revés) y marca la casilla; con la trasera casi nunca lo está.
 - Formato MP4 (H.264 o HEVC). Si Chrome no puede decodificar el códec, la tarjeta lo dice: graba en H.264 («Más compatible» en la app de cámara).
 
-**Cómo analizarlo:** elige el archivo, comprueba que la ficha dice «El navegador lo puede decodificar» y pulsa **«Analizar el vídeo»**. Un vídeo de 1 minuto tarda unos 2–3 minutos; uno de 4 minutos, unos 10. Mantén la pantalla encendida. Al acabar salen el resumen (reposo y resto del vídeo, con asimetrías) y el JSON.
+**Cómo analizarlo:** elige el archivo, comprueba que la ficha dice «El navegador lo puede decodificar» y pulsa **«Analizar el vídeo»**. Un vídeo de 1 minuto tarda algo más de 1 minuto; uno de 4 minutos, unos 5 (más si es 4K o a 60 fps). Mantén la pantalla encendida. Al acabar salen el resumen (reposo y resto del vídeo, con asimetrías) y el JSON.
 
 **El protocolo, grabado:** en la tarjeta «Protocolo clínico», la casilla **«Grabar el vídeo para analizarlo después»** graba el vídeo del propio protocolo y, al acabar, lo analiza fotograma a fotograma con las fases exactas. Ofrece el mismo resumen por fases con más sensibilidad: por ejemplo, detecta más parpadeos y los mide con su duración real.
 
-**Análisis de la cara (prueba de velocidad):** la tarjeta deja elegir cuántos análisis de la cara trabajan a la vez y con qué acelerador: 1 GPU (como hasta ahora), GPU + GPU, 1 CPU o CPU + CPU. Nunca se mezclan GPU y CPU en un mismo vídeo, porque no dan los mismos números y eso metería ruido en la señal. Es una opción de prueba hasta medir en el móvil cuál va más rápido.
+**Análisis de la cara:** por defecto, el vídeo se analiza con **1 CPU (recomendado)**: en el móvil de pruebas va unas dos veces más rápido que con la GPU (un vídeo de 1 minuto tarda algo más de 1 minuto). La tarjeta deja elegir también CPU + CPU (un poco más rápido, pero gasta más memoria), 1 GPU (como antes) y GPU + GPU. Nunca se mezclan GPU y CPU en un mismo vídeo, porque no dan exactamente los mismos números y eso metería ruido en la señal. Por lo mismo, un vídeo analizado con CPU puede dar valores muy ligeramente distintos de uno analizado antes con la GPU (el EAR, unas centésimas); compara siempre análisis hechos con la misma opción.
 
 **Privacidad:** el vídeo se lee en el móvil y no sale de él. El que graba el protocolo **solo existe en la memoria**: no se guarda como archivo ni se puede exportar, y se borra al terminar el análisis, al descartarlo o al empezar otra sesión.
 

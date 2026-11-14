@@ -223,9 +223,13 @@ const FACE_LANES = {
   cpu: { reuse: false, extra: [['CPU']] }, // uno en la CPU
   'cpu+cpu': { reuse: false, extra: [['CPU'], ['CPU']] }, // dos en la CPU
 };
+// Por defecto, 1 CPU: en el móvil del autor (2026-11-14, vídeo de 68 s a 1080p) iba a 27,4 fotogramas/s frente a
+// 12,6–13,5 con 1 GPU (la CPU analiza en 33 ms y la GPU en 63–76: subir y bajar el fotograma de la GPU pesa más
+// de lo que gana). CPU + CPU solo ganaba un 8 % (29,6) a cambio de otro modelo en memoria. Ver docs/plan-fase-6.md.
+const DEFAULT_FACE_LANES = 'cpu';
 const faceLanesChoice = () => {
   const v = document.getElementById('vidLanes')?.value;
-  return v in FACE_LANES ? v : '1';
+  return v in FACE_LANES ? v : DEFAULT_FACE_LANES;
 };
 
 /** Análisis de la cara para un vídeo: el de siempre, o un pool con otros que usan el mismo acelerador. */

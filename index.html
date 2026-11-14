@@ -60,12 +60,12 @@
           <label class="check"><input type="checkbox" id="vidCap"> Como mucho 30 fotogramas/s (tarda la mitad)</label>
         </div>
         <label class="field">
-          <span class="control-label">Análisis de la cara (prueba de velocidad)</span>
+          <span class="control-label">Análisis de la cara</span>
           <select class="select" id="vidLanes" aria-label="Análisis de la cara en paralelo">
-            <option value="1" selected>1 a la vez, GPU (como hasta ahora)</option>
-            <option value="gpu+gpu">2 a la vez, GPU + GPU</option>
-            <option value="cpu">1 a la vez, CPU</option>
+            <option value="cpu" selected>1 a la vez, CPU (recomendado)</option>
             <option value="cpu+cpu">2 a la vez, CPU + CPU</option>
+            <option value="1">1 a la vez, GPU (como antes)</option>
+            <option value="gpu+gpu">2 a la vez, GPU + GPU</option>
           </select>
         </label>
         <div class="sum-card" id="vidSaved" hidden>
