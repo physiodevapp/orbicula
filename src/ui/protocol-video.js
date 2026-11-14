@@ -169,5 +169,5 @@ export function createProtocolVideo({ getStream, analyzeVideoFile, saved = null,
     show(`Descargado: ${name} (${Math.round(size / 1024)} KB).`);
   });
 
-  return { beforeStart, onState, forget, supported };
+  return { beforeStart, onState, forget, supported, /** Hay un vídeo grabado en la memoria sin analizar todavía (recargar lo perdería). */ get pending() { return !!recorded; } };
 }

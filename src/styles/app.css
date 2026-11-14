@@ -311,3 +311,18 @@ main {
 #videoCard .coach-bar { background: var(--surface3); }
 #videoCard .coach-bar i { background: var(--accent); }
 .vid-thumb { max-width: 160px; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+
+/* ── Aviso de versión nueva (flotante: no ocupa sitio) ───────────────────── */
+.update-notice {
+  position: fixed; z-index: 40;
+  top: max(var(--sp-2), env(safe-area-inset-top)); left: var(--sp-2); right: var(--sp-2);
+  margin: 0 auto; max-width: 36rem;
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface2); border: 1px solid var(--accent-line); border-radius: var(--radius-sm);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  font-size: var(--fs-sm); color: var(--text);
+}
+.update-notice span { flex: 1; min-width: 0; line-height: 1.4; }
+.update-notice .btn { flex-shrink: 0; }
+.update-notice button:disabled { opacity: 0.5; }

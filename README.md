@@ -145,3 +145,5 @@ Cloudflare Workers con archivos estáticos (`wrangler.jsonc`), conectado al repo
 - cada rama → previsualización: `https://<rama>-orbicula.<subdominio>.workers.dev`
 
 El pie de la app muestra la versión, la rama y el commit con que se construyó. GitHub Actions pasa los tests y la build en cada PR y en `main`.
+
+**Aviso de versión nueva:** cada build publica `version.json` con su commit (el del pie). La app lo pide sin caché al abrir, al volver a ella y cada 10 minutos; si es otro commit, sale un aviso flotante «Hay una versión nueva» con «Recargar». Una app abierta en las recientes de Android puede quedarse con una versión vieja días. El aviso se puede cerrar y no vuelve hasta que se publique otra versión distinta; **no deja recargar mientras haya un protocolo, un análisis de vídeo o un vídeo grabado sin analizar** (se perdería), y se activa solo en cuanto acaban. Lo guardado en el móvil (sesiones) se conserva al recargar. Es una petición al propio origen: no sale ningún dato del paciente. En modo alojado (`?host=physiq`) no se muestra: allí decide el hub cuándo actualizar.

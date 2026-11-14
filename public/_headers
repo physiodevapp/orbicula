@@ -7,6 +7,10 @@
   Permissions-Policy: camera=(self), microphone=(), geolocation=()
   Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'self' https://physiodevapp.github.io
 
+# La versión publicada (src/app/version.js): se pide sin caché para enterarse enseguida de una nueva.
+/version.json
+  Cache-Control: no-cache
+
 # Vite pone un hash en el nombre de estos archivos: si cambian, cambia el nombre.
 /assets/*
   Cache-Control: public, max-age=31536000, immutable

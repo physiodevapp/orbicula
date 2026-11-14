@@ -4,6 +4,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (aviso de versión nueva)
+- **Aviso flotante «Hay una versión nueva»** con «Recargar» y «✕». Cada build publica `version.json` (`{ commit, branch }`, el mismo commit que el pie, servido sin caché); la app lo pide al abrir, al volver a ella (`visibilitychange`, `pageshow`) y cada 10 minutos mientras se ve. Resuelve el caso de una versión vieja que se queda abierta en las recientes de Android.
+- **No interrumpe lo que está en marcha:** es `fixed` (no mueve la maquetación) y «Recargar» queda desactivado, con el motivo, mientras haya un protocolo, una prueba, un análisis de vídeo o un vídeo grabado sin analizar; se activa solo al acabar.
+- **Se puede cerrar** y no vuelve hasta que se publique otra versión distinta. Un fallo (sin conexión, no es JSON, servidor de desarrollo) no avisa de nada.
+- **Privacidad:** petición relativa al propio origen (`connect-src 'self'` y la barrera de `src/privacy/` la permiten); no sale ningún dato del paciente. Sin cambios en la CSP.
+- **En modo alojado (`?host=physiq`) no se muestra:** allí decide el hub cuándo actualizar.
+- `scripts/dev/check-version.cjs`: el aviso, el cierre, que no vuelve por lo mismo, que no deja recargar con algo en marcha, que no mueve la maquetación, el modo alojado y el fallo de red.
+- 11 tests nuevos.
+
 ### Añadido (fase 7d: cierre de la integración)
 - **`docs/integracion.md`:** la guía para quien programe el hub. Lista de comprobación, cómo cargar el iframe (`allow="camera; screen-wake-lock"`, bajo demanda, `?host=physiq`), los mensajes con sus campos, las reglas de orígenes y privacidad, un ejemplo de código del lado del hub, cómo probarlo, compatibilidad y limitaciones conocidas.
 - **Selector Trasera / Frontal en la tarjeta «Cámara» de inicio** (antes solo aparecía tras activar la cámara). Comparte el estado con el de los controles, y elegir no enciende la cámara: se enciende con «Activar cámara». `scripts/dev/check-facing.cjs` lo comprueba.

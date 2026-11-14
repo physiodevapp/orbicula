@@ -19,6 +19,7 @@ import { createAssistant } from './ui/assistant.js';
 import { createVideoCard } from './ui/video.js';
 import { createProtocolVideo } from './ui/protocol-video.js';
 import { createSavedCard } from './ui/saved.js';
+import { createUpdateNotice } from './ui/update-notice.js';
 import { hostFrom } from './integration/host.js';
 import { allowedOrigins } from './integration/origins.js';
 import { createBridge } from './integration/bridge.js';
@@ -980,5 +981,20 @@ if (hub.embedded && !hub.blocked) {
   document.getElementById('prSendHub')?.addEventListener('click', () => {
     if (lastHubResult) sendToHub({ ...lastHubResult, code: document.getElementById('prExportCode')?.value.trim() ?? '' });
     else hubStatus('Todavía no hay ningún resultado que enviar.');
+  });
+}
+
+// Aviso de versión nueva. En modo alojado no: allí decide el hub cuándo actualizar. Al recargar se pierde lo que
+// esté en marcha, así que mientras tanto no deja recargar.
+if (!hosted) {
+  createUpdateNotice({
+    current: __COMMIT__,
+    isBusy: () => {
+      const busy = document.body.dataset.busy;
+      if (busy === 'video') return 'Se está analizando un vídeo';
+      if (busy) return 'Hay una prueba en marcha';
+      if (protocolVideo.pending) return 'Hay un vídeo grabado sin analizar';
+      return null;
+    },
   });
 }
