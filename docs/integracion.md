@@ -28,6 +28,7 @@ SATS.orbicula = '/physiq/orbicula/?host=physiq';   // _showSat pone frame.src al
 - **Sin cabecera ni pie:** el hub ya pone su marco. La versión y el commit siguen en «Detalle técnico de la captura» (con la cámara encendida).
 - **Tema oscuro** (el hub es solo oscuro), salvo que el hub mande otra cosa con `orbicula:config`.
 - **Tokens del hub:** el texto (`#e8edf2`, `#8aa4bc`) y el rojo de error (`#ef4444`). El fondo, las superficies, los bordes y las fuentes ya coincidían. **El acento sigue siendo el de orbicula**, porque cada satélite tiene el suyo.
+- **Sin aviso de versión nueva:** en modo autónomo orbicula avisa cuando hay una versión más nueva publicada; dentro del hub no, porque ahí decide el hub cuándo actualizar (al copiar una versión nueva de orbicula, recarga el iframe).
 - **No se guardan sesiones en el dispositivo** (en modo autónomo sí, ver el README): el hub recibe el resultado por mensaje y no debe quedar una copia en el almacenamiento del iframe.
 - **Variables CSS:** todas están en `src/styles/tokens.css`. El hub puede sobrescribirlas con `iframe.contentDocument.documentElement.style.setProperty('--accent', '…')` (solo con el mismo origen).
 
