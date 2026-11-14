@@ -63,6 +63,12 @@ node scripts/dev/check-protocol-video.cjs --video /tmp/caras/lid.y4m --live en-d
 ```
 Hace el protocolo en directo con la casilla «Grabar el vídeo…» marcada (MediaRecorder; el Chromium de Playwright graba MP4 H.264), descarga el JSON del directo, analiza el vídeo grabado y descarga el JSON del análisis. Con `--full` procesa todos los fotogramas y no uno de cada dos. Tarda unos 10 min con `escala=0.4` (análisis sin GPU).
 
+## Selector de cámara de la tarjeta de inicio (fase 7d)
+```bash
+node scripts/dev/check-facing.cjs --video /tmp/caras/lid.y4m
+```
+Elige «Frontal» antes de encender (no debe encender la cámara), comprueba que queda marcado en los controles, que «Activar cámara» usa lo elegido y que con la cámara encendida cambiar de cámara la reinicia. Tarda unos 30 s.
+
 ## Integración con el hub por postMessage (fase 7c)
 ```bash
 npm run build && npx vite preview --port 4173 --host 127.0.0.1 &

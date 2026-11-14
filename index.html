@@ -22,7 +22,15 @@
     <section class="card" id="startCard">
       <div class="card-title">Cámara</div>
       <p class="card-text">orbicula usa la cámara para medir movimientos alrededor de los ojos. La imagen se procesa en el móvil y no sale de él.</p>
+      <div class="control-row">
+        <span class="control-label">Usar</span>
+        <div class="segmented" role="group" aria-label="Cámara a usar">
+          <button type="button" data-facing="rear" aria-pressed="true">Trasera</button>
+          <button type="button" data-facing="front" aria-pressed="false">Frontal</button>
+        </div>
+      </div>
       <button class="btn btn-primary" id="startBtn" type="button">Activar cámara</button>
+      <p class="hint">En un móvil, la trasera da la mejor imagen. En un ordenador, la webcam suele reconocerse sola como frontal.</p>
     </section>
 
     <section class="card" id="videoCard">

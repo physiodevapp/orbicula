@@ -119,8 +119,8 @@ Recargar la página perdía un protocolo o 2 minutos de análisis de vídeo. Se 
 - **Hallazgo (prueba en el móvil):** un iframe de otro origen que queda fuera de la pantalla se frena y no procesa el vídeo. En el hub de verdad no pasa (cada satélite ocupa la pantalla), pero la página de prueba, con el iframe debajo de los botones, lo sufría: «mostrar» parecía no hacer nada. Ahora oculta y muestra el iframe como el hub y lo trae a la vista.
 - **Hallazgo:** dentro de un iframe, el bloqueo de pantalla exige `allow="screen-wake-lock"` en el iframe del hub (ahora se comprueba antes de pedirlo, y el `ready` informa de los permisos).
 
-### Pendiente para 7d (pedido por el autor)
-- **Selector Trasera / Frontal en la tarjeta «Cámara» de antes de encender.** Hoy solo aparece después de activar la cámara y cuesta encontrarlo (lo notó al probar 7c con la webcam del ordenador, que no dice si es frontal o trasera). Debe ir con el mismo estado que el selector actual, sin duplicar la lógica.
+### Hecho en 7d (pedido por el autor)
+- **Selector Trasera / Frontal en la tarjeta «Cámara» de inicio.** Antes solo aparecía tras activar la cámara y costaba encontrarlo. Comparte el estado con el de los controles (el mismo `data-facing`), y elegir no enciende la cámara. En su navegador la webcam ya se reconoce sola como frontal (`facingMode: "user"`), así que en el ordenador casi no hace falta; sirve en navegadores que no lo dicen.
 
 ### Pendiente para después de 7d (hallazgo de la prueba en el ordenador)
 - **Aviso de cara pequeña mejor, y también por voz.** En la webcam del ordenador, con «ojo ≈ 50 px» el reposo falló siempre («la cabeza se ha movido»); a 70 px y con más luz calibró a la primera. El aviso actual no saltó porque usa una proporción del encuadre (cara < 30 % del lado corto), no los píxeles del ojo, que es lo que importa: el ruido de la cámara es casi fijo en píxeles y con el ojo pequeño parece movimiento. Cambiarlo a píxeles del ojo (umbral provisional, ~60 px: solo hay dos observaciones), avisar también por voz antes del reposo y, si el reposo falla por movimiento con el ojo pequeño, decirlo. **No tocar los umbrales de movimiento de la cabeza.** Para fijar el umbral: probar en el ordenador a 55–60 px.
@@ -134,6 +134,41 @@ Recargar la página perdía un protocolo o 2 minutos de análisis de vídeo. Se 
    - Una página de prueba que carga orbicula en un iframe y comprueba `ready`, `result` y `config`, con orígenes permitidos y no permitidos (criterio 6).
    - **Tu prueba:** abrir esa página de prueba en el móvil.
 4. **7d. Cierre.** `docs/integracion.md` (la API para quien programe el hub), README, CHANGELOG y conclusión. **Después propongo la mejora pendiente:** el análisis de la cara en paralelo (fase 6).
+
+## Conclusión de la fase 7
+**Hecho (rama `feat/fase-7-integracion`):**
+- **7a, resultados:** JSON público (`schemaVersion: "1"`) con un esquema formal y documentado ([`schema.md`](schema.md)), validado con `ajv` en los tests y con los archivos reales del móvil del autor, y CSV en dos archivos (cara y flujo). El esquema se revisó con Opus antes de fijarlo (ocho cambios, arriba).
+- **7a bis, sesiones guardadas:** recuperar el trabajo tras recargar (IndexedDB, sin vídeo, huella del archivo sin el nombre, 5 sesiones y 30 días).
+- **7b, modo alojado:** `?host=physiq` (sin cabecera ni pie, tema oscuro, tokens del hub).
+- **7c, API `postMessage`:** `ready`, `result` y `config`; orígenes permitidos sin comodín; el hub que oculta orbicula apaga la cámara y la reabre al mostrarla.
+- **7d, cierre:** [`integracion.md`](integracion.md) para quien programe el hub, README, CHANGELOG, esta conclusión y el selector de cámara en la tarjeta de inicio.
+- **Cifras:** de 242 a 289 tests; cinco scripts de comprobación de punta a punta (`check-export`, `check-saved`, `check-host`, `check-hub`, `check-facing`).
+
+**Lo que enseñaron las pruebas del autor (y no habría salido de otro modo):**
+- **El cierre por flujo es una integral con fuga:** su nivel absoluto no significa nada y arrastra lo anterior a la grabación (−0,47 al inicio del reposo en el JSON real). Se documentó y se exporta `analysis.closureTauMs`. También: el desfase de la co-activación en ±300 ms está en el borde de la ventana.
+- **Un aviso que sale fuera de la pantalla no existe.** El mensaje de un código no válido quedaba debajo de los botones y no se veía. Ahora el campo avisa al escribir y los mensajes de exportar se traen a la vista.
+- **Un iframe de otro origen fuera de la pantalla se frena** y no procesa el vídeo. En el hub de verdad no pasa; la página de prueba lo sufría.
+- **Dentro de un iframe, el bloqueo de pantalla exige `allow="screen-wake-lock"`.** Se comprueba antes de pedirlo y el `ready` informa de los permisos.
+- **Webcam del ordenador:** con «ojo ≈ 50 px» el reposo fallaba siempre («la cabeza se ha movido»); a 70 px y con más luz calibró a la primera. El aviso de cara pequeña no saltó porque usa una proporción del encuadre, no los píxeles del ojo. Pendiente, abajo.
+- **Se aprendió de `dualkinema` y se le devolvió:** de allí se trajo la huella sin nombre, los dos almacenes y la reapertura de la conexión de IndexedDB; a cambio se le propuso la caducidad, el máximo de sesiones y «Borrar todo».
+
+**Criterios de aceptación (de `CLAUDE.md`):**
+| # | Criterio | Estado |
+|---|---|---|
+| 1 | En directo, 24 fps o más; si no llega, lo dice y propone el vídeo | Cumplido: el análisis fue de 24,7 a 26,5 por segundo en el móvil del autor y hay aviso por debajo de 24 (fase 6d). |
+| 2 | Un guiño en el lado correcto, con las dos cámaras | Cumplido con el vídeo grabado (fase 6). |
+| 3 | La energía de flujo distingue una contracción mínima menor que la que mueve el EAR | Cumplido en las pruebas de las fases 4 y 5 (25 y 26 de 29 contracciones, 0 de 26 falsas alarmas). |
+| 4 | Un cabeceo suave no genera eventos | Cumplido (0 eventos en cabeceo y giro, fase 5). |
+| 5 | El JSON exportado valida contra el esquema | **Cumplido (fase 7):** tests, comprobación de punta a punta y el JSON real del móvil. |
+| 6 | Con `?host=physiq` en un iframe emite `ready` y `result` y aplica la configuración | **Cumplido (fase 7):** comprobado a mano en el móvil y en el ordenador, y con `check-hub.cjs`. |
+| 7 | Despliegue en Cloudflare por HTTPS, en producción y en las previsualizaciones | Las previsualizaciones por rama funcionan todo el desarrollo. **Pendiente:** comprobar producción tras fusionar esta fase. |
+
+**Pendiente, para después de esta fase:**
+1. **Análisis de la cara en paralelo** (propuesta aparte): subir el análisis de un vídeo de ~14,6 a ~25 fotogramas por segundo.
+2. **Aviso de cara pequeña por píxeles del ojo, también por voz** (arriba).
+3. **Sonrisa medida con las comisuras de la boca** (landmarks 61 y 291) en vez del blendshape, que casi satura; con ella se revisa la co-activación.
+4. **Elevación de cejas más baja en el vídeo que en directo:** sin explicar.
+5. **Aviso de versión nueva** como el de `dualkinema` (`/version.json`, aviso flotante que no interrumpe una prueba en marcha): propuesto, el autor aún no ha decidido.
 
 ## Pruebas
 - **Tests unitarios:** construcción del JSON público desde los resultados de las tres fuentes; validación contra el esquema; asimetrías solo de magnitudes positivas; tiempos en ms y lados del paciente; sin ningún campo que identifique al paciente; el CSV (columnas, separadores, número de filas).

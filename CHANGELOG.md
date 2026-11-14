@@ -4,6 +4,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (fase 7d: cierre de la integración)
+- **`docs/integracion.md`:** la guía para quien programe el hub. Lista de comprobación, cómo cargar el iframe (`allow="camera; screen-wake-lock"`, bajo demanda, `?host=physiq`), los mensajes con sus campos, las reglas de orígenes y privacidad, un ejemplo de código del lado del hub, cómo probarlo, compatibilidad y limitaciones conocidas.
+- **Selector Trasera / Frontal en la tarjeta «Cámara» de inicio** (antes solo aparecía tras activar la cámara). Comparte el estado con el de los controles, y elegir no enciende la cámara: se enciende con «Activar cámara». `scripts/dev/check-facing.cjs` lo comprueba.
+- **Conclusión de la fase 7** en `docs/plan-fase-7.md`, con el estado de los criterios de aceptación.
+
 ### Añadido (fase 7c: API postMessage)
 - **`orbicula:ready`** al cargar (con la versión de la app, la del esquema y los permisos que el hub ha concedido al iframe), **`orbicula:result`** al terminar el protocolo en directo y el análisis del protocolo grabado, y **`orbicula:config { theme, lang, protocol }`** de entrada. El resultado lleva `sessionId` fuera del JSON: el protocolo grabado manda un segundo resultado con el mismo, para que el hub reemplace el primero.
 - **Orígenes:** solo el propio y `https://physiodevapp.github.io` (`src/integration/origins.js`), ampliable al construir con `VITE_ORBICULA_ORIGINS`, **nunca por la dirección**. Los mensajes salen solo al origen del padre, **nunca con `"*"`**, y los entrantes solo se aceptan si vienen del marco padre y de un origen permitido. Con un padre no permitido, orbicula no manda ni acepta nada.

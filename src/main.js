@@ -940,7 +940,8 @@ document.querySelectorAll('[data-facing]').forEach((b) =>
     state.facing = b.dataset.facing;
     state.deviceId = null;
     setPressed('facing', state.facing);
-    start();
+    // Desde la tarjeta de inicio (cámara aún apagada) solo se elige: la cámara se enciende con «Activar cámara».
+    if (state.running) start();
   }),
 );
 
