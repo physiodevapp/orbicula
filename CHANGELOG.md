@@ -14,6 +14,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - **El reloj de la sesión avanza con los resultados de la cara, no al enviar los fotogramas:** con varios en vuelo, las últimas muestras de un tramo caían en el siguiente.
 - **La muestra de la frontera entre tramos ya no se pierde:** la sesión necesitaba tres pasos para cruzarla y se le daban dos. La variante de siempre pasa de 1439 a 1440 muestras de 1440.
 - Los pares de flujo que esperan su pose al final del vídeo se registran antes de cerrar el último tramo.
+- **Analizar otra vez el mismo vídeo sin volver a elegirlo fallaba en Android con «Decoder error»** (en la nube no). Ahora el archivo se vuelve a abrir (solo el índice) antes de cada análisis y de cada prueba de lectura, que es lo que hacía elegirlo de nuevo. Si aun así falla el decodificador, el mensaje dice que se vuelva a elegir el vídeo.
 - 12 tests nuevos.
 
 ### Añadido (aviso de versión nueva)
