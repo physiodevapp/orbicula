@@ -344,4 +344,6 @@ Una primera prueba de 1 GPU en la rama dio 8,1 fotogramas/s; repetida, 12,6, com
 
 **El desfase fijo de ~0,5 s:** la corrección tomaba como referencia el primer trozo. Al arrancar, el codificador llena su cola y los primeros trozos llegan antes, así que ese llenado contaba como deriva. Ahora la referencia es el inicio del primer paso (`anchorMs`): ahí el reloj queda como sin corregir (+0,1 s el día 10) y se corrige la deriva a partir de ese punto. El JSON guarda además la curva de la corrección (`video.alignment.curve`, cada ~5 s) para comprobarlo en la próxima prueba.
 
-**Pendiente:** otro protocolo grabado para ver el desfase que queda con la referencia nueva (lo esperado, ~0,1 s y fijo).
+**Prueba con la referencia nueva (2026-11-15, P04, `06e61d0`):** deriva corregida de 1,28 s (72 trozos), casi lineal (~0,54 %). El desfase que queda: **+0,21, +0,17, +0,10, +0,08, −0,02 y −0,04 s** por fase (r 0,86–0,99), frente a ~0,5 s fijo en P03 y hasta −1,01 s sin corregir. Subida de la ceja: directo 0,153 / 0,177 DI, vídeo 0,163 / 0,194.
+- Queda una pendiente pequeña (~0,25 s en 4 min, algo de más corregido): se deja así. Para afinarla harían falta más grabaciones, y ±0,2 s no cambia las ventanas de las repeticiones (empiezan en el pitido y duran 4 s).
+- La comisura sale algo más alta en el vídeo (0,63 / 0,56 frente a 0,51 / 0,51): en directo el modo VIDEO suaviza los puntos y recorta los picos. Como con los parpadeos, compara directo con directo y vídeo con vídeo.
