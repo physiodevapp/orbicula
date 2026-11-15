@@ -366,7 +366,7 @@ describe('asistente de la fase 4', () => {
     at(100); // empieza a grabar
     s.record(150, sample(0.3, 0.3)); // t0 de las series = 150
     at(300); // 200 ms desde el inicio: «ahora» 1
-    expect(s.snapshot().rep).toEqual({ of: 2, k: 1, holding: true, control: false });
+    expect(s.snapshot().rep).toEqual({ of: 2, k: 1, holding: true, control: false, sinceMs: 0 });
     at(700); // «suelta» 1
     expect(s.snapshot().rep.holding).toBe(false);
     at(1350);
@@ -566,5 +566,19 @@ describe('prueba con controles', () => {
       expect(s.reps.randomize).toBe(true);
       expect(s.say).toMatch(/Dos pitidos cortos: no hagas nada/);
     }
+  });
+});
+
+describe('snapshot: repetición en curso', () => {
+  it('rep.sinceMs es el tiempo desde el último «ahora» o «suelta»', () => {
+    let t = 0;
+    const steps = [{ id: 'x', title: 'x', durationMs: 20000, prepMs: 0, reps: { count: 2, everyMs: 8000, holdMs: 3000, offsetMs: 2000 } }];
+    const s = new GuidedSession(steps, { now: () => t, prepMs: 0 });
+    s.start();
+    t = 1; s.tick();
+    t = 2500; s.tick();
+    expect(s.snapshot().rep).toMatchObject({ holding: true, sinceMs: 499 }); // el paso empezó en t = 1: «ahora» a los 2000 ms
+    t = 6000; s.tick();
+    expect(s.snapshot().rep).toMatchObject({ holding: false, sinceMs: 5999 - 5000 }); // «suelta» a los 5000 ms
   });
 });

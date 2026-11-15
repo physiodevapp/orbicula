@@ -5,6 +5,8 @@ import { GuidedSession, AUTO_PAUSE_MS, randomPattern } from '../assistant/sessio
 import { PLANS, DEFAULT_PLAN, spokenPrepMs } from '../assistant/steps.js';
 import { cleanSettings, PROTOCOL_DEFAULTS } from '../protocol/steps.js';
 import { summarizeProtocol } from '../protocol/summary.js';
+import { qualityVoice } from '../protocol/quality-voice.js';
+import { SMALL_FACE_MID_SAY } from '../protocol/face-size.js';
 import { renderSummary } from './summary.js';
 import { bindCodeField, showMessage } from './code-field.js';
 import { requestWake } from './wake.js';
@@ -58,6 +60,7 @@ const mmss = (ms) => `${Math.floor(ms / 60000)}:${pad(Math.ceil((ms % 60000) / 1
  */
 export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () => {}, onStepStart = () => {}, onState = () => {}, exporter = null, prefix = 'as', rootId = 'assistant', busyKey = 'assistant', plan: fixedPlan = null }) {
   const root = $(rootId);
+  const warnedSmall = new Set(); // avisos de «cara pequeña» ya dados en las fases que no son el reposo (uno por paso)
   const P = prefix;
   const el = {
     status: $(`${P}Status`), code: $(`${P}Code`), sound: $(`${P}Sound`), auto: $(`${P}Auto`), voice: $(`${P}Voice`),
@@ -374,14 +377,19 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
     /** La cámara se reinició, etc.: el paso en curso queda interrumpido. */
     interrupt: (reason) => session.interrupt(reason),
     /**
-     * Aviso de calidad (p. ej. «cara pequeña»): un tono grave y la voz, solo antes y durante el reposo, que es
-     * donde el tamaño de la cara decide si la calibración vale. No corta la voz del paso. Devuelve si avisó.
+     * Aviso de calidad por voz (`kind`: 'small' = cara pequeña, 'lost' = cara perdida): un tono grave y la voz, sin
+     * cortar la del paso. Quién puede hablar y cuándo lo decide qualityVoice (src/protocol/quality-voice.js): en el
+     * reposo, como siempre; en las demás fases, la cara perdida y la pequeña (una vez por paso), nunca durante un
+     * gesto. Devuelve si avisó de verdad (si no, quien llama lo reintenta con el siguiente resultado).
      */
-    speakWarning: (text) => {
-      const s = session.snapshot();
-      if (!['prep', 'running'].includes(s.state) || !s.step?.calibrates) return false;
+    speakWarning: (text, { kind = 'small', sustainedMs = Infinity } = {}) => {
+      const snap = session.snapshot();
+      const d = qualityVoice(kind, snap, sustainedMs, warnedSmall);
+      if (!d.speak) return false;
+      if (d.key) warnedSmall.add(d.key);
       beep(260, 280); buzz(90);
-      say(text, { queue: true });
+      // «Cara pequeña» fuera del reposo: un aviso más suave («te has alejado»).
+      say(kind === 'small' && !snap.step?.calibrates ? SMALL_FACE_MID_SAY : text, { queue: true });
       return true;
     },
     /** El hub oculta orbicula: se detiene la sesión conservando lo ya hecho (como «Detener», con «Retomar sesión»). */

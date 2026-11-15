@@ -156,7 +156,8 @@ export class GuidedSession {
     if (this.state === 'running' && step?.reps) {
       const due = repSchedule(step.reps).filter((e) => e.at <= elapsed);
       const last = due.at(-1);
-      rep = { of: step.reps.count, k: last ? last.k + 1 : 0, holding: last?.kind === 'hold', control: last?.cond === 'control' };
+      // sinceMs: tiempo desde el último «ahora» o «suelta» (para no avisar de nada justo después de un gesto).
+      rep = { of: step.reps.count, k: last ? last.k + 1 : 0, holding: last?.kind === 'hold', control: last?.cond === 'control', sinceMs: last ? Math.round(elapsed - last.at) : null };
     }
     return { state: this.state, index: this.index, total: this.steps.length, completed: this.results.length, step, remainingMs, progress, current: this.cur, rep, autoAdvancing: this.autoAdvancing };
   }

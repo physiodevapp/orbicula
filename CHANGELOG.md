@@ -4,6 +4,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Añadido (avisos por voz en todas las fases del protocolo)
+- **Cara perdida:** en cualquier fase, si lleva 1,5 s sin verse, tono grave y «No te veo. Vuelve al centro»; se repite cada 10 s mientras siga.
+- **Cara pequeña fuera del reposo:** a los 3 s, una sola vez por fase («Te has alejado. Acércate un poco»). En el reposo sigue como antes («Cara pequeña. Acércate un poco»).
+- **Nunca durante un gesto:** ni entre el «ahora» y el «suelta» ni el segundo y medio siguiente. El aviso espera a la pausa y sale en cuanto se puede. No corta la voz del paso.
+- Lógica en `src/protocol/quality-voice.js` (pura, con tests); `snapshot().rep.sinceMs` dice el tiempo desde el último «ahora» o «suelta».
+
 ### Corregido (protocolo grabado)
 - **Las fases y las marcas caían cada vez más tarde en el vídeo grabado:** el reloj del MP4 de MediaRecorder se queda atrás respecto al de la sesión (~1 s en 4 min en el móvil del autor). Por eso la subida de la ceja salía más baja en el vídeo que en directo: la ceja empezaba a subir antes de la ventana de la repetición. Ahora se anota cuándo llega cada trozo de la grabación y se corrige la deriva al abrir el vídeo (`mediaClock`). El JSON del vídeo guarda `video.alignment` con la deriva corregida y, por fase, el desfase que queda entre el EAR del directo y el del vídeo, para comprobarlo.
 

@@ -192,3 +192,12 @@ Recargar la página perdía un protocolo o 2 minutos de análisis de vídeo. Se 
 2. **CSV:** ¿te vale en dos archivos (cara y flujo)? Es lo más limpio, porque no comparten instantes.
 3. **Qué lleva `timeseries`:** las señales de la cara más el cierre por flujo, sin el flujo por ROI. ¿Te parece bien o quieres más?
 4. **Tokens del hub:** ¿puedo leer el repo `physiodevapp/physiq`? Lo pide `CLAUDE.md`, y es la única forma de copiar bien sus tokens.
+
+## Avisos por voz en todas las fases (2026-11-15)
+Con la cámara trasera no se mira la pantalla: en el modo seguido, el clínico no se enteraba de que se había alejado o salido del encuadre hasta el resumen. Reglas (`src/protocol/quality-voice.js`):
+- **Cara perdida:** cualquier fase y paso; a los 1,5 s; se repite cada 10 s mientras siga.
+- **Cara pequeña:** en el reposo, como antes (decide si la calibración vale, repite cada 15 s). En las demás fases, a los 3 s y **una vez por paso e intento**: los datos siguen valiendo con más ruido, y repetirlo distrae.
+- **Sin cortar el gesto:** nada entre el «ahora» y el «suelta» ni en el 1,5 s siguiente (el gesto llega ~0,5–1 s tarde). Como la app reintenta con cada resultado, el aviso sale en la pausa siguiente.
+- La voz encola el aviso tras la del paso, nunca la corta.
+
+**No hecho:** repetir automáticamente al final las fases en las que se perdió la cara más del 10 % (idea de la conversación); se deja hasta ver si con la voz basta. **Verificado:** tests de las reglas y `check-smallface` (el reposo sigue avisando una vez cada 15 s; la cara grande no avisa). La cara perdida en medio de una fase no se probó en el navegador (la cámara simulada siempre la ve); falta la prueba en el móvil.
