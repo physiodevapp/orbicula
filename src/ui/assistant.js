@@ -127,6 +127,12 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
     else if (cue === 'go') { beep(880, 200); buzz(150); }
     // Reposo no válido: dos pitidos graves y la voz lo explica; el paso se repite.
     else if (cue === 'invalid') { beep(330, 200); beep(330, 200, 0.28); buzz([200, 80, 200]); say(`El reposo no ha valido. ${INVALID_SAY[invalidKey(session.cur?.calibration)] ?? 'Quédate quieto.'} Repetimos.`); }
+    // Una fase en la que no se vio la cara: los dos pitidos graves y la voz dice por qué; en modo seguido se repite sola.
+    else if (cue === 'retry') {
+      beep(330, 200); beep(330, 200, 0.28); buzz([200, 80, 200]);
+      const c = session.cur;
+      say(`${c?.title ?? 'La fase'}: no te he visto bien la cara${c?.retry?.text ? ` (${c.retry.text})` : ''}. ${session.autoAdvanceMs != null ? 'Repetimos.' : 'Puedes repetirla.'}`);
+    }
     else if (cue === 'end') { beep(660); beep(660, 130, 0.22); buzz([80, 60, 80]); }
     else if (cue === 'done') { beep(660); beep(880, 130, 0.18); beep(1100, 200, 0.36); buzz([100, 60, 100, 60, 200]); say('Prueba terminada.'); }
     // Repeticiones: agudo y largo = «ahora»; grave = «suelta».
@@ -244,8 +250,10 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
       const exp = !x ? '' : x.closures != null
         ? `Esperado: ${x.closures} cierres en cada ojo.`
         : `Esperado: I ${x.left}, D ${x.right} (parpadeos o cierres).`;
-      const auto = s.autoAdvancing ? (invalid ? 'Modo seguido: el reposo se repite solo en unos segundos.' : 'Modo seguido: el siguiente paso empieza solo.') : '';
-      el.expect.textContent = [auto, exp, s.step.hint].filter(Boolean).join(' ');
+      const retry = c.retry;
+      const auto = s.autoAdvancing ? (invalid ? 'Modo seguido: el reposo se repite solo en unos segundos.' : retry ? 'Modo seguido: la fase se repite sola en unos segundos.' : 'Modo seguido: el siguiente paso empieza solo.') : '';
+      const poor = retry ? `No se vio bien la cara: ${retry.text}.${s.autoAdvancing ? '' : ' Conviene repetir la fase.'}` : c.phaseQuality && !c.phaseQuality.ok ? 'La cara volvió a no verse bien: la fase queda marcada como poco fiable.' : '';
+      el.expect.textContent = [poor, auto, exp, s.step.hint].filter(Boolean).join(' ');
       $(`${P}Next`).disabled = invalid; // un reposo no válido no se da por bueno: hay que repetirlo
       el.countedRow.hidden = !s.step.countable;
       el.counted.value = c.user.counted ?? '';

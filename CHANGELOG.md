@@ -10,6 +10,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - **Nunca durante un gesto:** ni entre el «ahora» y el «suelta» ni el segundo y medio siguiente. El aviso espera a la pausa y sale en cuanto se puede. No corta la voz del paso.
 - Lógica en `src/protocol/quality-voice.js` (pura, con tests); `snapshot().rep.sinceMs` dice el tiempo desde el último «ahora» o «suelta».
 
+### Añadido (repetir una fase en la que no se vio la cara)
+- **El parpadeo espontáneo y las fases de gesto se repiten una vez** si no se vio la cara: en el parpadeo, menos del 90 % del tiempo; en las demás, si no valen 2 de 3 repeticiones (una repetición vale si la cara se vio el 90 % de su ventana). En **modo seguido** se repite sola, tras dos pitidos graves y la voz diciendo por qué; sin modo seguido, suena el aviso y la pantalla de revisión permite seguir o repetir. Si falla otra vez, se sigue y el resumen la marca poco fiable.
+- **El resumen no cuenta las repeticiones sin cara** si quedan las necesarias, y lo anota (`reps-discarded`: «1 de 3 repeticiones descartada»).
+- Solo cuenta la cara no vista: la cara pequeña y la cabeza en movimiento siguen siendo notas. Taparse con la mano no se detecta como «cara perdida» (el modelo sigue detectando una cara).
+- `src/protocol/phase-quality.js`; 11 tests nuevos.
+
 ### Corregido (protocolo grabado)
 - **Las fases y las marcas caían cada vez más tarde en el vídeo grabado:** el reloj del MP4 de MediaRecorder se queda atrás respecto al de la sesión (~1 s en 4 min en el móvil del autor). Por eso la subida de la ceja salía más baja en el vídeo que en directo: la ceja empezaba a subir antes de la ventana de la repetición. Ahora se anota cuándo llega cada trozo de la grabación y se corrige la deriva al abrir el vídeo (`mediaClock`). El JSON del vídeo guarda `video.alignment` con la deriva corregida y, por fase, el desfase que queda entre el EAR del directo y el del vídeo, para comprobarlo.
 

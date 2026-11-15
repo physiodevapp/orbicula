@@ -37,6 +37,7 @@ export function protocolSteps(settings = {}) {
     durationMs: repDuration(reps),
     reps,
     say: `Espera al pitido agudo. Entonces ${sayWhat} Mantenlo hasta el pitido grave y relaja. ${n[0].toUpperCase()}${n.slice(1)} veces.`,
+    retryOnFaceLoss: true,
     ...(hint ? { hint } : {}),
   });
   return [
@@ -61,6 +62,7 @@ export function protocolSteps(settings = {}) {
       durationMs: naturalSec * 1000,
       say: 'Mira al frente y parpadea con naturalidad, sin forzar.',
       countable: true,
+      retryOnFaceLoss: true, // si la cara no se ve, se repite una vez (phase-quality.js)
     },
     gesture('soft', 'Cierre suave', 'cierra los ojos suavemente, como para dormir.', 'cierra los ojos suavemente, como para dormir.'),
     gesture('forced', 'Cierre forzado', 'aprieta los ojos con fuerza.', 'aprieta los ojos con fuerza.'),
