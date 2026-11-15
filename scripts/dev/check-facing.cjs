@@ -11,6 +11,16 @@ const check = (name, ok, extra = '') => { console.log(`${ok ? 'OK ' : 'MAL'} ${n
   if (arg('video')) args.push(`--use-file-for-fake-video-capture=${arg('video')}`);
   const browser = await chromium.launch({ args });
   const ctx = await browser.newContext({ viewport: { width: 380, height: 800 }, permissions: ['camera'] });
+  // Un móvil tiene dos cámaras (trasera y frontal); la simulada es una sola, y con una sola cámara y la frontal la app
+  // desactiva «Trasera» (un ordenador). Se simula una segunda cámara.
+  await ctx.addInitScript(() => {
+    const orig = navigator.mediaDevices.enumerateDevices.bind(navigator.mediaDevices);
+    navigator.mediaDevices.enumerateDevices = async () => {
+      const list = await orig();
+      const cam = list.find((d) => d.kind === 'videoinput');
+      return cam ? [...list, { deviceId: 'segunda', groupId: '', kind: 'videoinput', label: 'camera 1, facing front', toJSON() { return this; } }] : list;
+    };
+  });
   const page = await ctx.newPage();
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error' && !/XNNPACK/.test(m.text())) errors.push(m.text().slice(0, 160)); });

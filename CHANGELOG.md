@@ -4,6 +4,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Cambiado (cierre de la v0)
+- **Conclusiones de la prueba de concepto** en `docs/conclusiones-v0.md`: la respuesta a la pregunta de la v0, el estado de los siete criterios de aceptación, qué mide la app y con qué fiabilidad, limitaciones y recomendaciones para una v1.
+- **«Trasera» desactivada en un equipo que solo tiene la frontal** (un ordenador): antes, pulsarla no hacía nada y parecía un fallo. Vuelve a activarse si alguna vez se obtiene la trasera.
+- **«El ojo se abre» al subir las cejas, orientativo:** la diferencia de P03 entre directo y vídeo no se repitió en P04 (los dos ~0). Se anota en el resumen y en `schema.md`; el cálculo no cambia.
+- **El reposo no válido también espera a que acabe su aviso por voz** antes de repetirse (como la repetición de una fase).
+
 ### Añadido (avisos por voz en todas las fases del protocolo)
 - **Cara perdida:** en cualquier fase, si lleva 1,5 s sin verse, tono grave y «No te veo. Vuelve al centro»; se repite cada 10 s mientras siga.
 - **Cara pequeña fuera del reposo:** a los 3 s, una sola vez por fase («Te has alejado. Acércate un poco»). En el reposo sigue como antes («Cara pequeña. Acércate un poco»).

@@ -96,6 +96,7 @@ main {
 }
 .segmented button + button { border-left: 1px solid var(--border2); }
 .segmented button[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent); }
+.segmented button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ── Escena de cámara ───────────────────────────────────────────────────── */
 .stage {

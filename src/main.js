@@ -448,9 +448,17 @@ const pref = {
   remove(k) { try { localStorage.removeItem(`orbicula.${k}`); } catch { /* sin almacenamiento */ } },
 };
 
-// Si este navegador solo dio la frontal al pedir la trasera (un ordenador), se preselecciona la frontal.
+// Si este navegador solo dio la frontal al pedir la trasera (un ordenador), se preselecciona la frontal y el botón
+// «Trasera» se desactiva: en un equipo sin trasera, pulsarlo no hacía nada y parecía un fallo.
 state.facing = initialFacing(pref.get('onlyFront'));
 setPressed('facing', state.facing);
+function setRearAvailable(ok) {
+  document.querySelectorAll('[data-facing="rear"]').forEach((b) => {
+    b.disabled = !ok;
+    b.title = ok ? '' : 'Este equipo solo tiene cámara frontal';
+  });
+}
+setRearAvailable(pref.get('onlyFront') !== 'front');
 
 // Los fps solo se dan por bajos tras unos segundos estables (el arranque siempre va lento).
 let lowSince = null;
@@ -922,6 +930,7 @@ async function start() {
     const remember = facingToRemember(requested, info.facing, !!state.deviceId, cameras);
     if (remember === 'front') pref.set('onlyFront', 'front');
     else if (remember === null) pref.remove('onlyFront');
+    setRearAvailable(pref.get('onlyFront') !== 'front');
     state.facing = info.facing;
     setPressed('facing', info.facing);
     state.displayMirrored = info.facing === 'front';
