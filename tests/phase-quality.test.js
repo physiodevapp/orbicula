@@ -96,6 +96,17 @@ describe('repetir una fase en la que no se vio la cara', () => {
     expect(s.state).toBe('review');
   });
 
+  it('la pausa de la repetición puede alargarla quien dice el aviso (retry.pauseMs)', () => {
+    const { s, at, run } = make({ seguido: true });
+    s.start();
+    run(0, false);
+    s.cur.retry.pauseMs = 12000; // lo que tarda la voz en decir el motivo
+    at(1002 + RETRY_PAUSE_MS + 100);
+    expect(s.state).toBe('review'); // con los 7 s de siempre ya habría repetido
+    at(1002 + 12000);
+    expect(s.state).toBe('prep');
+  });
+
   it('con la cara a la vista no pasa nada', () => {
     const { s, cues, run } = make({ seguido: true });
     s.start();

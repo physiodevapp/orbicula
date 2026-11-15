@@ -1,7 +1,7 @@
 // Asistente de pruebas: guía paso a paso (GuidedSession), avisa sobre el vídeo con la cuenta
 // atrás y guarda el registro como un JSON que se descarga o se comparte. Todo en el
 // dispositivo: no hay ninguna llamada de red.
-import { GuidedSession, AUTO_PAUSE_MS, randomPattern } from '../assistant/session.js';
+import { GuidedSession, AUTO_PAUSE_MS, RETRY_PAUSE_MS, randomPattern } from '../assistant/session.js';
 import { PLANS, DEFAULT_PLAN, spokenPrepMs } from '../assistant/steps.js';
 import { cleanSettings, PROTOCOL_DEFAULTS } from '../protocol/steps.js';
 import { summarizeProtocol } from '../protocol/summary.js';
@@ -109,12 +109,19 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
     const voice = localVoice();
     if (!voice) return;
     try {
-      if (!queue) speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.voice = voice;
       u.lang = voice.lang;
       u.rate = 1.05;
-      speechSynthesis.speak(u);
+      // Chrome en Android a veces no dice lo que se pide justo después de cancelar una voz que aún hablaba: se deja
+      // pasar un momento entre cancelar y hablar (solo si había algo hablando).
+      if (!queue && (speechSynthesis.speaking || speechSynthesis.pending)) {
+        speechSynthesis.cancel();
+        setTimeout(() => { try { speechSynthesis.speak(u); } catch { /* sin voz */ } }, 150);
+      } else {
+        if (!queue) speechSynthesis.cancel();
+        speechSynthesis.speak(u);
+      }
     } catch { /* sin voz */ }
   }
 
@@ -131,7 +138,11 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
     else if (cue === 'retry') {
       beep(330, 200); beep(330, 200, 0.28); buzz([200, 80, 200]);
       const c = session.cur;
-      say(`${c?.title ?? 'La fase'}: no te he visto bien la cara${c?.retry?.text ? ` (${c.retry.text})` : ''}. ${session.autoAdvanceMs != null ? 'Repetimos.' : 'Puedes repetirla.'}`);
+      const text = `${c?.title ?? 'La fase'}: no te he visto bien la cara${c?.retry?.text ? ` (${c.retry.text})` : ''}. ${session.autoAdvanceMs != null ? 'Repetimos.' : 'Puedes repetirla.'}`;
+      // La repetición espera a que termine de decirlo: si empezara la cuenta atrás con la voz aún hablando, la
+      // explicación de la fase (que no se encola) cortaba este aviso y, en Android, a veces no llegaba a sonar.
+      if (c?.retry && el.voice.checked) c.retry.pauseMs = Math.max(RETRY_PAUSE_MS, spokenPrepMs(text, 0) - 1000);
+      say(text);
     }
     else if (cue === 'end') { beep(660); beep(660, 130, 0.22); buzz([80, 60, 80]); }
     else if (cue === 'done') { beep(660); beep(880, 130, 0.18); beep(1100, 200, 0.36); buzz([100, 60, 100, 60, 200]); say('Prueba terminada.'); }

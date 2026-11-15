@@ -100,7 +100,7 @@ const newResult = (step, attempt) => ({
   wantsFlow: !!step.flow, // el plan necesita el flujo óptico (para avisar si no llega)
   calibration: null, // calibración sobre este paso (si es el reposo; fase 5)
   phaseQuality: null, // ¿salió bien la fase? (phase-quality.js; solo los pasos que piden repetirse si falla)
-  retry: null, // { code, text }: salió mal y se va a repetir (solo el primer intento; en modo seguido, solo)
+  retry: null, // { code, text, pauseMs? }: salió mal y se va a repetir (solo el primer intento; en modo seguido, solo). pauseMs: espera hasta repetir (la pone la voz: lo que tarda en decirlo)
   detections: [], // eventos de la fase 5 (src/protocol/events.js), en ms desde t0
 });
 
@@ -208,7 +208,7 @@ export class GuidedSession {
     if (this.autoAdvancing) {
       const invalid = this.cur.status === 'invalid' || !!this.cur.retry;
       // `pauseAfterMs` del paso: pausa propia (el análisis del vídeo grabado reproduce los tiempos reales).
-      if (t - this.phaseStart >= (invalid ? RETRY_PAUSE_MS : (this.step.pauseAfterMs ?? this.autoAdvanceMs))) {
+      if (t - this.phaseStart >= (invalid ? (this.cur.retry?.pauseMs ?? RETRY_PAUSE_MS) : (this.step.pauseAfterMs ?? this.autoAdvanceMs))) {
         if (invalid) this.repeat();
         else this.next();
         return;
