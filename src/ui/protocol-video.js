@@ -106,7 +106,7 @@ export function createProtocolVideo({ getStream, analyzeVideoFile, saved = null,
     try {
       const mp4 = await openRecording(recorded.blob);
       // Fases y marcas en el reloj del vídeo, con su deriva corregida (si los trozos lo permiten).
-      const clock = mediaClock(recorded.timeline, mp4.samples, recorded.recStart);
+      const clock = mediaClock(recorded.timeline, mp4.samples, recorded.recStart, { anchorMs: recorded.windows[0]?.runStart });
       const windows = clock.method === 'chunks' ? protocolWindows(recorded.live, recorded.recStart, clock.map) : recorded.windows;
       recorded.windows = windows;
       recorded.durationMs = windows.at(-1).runEnd;
@@ -123,7 +123,7 @@ export function createProtocolVideo({ getStream, analyzeVideoFile, saved = null,
       const s = out.stats;
       // Comprobación: desfase que queda entre el EAR del directo y el del vídeo en cada fase (lo ideal, ~0).
       const check = out.results.map((r) => ({ id: r.id, ...(alignmentLag(recorded.live.find((x) => x.id === r.id), r) ?? {}) }));
-      const alignment = { method: clock.method, ...(clock.reason ? { reason: clock.reason } : {}), ...(clock.points ? { points: clock.points, driftMs: clock.driftMs } : {}), check };
+      const alignment = { method: clock.method, ...(clock.reason ? { reason: clock.reason } : {}), ...(clock.points ? { points: clock.points, driftMs: clock.driftMs, curve: clock.curve } : {}), check };
       analysis = { ...out, video: { source: 'recorded-during-protocol', sizeMB: Math.round((recorded.blob.size / 1048576) * 10) / 10, track: mp4.track, timing: mp4.timing, processing: s, windows: recorded.windows, alignment, capped: el.cap.checked } };
       el.progress.textContent = `Hecho: ${s.frames} fotogramas en ${mmss(s.elapsedMs)}. El vídeo se ha borrado de la memoria.`;
       renderSummary(el.summary, summarizeProtocol(out.results), out.results);

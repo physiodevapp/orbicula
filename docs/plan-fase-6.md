@@ -340,4 +340,8 @@ Una primera prueba de 1 GPU en la rama dio 8,1 fotogramas/s; repetida, 12,6, com
 3. Se corrige solo lo que crece desde el principio: el desfase inicial (+0,1 s) se deja como estaba. Si los trozos no cuadran (menos de 3, o más de un 5 % de deriva), no se toca nada.
 4. **Comprobación en cada análisis:** el JSON del vídeo guarda `video.alignment` con el método, la deriva corregida y, por fase, el desfase que queda entre el EAR del directo y el del vídeo (lo ideal, ~0; vacío si la correlación es menor de 0,5, p. ej. en una fase sin parpadeos). En la nube (cara sintética) sale `chunks` con 26 trozos.
 
-**Pendiente:** un protocolo grabado en el móvil para ver `video.alignment.check`. Si el desfase que queda es fijo y distinto de 0, falta restar la latencia de entrega de cada trozo.
+**Prueba en el móvil (2026-11-15, P03, `d3fc590`):** deriva detectada y corregida de **1,17 s** (73 trozos). El desfase que queda ya no crece: **+0,55, +0,53, +0,54, +0,51, +0,43 y +0,39 s** por fase (r 0,81–0,99), frente a +0,11 → −1,01 s sin corregir. **La subida de la ceja ya coincide:** directo 0,223 / 0,221 DI, vídeo 0,230 / 0,225 (antes 0,11 / 0,12). La comisura, también (0,49 / 0,48 frente a 0,52 / 0,49).
+
+**El desfase fijo de ~0,5 s:** la corrección tomaba como referencia el primer trozo. Al arrancar, el codificador llena su cola y los primeros trozos llegan antes, así que ese llenado contaba como deriva. Ahora la referencia es el inicio del primer paso (`anchorMs`): ahí el reloj queda como sin corregir (+0,1 s el día 10) y se corrige la deriva a partir de ese punto. El JSON guarda además la curva de la corrección (`video.alignment.curve`, cada ~5 s) para comprobarlo en la próxima prueba.
+
+**Pendiente:** otro protocolo grabado para ver el desfase que queda con la referencia nueva (lo esperado, ~0,1 s y fijo).

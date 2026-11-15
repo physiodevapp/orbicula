@@ -90,14 +90,17 @@ export function protocolWindows(results, recStartCam, map = (ms) => ms) {
  *
  * Con cada trozo que entrega MediaRecorder se anota cuándo llegó y cuántos bytes iban: el último fotograma
  * entero de esos bytes dice hasta qué tiempo del vídeo se había grabado en ese instante de la sesión. La
- * diferencia (sesión − vídeo), suavizada con una mediana de 5 trozos, es la deriva; se corrige solo lo que
- * crece desde el principio (el desfase inicial se deja como estaba, que es lo que se ha medido bien).
+ * diferencia (sesión − vídeo), suavizada con una mediana de 5 trozos, es la deriva. Se corrige respecto a la del
+ * instante `anchorMs` (el inicio del primer paso): al arrancar, el codificador llena su cola y los primeros trozos
+ * llegan antes, y tomar el primero como referencia dejaba un desfase fijo de ~0,5 s (protocolo del 2026-11-15).
+ * En el paso de referencia el reloj queda como estaba (lo que se midió el 2026-11-10: +0,1 s).
  * @param {{at:number, bytes:number}[]} timeline llegada de cada trozo (performance.now) y bytes acumulados
  * @param {{byte?:number, size:number, t:number, durationMs:number}[]} samples muestras del MP4
  * @param {number} recStart performance.now() al arrancar la grabación
- * @returns {{map:(ms:number)=>number, method:'chunks'|'identity', reason?:string, points?:number, driftMs?:number}}
+ * @param {{anchorMs?: number}} [o] instante de la sesión (desde el arranque) en que la corrección vale 0
+ * @returns {{map:(ms:number)=>number, method:'chunks'|'identity', reason?:string, points?:number, driftMs?:number, curve?:number[][]}}
  */
-export function mediaClock(timeline, samples, recStart) {
+export function mediaClock(timeline, samples, recStart, { anchorMs = null } = {}) {
   const identity = (reason) => ({ map: (ms) => ms, method: 'identity', reason });
   if (!Array.isArray(timeline) || timeline.length < 3 || !Number.isFinite(recStart)) return identity('sin tiempos de los trozos');
   const byByte = samples.filter((s) => Number.isFinite(s.byte)).map((s) => ({ end: s.byte + s.size, m: s.t + s.durationMs })).sort((a, b) => a.end - b.end);
@@ -116,21 +119,23 @@ export function mediaClock(timeline, samples, recStart) {
     const win = pts.slice(Math.max(0, i - 2), i + 3).map((q) => q.d).sort((a, b) => a - b);
     return { w: p.w, d: win[Math.floor(win.length / 2)] };
   });
-  const d0 = sm[0].d;
-  const span = sm.at(-1).w - sm[0].w;
-  const driftMs = sm.at(-1).d - d0;
-  // Más de un 5 % no es una deriva de reloj: algo no cuadra con los trozos, mejor no tocar nada.
-  if (!(span > 0) || Math.abs(driftMs) > 0.05 * span) return identity(`deriva fuera de rango (${Math.round(driftMs)} ms en ${Math.round(span)} ms)`);
-  const driftAt = (w) => {
-    if (w <= sm[0].w) return 0;
-    if (w >= sm.at(-1).w) return driftMs;
+  const dAt = (w) => {
+    if (w <= sm[0].w) return sm[0].d;
+    if (w >= sm.at(-1).w) return sm.at(-1).d;
     let i = 1;
     while (sm[i].w < w) i++;
     const a = sm[i - 1];
     const b = sm[i];
-    return a.d + ((b.d - a.d) * (w - a.w)) / (b.w - a.w || 1) - d0;
+    return a.d + ((b.d - a.d) * (w - a.w)) / (b.w - a.w || 1);
   };
-  return { map: (ms) => ms - driftAt(ms), method: 'chunks', points: pts.length, driftMs: Math.round(driftMs) };
+  const d0 = Number.isFinite(anchorMs) ? dAt(anchorMs) : sm[0].d;
+  const span = sm.at(-1).w - sm[0].w;
+  const driftMs = sm.at(-1).d - d0;
+  // Más de un 5 % no es una deriva de reloj: algo no cuadra con los trozos, mejor no tocar nada.
+  if (!(span > 0) || Math.abs(driftMs) > 0.05 * span) return identity(`deriva fuera de rango (${Math.round(driftMs)} ms en ${Math.round(span)} ms)`);
+  // Curva para el diagnóstico: [instante de la sesión, corrección] cada ~5 s (ms enteros).
+  const curve = sm.filter((_, i) => i % 5 === 0 || i === sm.length - 1).map((p) => [Math.round(p.w), Math.round(p.d - d0)]);
+  return { map: (ms) => ms - (dAt(ms) - d0), method: 'chunks', points: pts.length, driftMs: Math.round(driftMs), curve };
 }
 
 /**

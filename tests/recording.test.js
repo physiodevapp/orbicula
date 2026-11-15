@@ -144,6 +144,17 @@ describe('deriva del reloj del vídeo grabado', () => {
     expect(Math.abs(250000 - 250000 * RATE)).toBeGreaterThan(1000);
   });
 
+  it('con anchorMs, la corrección vale 0 en ese instante (el arranque del codificador no cuenta como deriva)', () => {
+    const { samples, timeline } = fakeRecording(120);
+    // Los tres primeros trozos llegan 400 ms antes (cola del codificador vacía al arrancar).
+    const early = timeline.map((c, i) => (i < 3 ? { ...c, at: c.at - 400 } : c));
+    const anchored = mediaClock(early, samples, recStart, { anchorMs: 16000 });
+    expect(Math.abs(anchored.map(16000) - 16000)).toBeLessThan(5);
+    // Desde ahí corrige solo la deriva del reloj: a los 100 s, lo que se ha quedado atrás desde los 16 s.
+    expect(Math.abs(anchored.map(100000) - (100000 - (100000 - 16000) * (1 - RATE)))).toBeLessThan(60);
+    expect(anchored.curve.length).toBeGreaterThan(5);
+  });
+
   it('sin deriva, no mueve nada', () => {
     const { samples, timeline } = fakeRecording(60, 1);
     const clock = mediaClock(timeline, samples, recStart);
