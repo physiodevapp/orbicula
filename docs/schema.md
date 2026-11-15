@@ -101,7 +101,7 @@ Sale del reposo del propio paciente; `null` si no hubo reposo.
 | `incompletePct` | `natural` | % | Parpadeos con menos del 80 % de ese cierre máximo. Orientativo: a ~27 fps se subestima el cierre de un parpadeo breve. |
 | `closure` | `soft`, `forced`, `smile` | 0–1 | Cierre del ojo: en los cierres, `1 − EAR mínimo / EAR en reposo`; en la sonrisa, el cierre medido sobre la mediana del EAR sin parpadeos (misma escala que en los cierres). |
 | `browRecruit`, `canthusRecruit` | `soft`, `forced` | × | Pico del movimiento de la ceja / del canto externo, en veces su p99 del reposo. |
-| `eyeOpening` | `brows` | 0–1 | Cuánto se abre el ojo al subir las cejas. |
+| `eyeOpening` | `brows` | 0–1 | Cuánto se abre el ojo al subir las cejas (1 − mediana del EAR sin parpadeos / EAR del reposo, con signo cambiado). **Orientativo:** en las pruebas va de 0 a 0,11 y no se repite entre sesiones ni entre el directo y el vídeo de la misma sesión. |
 | `browLift` | `brows` | DI | Desplazamiento de la ceja hacia arriba (flujo integrado). |
 | `browPeak` | `brows` | × | Pico de movimiento de la ceja, en veces su p99 del reposo. |
 | `smile` | `smile` | 0–1 | Blendshape `mouthSmile` de ese lado. **Casi satura** con una sonrisa amplia: da la dirección, no la magnitud. |
