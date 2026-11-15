@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { FrameRecorder, recordingType, MAX_BYTES } from '../src/video/recorder.js';
 import { protocolSteps } from '../src/protocol/steps.js';
-import { protocolWindows, windowedSteps, createVideoSession } from '../src/video/offline.js';
+import { protocolWindows, windowedSteps, createVideoSession, mediaClock, alignmentLag } from '../src/video/offline.js';
 import { repSchedule } from '../src/assistant/session.js';
 
 class FakeRecorder {
@@ -32,6 +32,7 @@ describe('grabador del vídeo del protocolo', () => {
     expect(r.startedAt).toBeGreaterThan(0);
     FakeRecorder.last.ondataavailable({ data: new Blob([new Uint8Array(1000)]) });
     FakeRecorder.last.ondataavailable({ data: new Blob([new Uint8Array(500)]) });
+    expect(r.timeline.map((c) => c.bytes)).toEqual([1000, 1500]); // bytes acumulados al llegar cada trozo
     const blob = await r.stop();
     expect(blob.size).toBe(1500);
     expect(r.active).toBe(false);
@@ -39,6 +40,7 @@ describe('grabador del vídeo del protocolo', () => {
     expect(r.blob()).toBeNull();
     expect(r.bytes).toBe(0);
     expect(r.startedAt).toBeNull();
+    expect(r.timeline).toEqual([]);
   });
 
   it('si la memoria pasa del tope, corta la grabación y lo avisa', async () => {
@@ -107,5 +109,69 @@ describe('el protocolo grabado se analiza en las mismas fases y marcas que en di
     const plan = repSchedule(soft.reps);
     expect(soft.marks.filter((m) => m.kind === 'hold')).toHaveLength(3);
     soft.marks.forEach((m, i) => expect(Math.abs(m.t - plan[i].at)).toBeLessThanOrEqual(100));
+  });
+});
+
+describe('deriva del reloj del vídeo grabado', () => {
+  // Vídeo de 30 fps cuyo reloj avanza un 0,5 % más despacio que el de la sesión; un trozo por segundo de sesión,
+  // que llega 80 ms después de su último fotograma. Cada fotograma ocupa 1000 bytes.
+  const RATE = 0.995;
+  const LAT = 80;
+  const recStart = 5000;
+  function fakeRecording(seconds, rate = RATE) {
+    const samples = [];
+    const timeline = [];
+    let byte = 0;
+    for (let k = 0; k * 33.333 < seconds * 1000; k++) {
+      const wall = k * 33.333; // instante de captura (sesión, desde el arranque)
+      samples.push({ byte, size: 1000, t: wall * rate, durationMs: 33.333 * rate, wall });
+      byte += 1000;
+    }
+    for (let s = 1; s <= seconds; s++) {
+      const bytes = samples.filter((x) => x.wall <= s * 1000 - 33.333).length * 1000;
+      timeline.push({ at: recStart + s * 1000 + LAT, bytes });
+    }
+    return { samples, timeline };
+  }
+
+  it('corrige la deriva: un instante de la sesión cae en su tiempo del vídeo (error < 60 ms tras 4 min)', () => {
+    const { samples, timeline } = fakeRecording(270);
+    const clock = mediaClock(timeline, samples, recStart);
+    expect(clock.method).toBe('chunks');
+    expect(clock.driftMs).toBeGreaterThan(1000); // ~1,3 s en 4,5 min
+    for (const w of [20000, 120000, 250000]) expect(Math.abs(clock.map(w) - w * RATE)).toBeLessThan(60);
+    // Sin corregir, a los 250 s el error sería de 1,25 s.
+    expect(Math.abs(250000 - 250000 * RATE)).toBeGreaterThan(1000);
+  });
+
+  it('sin deriva, no mueve nada', () => {
+    const { samples, timeline } = fakeRecording(60, 1);
+    const clock = mediaClock(timeline, samples, recStart);
+    for (const w of [1000, 30000, 59000]) expect(Math.abs(clock.map(w) - w)).toBeLessThan(5);
+  });
+
+  it('sin tiempos de los trozos o con algo que no cuadra, deja el reloj como estaba', () => {
+    const { samples, timeline } = fakeRecording(60);
+    expect(mediaClock([], samples, recStart).method).toBe('identity');
+    expect(mediaClock(timeline, samples.map(({ byte, ...x }) => x), recStart).method).toBe('identity');
+    const absurd = fakeRecording(60, 0.8);
+    expect(mediaClock(absurd.timeline, absurd.samples, recStart).method).toBe('identity');
+    expect(mediaClock(timeline, samples, recStart).map(1234)).not.toBe(NaN);
+  });
+
+  it('protocolWindows usa el reloj corregido', () => {
+    const results = [{ id: 'rest', status: 'completed', t0: recStart + 100000, plannedMs: 30000 }];
+    const [w] = protocolWindows(results, recStart, (ms) => ms * RATE);
+    expect(w.runStart).toBeCloseTo(100000 * RATE, 3);
+    expect(w.runEnd).toBeCloseTo(130000 * RATE, 3);
+  });
+
+  it('alignmentLag mide el desfase que queda entre el EAR del directo y el del vídeo', () => {
+    const t = Array.from({ length: 900 }, (_, i) => i * 33);
+    const ear = (x) => (Math.floor(x / 3000) % 2 ? 0.1 : 0.3) + 0.01 * Math.sin(x / 170);
+    const step = (shift) => ({ series: { t, left: { ear: t.map((x) => ear(x - shift)) }, right: { ear: t.map((x) => ear(x - shift)) } } });
+    expect(Math.abs(alignmentLag(step(0), step(400)).lagMs - 400)).toBeLessThanOrEqual(20); // en el vídeo pasa 0,4 s más tarde
+    expect(Math.abs(alignmentLag(step(0), step(-700)).lagMs + 700)).toBeLessThanOrEqual(20);
+    expect(alignmentLag(step(0), step(0)).r).toBeGreaterThan(0.99);
   });
 });

@@ -199,7 +199,7 @@ El vídeo de la app de cámara no sabe en qué fase está cada momento. Hay tres
   - **Parpadeos:** el vídeo detecta un 40 % más y su duración es la de un parpadeo real (100–150 ms); en directo salen el doble de largos. Era lo esperado.
   - **Cierres y asimetrías:** iguales en las dos formas.
   - **Co-activación:** más alta y más limpia en el vídeo.
-  - **Subida de la ceja:** más baja en el vídeo, con distinta asimetría. Sin explicar; son medidas de flujo y no sé si cambian por la tasa de fotogramas o por el tamaño de la franja. Pendiente de mirar.
+  - **Subida de la ceja:** más baja en el vídeo, con distinta asimetría. **Explicado el 2026-11-15:** no era la medida, era la deriva del reloj del vídeo (ver «Deriva del reloj del vídeo grabado» al final).
 
 ## Paso 6d (en curso; pendiente de la prueba en el móvil)
 - **Criterio de aceptación 1, el aviso:** si el análisis de la cara en directo va por debajo de 24/s durante 5 s seguidos, sale un aviso con la velocidad actual que propone el vídeo grabado, o marcar «Grabar el vídeo» al hacer el protocolo. No sale mientras se procesa un vídeo (ahí no hay prisa) y se quita solo si la cámara se para. El aviso de los fps de la cámara ya no dice «llegará en una fase posterior».
@@ -317,3 +317,27 @@ Una primera prueba de 1 GPU en la rama dio 8,1 fotogramas/s; repetida, 12,6, com
 - Un vídeo analizado ahora puede dar valores muy ligeramente distintos de uno analizado antes con la GPU: el EAR, unas centésimas (el ruido del EAR en reposo es igual con las dos, desviación típica 0,015–0,018), y algún cierre del 25–28 % que está justo en el umbral. Cada sesión se compara consigo misma, así que no rompe nada; para comparar dos vídeos, analízalos con la misma opción. El informe guarda la opción usada (`video.processing.face`).
 - El umbral de flujo del reposo salió la mitad con CPU (0,006 frente a 0,013), pero no por la CPU: el percentil 95 del reposo es el mismo con las dos (0,003). El umbral es el **máximo** del reposo limpio, y con GPU entró en él una sacudida suelta del párpado (el propio análisis lo avisaba). **Pendiente aparte:** hacer el umbral más robusto frente a un solo pico.
 - **Medido después (2026-11-14): en directo, no.** Con el protocolo completo en la cámara trasera a 720p, la GPU dio 24,1–28,8 análisis/s por fase (34–40 ms) y la CPU 22,4–23,9 (41–43 ms), con más ruido del EAR. En directo la CPU la comparten la cámara y el flujo, y el modo VIDEO le sienta mejor a la GPU. El directo sigue con la GPU (hay un selector para medirlo en otros móviles).
+
+## Deriva del reloj del vídeo grabado (2026-11-15)
+**Síntoma:** en el protocolo grabado del 2026-11-10, la subida de la ceja salía más baja en el vídeo (0,11 / 0,12 DI) que en directo (0,17 / 0,22).
+
+**Lo que no era:** ni la medida ni la tasa de fotogramas. La velocidad de la ceja se normaliza por el intervalo de cada par, el vídeo no tenía huecos y la velocidad máxima de subida era la misma. **La primera repetición daba lo mismo** en los dos (0,21 / 0,22); en el vídeo, la 2 y la 3 se quedaban en 0,04–0,08.
+
+**Lo que era:** en el vídeo la ceja **empezaba a subir antes del pitido «ahora»**, y la ventana de la medida empieza en el pitido. Correlando el EAR del directo con el del vídeo (`alignmentLag`), lo que pasa en el directo aparece en el vídeo cada vez antes de donde lo coloca la ventana:
+
+| Fase | Reposo | Parpadeo | Cierre suave | Cierre forzado | Cejas | Sonrisa |
+|---|---|---|---|---|---|---|
+| Desfase (r) | +0,11 s (0,86) | −0,22 s (0,79) | −0,43 s (1,00) | −0,59 s (0,99) | **−0,84 s** (0,97) | −1,01 s (0,87) |
+
+- El reloj de la sesión es bueno: los inicios de las fases según la cámara coinciden con la hora del sistema (±0,05 s en 4 min).
+- **El MP4 de MediaRecorder se va quedando atrás:** ~1,1 s en ~4 min (~0,5 %), a tirones (0,33 s en el parpadeo, 0,2 s en el cierre suave), más propio de parones del grabador que de un reloj lento.
+- Las marcas se colocaban como «instante de la sesión − arranque de la grabación», suponiendo los dos relojes iguales.
+- Afecta a todo lo que depende de la ventana de las repeticiones en el vídeo: la subida de la ceja (empieza antes de la ventana), y en menor medida la sonrisa y su co-activación. Los parpadeos no (se miden en todo el paso).
+
+**Corrección (`mediaClock`, `src/video/offline.js`):**
+1. Al grabar, con cada trozo de 1 s de MediaRecorder se anota cuándo llegó y cuántos bytes iban (`FrameRecorder.timeline`).
+2. Al abrir el vídeo, el último fotograma entero de esos bytes dice hasta qué tiempo del vídeo se había grabado en ese instante. La diferencia (sesión − vídeo), con una mediana de 5 trozos, es la deriva.
+3. Se corrige solo lo que crece desde el principio: el desfase inicial (+0,1 s) se deja como estaba. Si los trozos no cuadran (menos de 3, o más de un 5 % de deriva), no se toca nada.
+4. **Comprobación en cada análisis:** el JSON del vídeo guarda `video.alignment` con el método, la deriva corregida y, por fase, el desfase que queda entre el EAR del directo y el del vídeo (lo ideal, ~0).
+
+**Pendiente:** un protocolo grabado en el móvil para ver `video.alignment.check`. Si el desfase que queda es fijo y distinto de 0, falta restar la latencia de entrega de cada trozo.
