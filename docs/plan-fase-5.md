@@ -225,6 +225,11 @@ Se probaron tres reglas sobre los seis JSON con flujo (17:47, 18:38, 18:55, 19:1
 - **Se queda el máximo del reposo**, y la calibración da un **aviso** (`warning`) cuando el máximo supera 6 veces el p95 del reposo. En los JSON, la razón es de 1,4 a 2,5 en los reposos normales y de 14 a 23 en el de la sacudida.
 - El aviso sale en la revisión y en la franja de calidad: «Umbral alto en el ojo…: lo ha fijado una sacudida suelta del párpado durante el reposo. Vale, pero detectará menos contracciones finas; si quieres más sensibilidad, repite el reposo».
 
+**Umbral con una sacudida suelta: revisado el 2026-11-14 y descartado.** Se probó apartar la sacudida **solo cuando salta el aviso** (máximo > 6 × p95): quitar [pico − 0,5 s, pico + 1 s] y volver a tomar el máximo, hasta dos veces. Con `scripts/dev/replay-events.mjs` sobre los seis JSON:
+- Las cinco sesiones sin aviso quedan **idénticas** (no se tocan).
+- En la de la sacudida (protocolo de las 13:38) el umbral baja de 0,063 a **0,0011 DI** (casi el suelo): lo que queda del reposo es muy quieto, y casi todo lo que estaba por encima del p95 iba pegado a la sacudida. Con ese umbral aparecen contracciones en fases sin gesto: 2+1 → 9+7 en el parpadeo espontáneo y 1+0 → 2+1 en el propio reposo.
+- **Se queda el máximo con el aviso.** Repetir el reposo sigue siendo la forma de recuperar sensibilidad. El análisis de vídeo del 2026-11-14 (1 GPU) dio un caso así en el ojo derecho (máximo/p95 = 6,3), con su aviso.
+
 ### 2–5. Métricas por fase y lado (`src/protocol/summary.js`, `src/protocol/spectrum.js`)
 `summarizeProtocol(pasos)` da, para cada fase y lado:
 - sus métricas;

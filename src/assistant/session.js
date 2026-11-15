@@ -14,7 +14,7 @@ export const RETRY_PAUSE_MS = 7000;
 const r3 = (v) => (Number.isFinite(v) ? Math.round(v * 1000) / 1000 : null);
 
 /** Señales que se guardan por lado en cada paso. */
-export const SERIES_KEYS = ['ear', 'aperture', 'blink', 'lookDown', 'lookUp', 'irisH', 'irisV', 'smile'];
+export const SERIES_KEYS = ['ear', 'aperture', 'blink', 'lookDown', 'lookUp', 'irisH', 'irisV', 'smile', 'cornerOut', 'cornerUp'];
 const emptySide = () => Object.fromEntries(SERIES_KEYS.map((k) => [k, []]));
 
 /**

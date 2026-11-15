@@ -56,9 +56,11 @@ export const ROWS = {
     ['browPeak', 'Ceja (pico)', 'times'],
   ],
   smile: [
-    ['smile', 'Sonrisa de la boca', 'pct'],
+    ['commissure', 'Comisura de la boca (DI)', 'di', 'Cuánto se desplaza la comisura desde su reposo, en distancias intercantales.'],
+    ['commissureLift', 'Subida de la comisura (DI)', 'di'],
     ['closure', 'El ojo se cierra', 'pct'],
-    ['coactivation', 'Co-activación ojo–boca (r)', 'num2', 'Correlación entre la sonrisa y el cierre del ojo del mismo lado.'],
+    ['coactivationCorner', 'Co-activación ojo–boca (r)', 'num2', 'Correlación entre el desplazamiento de la comisura y el cierre del ojo del mismo lado.'],
+    ['smile', 'Sonrisa (modelo, 0–100 %)', 'pct', 'Estimación del modelo (blendshape): casi satura con una sonrisa amplia.'],
     ['contractions', 'Contracciones finas', 'count'],
   ],
 };

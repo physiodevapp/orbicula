@@ -89,6 +89,18 @@ describe('lateralidad (a la cara del paciente)', () => {
     expect(mirrored.left.ear).toBeLessThan(mirrored.right.ear);
   });
 
+  it('comisuras: la que sonríe a la izquierda de la imagen es la derecha sin espejo y la izquierda con espejo', () => {
+    const face = makeFace({ smileRight: 0.02 }); // se mueve la comisura del lado «right» del mallado
+    const rest = buildRois(makeFace(), FRAME);
+    const plain = buildRois(face, FRAME, { frameMirrored: false });
+    expect(plain.mouth.right.out).toBeGreaterThan(rest.mouth.right.out);
+    expect(plain.mouth.right.up).toBeGreaterThan(rest.mouth.right.up);
+    expect(plain.mouth.left).toEqual(rest.mouth.left);
+    const mirrored = buildRois(face, FRAME, { frameMirrored: true });
+    expect(mirrored.mouth.left.out).toBeGreaterThan(rest.mouth.left.out);
+    expect(mirrored.mouth.right).toEqual(rest.mouth.left);
+  });
+
   it('blendshapes: se asignan al lado del paciente y se corrigen con el espejo', () => {
     const cats = [
       { categoryName: 'eyeBlinkRight', score: 0.9 },
@@ -176,4 +188,46 @@ describe('dibujo (display)', () => {
     expect(toDisplay(p, rect, true).x).toBeCloseTo(rect.x + rect.w);
     expect(toDisplay({ x: 720, y: 1280 }, rect, true).x).toBeCloseTo(rect.x);
   });
+});
+
+describe('comisuras de la boca', () => {
+  const near = (a, b) => {
+    for (const side of ['left', 'right']) {
+      expect(a[side].out).toBeCloseTo(b[side].out, 6);
+      expect(a[side].up).toBeCloseTo(b[side].up, 6);
+    }
+  };
+  const transform = (lm, f) => lm.map((p) => f(p));
+
+  it('en distancias intercantales: con la cara de frente, la comisura queda fuera y por debajo', () => {
+    const { mouth } = buildRois(makeFace(), FRAME);
+    // origen en x 0,5; comisuras internas en 0,43 y 0,57 (0,14 de distancia); comisura en 0,42 y 0,58.
+    expect(mouth.right.out).toBeCloseTo(0.08 / 0.14, 6);
+    expect(mouth.left.out).toBeCloseTo(0.08 / 0.14, 6);
+    expect(mouth.right.up).toBeLessThan(0);
+  });
+
+  it('no cambia al acercar la cámara ni al inclinar la cabeza', () => {
+    const base = buildRois(makeFace({ smileLeft: 0.01 }), FRAME).mouth;
+    const a = (20 * Math.PI) / 180;
+    const moved = transform(makeFace({ smileLeft: 0.01 }), (p) => {
+      // Ampliar 1,5 veces y girar 20° en el plano, alrededor del centro, en píxeles (el frame no es cuadrado).
+      const x = (p.x - 0.5) * FRAME.width * 1.5;
+      const y = (p.y - 0.5) * FRAME.height * 1.5;
+      return { x: 0.5 + (x * Math.cos(a) - y * Math.sin(a)) / FRAME.width, y: 0.5 + (x * Math.sin(a) + y * Math.cos(a)) / FRAME.height, z: p.z * 1.5 };
+    });
+    near(buildRois(moved, FRAME).mouth, base);
+  });
+
+  it('no cambia al girar la cabeza a un lado (usa la profundidad del modelo)', () => {
+    const base = buildRois(makeFace({ smileRight: 0.01 }), FRAME).mouth;
+    const a = (25 * Math.PI) / 180;
+    const turned = transform(makeFace({ smileRight: 0.01 }), (p) => {
+      const x = (p.x - 0.5) * FRAME.width;
+      const z = p.z * FRAME.width;
+      return { x: 0.5 + (x * Math.cos(a) + z * Math.sin(a)) / FRAME.width, y: p.y, z: (-x * Math.sin(a) + z * Math.cos(a)) / FRAME.width };
+    });
+    near(buildRois(turned, FRAME).mouth, base);
+  });
+
 });

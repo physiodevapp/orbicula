@@ -215,9 +215,9 @@ describe('nombres de las métricas', () => {
 describe('CSV', () => {
   it('cara: cabecera, una fila por muestra, tiempos en ms, vacíos para los null y sin texto del paciente', () => {
     const lines = faceCsv(results).trimEnd().split('\n');
-    expect(lines[0]).toBe('t_ms,phase,left_ear,left_aperture,left_blink,left_smile,left_closure,right_ear,right_aperture,right_blink,right_smile,right_closure,closure_frozen');
+    expect(lines[0]).toBe('t_ms,phase,left_ear,left_aperture,left_blink,left_smile,left_closure,right_ear,right_aperture,right_blink,right_smile,right_closure,closure_frozen,left_cornerOut,left_cornerUp,right_cornerOut,right_cornerUp');
     expect(lines).toHaveLength(1 + collectSeries(phaseWindows(results)).face.t.length);
-    expect(lines[1].split(',')).toHaveLength(13);
+    expect(lines[1].split(',')).toHaveLength(17);
     expect(lines[1].startsWith('0,rest,0.3,0.1,0.05,0.02,')).toBe(true);
     expect(faceCsv(results)).not.toMatch(/undefined|NaN|null/);
   });

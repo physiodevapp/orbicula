@@ -28,7 +28,7 @@ v0, prueba de concepto. Hecho: **fase 1** (base: cámara, selector, fps y resolu
   | Frontal | 29.9 fps · 2160×3440 | 29.0 fps · 720×1280 |
 
   Ambas anuncian 60 fps, pero si solo se piden como «ideal» Chrome se queda en 30: por eso la prioridad «fps» exige un mínimo. **La prioridad por defecto es «fps» (720p)**: el análisis de la cara tarda lo mismo con cualquier resolución (el modelo reduce la imagen) y con la trasera a 4K, copiar cada frame al worker cuesta ~7 ms y el análisis cae a 16–21 por segundo, por debajo de los 24 mínimos. «Resolución» queda como opción. La frontal acepta el mínimo pero sigue dando unos 30. Con poca luz la cámara alarga la exposición y baja los fps (la frontal llegó a 24). **Para medir en directo, usa la trasera con prioridad «fps» y buena luz.**
-- **Privacidad:** la imagen se procesa en el propio móvil. No se envía nada a ningún servidor y el vídeo no se guarda. La librería de MediaPipe intenta enviar un registro de uso a `odml.pa.googleapis.com`: lo bloquean dos barreras independientes, la CSP de `public/_headers` y una barrera en el código (`src/privacy/`), que funciona aunque el hosting no sirva cabeceras. La sección «Verificación de lado» muestra qué dominios se han bloqueado.
+- **Privacidad:** la imagen se procesa en el propio móvil. No se envía nada a ningún servidor y el vídeo no se guarda. La librería de MediaPipe intenta enviar un registro de uso a `odml.pa.googleapis.com`: lo bloquean dos barreras independientes, la CSP de `public/_headers` y una barrera en el código (`src/privacy/`), que funciona aunque el hosting no sirva cabeceras. La sección «Detalle técnico del análisis y verificación de lado» muestra qué dominios se han bloqueado.
 
 ## Protocolo clínico
 
@@ -54,7 +54,7 @@ Se pueden cambiar la duración del reposo y del parpadeo, y las repeticiones de 
 - **Parpadeos:** frecuencia, duración y cierre respecto al **cierre máximo del propio ojo**.
 - **Cierres:** cuánto cierra cada ojo y cuánto se mueven la ceja y el canto externo.
 - **Cejas:** cuánto se abre el ojo y cuánto sube la ceja.
-- **Sonrisa:** la sonrisa de cada lado, cuánto se cierra el ojo con ella y la **co-activación ojo–boca**. Una sonrisa amplia sana también cierra algo el ojo: lo que informa es la **diferencia entre lados** y su evolución entre sesiones, no el valor solo.
+- **Sonrisa:** cuánto se desplaza y cuánto sube la **comisura de la boca** de cada lado desde su reposo (en distancias intercantales; los puntos de color en la boca son las comisuras que se miden), cuánto se cierra el ojo con ella y la **co-activación ojo–boca** (correlación entre el desplazamiento de la comisura y el cierre del ojo del mismo lado). También sale la sonrisa que estima el modelo, que casi satura con una sonrisa amplia. Una sonrisa amplia sana también cierra algo el ojo: lo que informa es la **diferencia entre lados** y su evolución entre sesiones, no el valor solo.
 - **Actividad rítmica** de los párpados (pico espectral, para mioquimias), en el reposo y el parpadeo.
 - **Contracciones finas:** subidas del cierre por flujo por encima del umbral del reposo, de más de 0,5 s, sin parpadeo ni movimiento de la cabeza.
 - **Avisos:** fases «poco fiables» (cabeza movida, cara perdida o análisis lento, por debajo de 24 por segundo) y umbral alto en el reposo.

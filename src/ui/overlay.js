@@ -78,6 +78,14 @@ export class Overlay {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
       ctx.fillText(LABEL[side], label.x, label.y - 6);
+      // Comisura de la boca de ese lado (la sonrisa se mide con ella).
+      const corner = result.rois.mouth?.[side]?.px;
+      if (corner) {
+        const d = toDisplay(corner, rect, displayMirrored);
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, 5, 0, 2 * Math.PI);
+        ctx.fill();
+      }
     }
 
     ctx.strokeStyle = ctx.fillStyle = this.colors.reference;

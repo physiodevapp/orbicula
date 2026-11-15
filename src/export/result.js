@@ -12,7 +12,7 @@ import { provenance } from './provenance.js';
 export const SCHEMA_VERSION = '1';
 export const SIDES = ['left', 'right'];
 /** Señales de la cara que van en `timeseries` (por lado), y de dónde salen en los pasos grabados. */
-export const SERIES = { ear: 'ear', aperture: 'aperture', blink: 'blink', smile: 'smile' };
+export const SERIES = { ear: 'ear', aperture: 'aperture', blink: 'blink', smile: 'smile', cornerOut: 'cornerOut', cornerUp: 'cornerUp' };
 
 /** Código del participante: letras sin tilde, números, «-» y «_», hasta 24. Cualquier otra cosa se rechaza. */
 export const CODE_PATTERN = /^[A-Za-z0-9_-]{1,24}$/;
@@ -74,7 +74,8 @@ function nearest(flowT, flowV, t, maxGap = 40) {
  * @returns {{face: {t:number[], phase:string[], frozen:(0|1|null)[], left:object, right:object}, flow: {t:number[], phase:string[], closure:{left:number[],right:number[]}, frozen:number[], head:{u:number[],v:number[]}}}}
  */
 export function collectSeries(windows) {
-  const face = { t: [], phase: [], frozen: [], left: { ear: [], aperture: [], blink: [], smile: [], closure: [] }, right: { ear: [], aperture: [], blink: [], smile: [], closure: [] } };
+  const sideSeries = () => ({ ...Object.fromEntries(Object.keys(SERIES).map((k) => [k, []])), closure: [] });
+  const face = { t: [], phase: [], frozen: [], left: sideSeries(), right: sideSeries() };
   const flow = { t: [], phase: [], closure: { left: [], right: [] }, frozen: [], head: { u: [], v: [] } };
   for (const w of windows) {
     const s = w.step;

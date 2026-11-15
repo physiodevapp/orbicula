@@ -7,7 +7,7 @@
 // derivada, anclada a la comisura externa. Las proporciones de abajo son provisionales y se
 // ajustan al ver las ROI en el móvil.
 
-import { EYES, NASAL_DORSUM, FACE_WIDTH, EAR_PAIR_POSITIONS, CENTER_PAIR_POSITION, IRIS_CENTERS, POSE_POINTS } from './indices.js';
+import { EYES, NASAL_DORSUM, FACE_WIDTH, EAR_PAIR_POSITIONS, CENTER_PAIR_POSITION, IRIS_CENTERS, POSE_POINTS, MOUTH_CORNERS } from './indices.js';
 import { SIDES, patientSide } from './laterality.js';
 
 /** Proporciones respecto al ancho del ojo (distancia entre comisuras). */
@@ -128,6 +128,50 @@ function eyeRois(lm, f, eye, intercanthal) {
 }
 
 /**
+ * Posición de las comisuras de la boca en un sistema de la propia cara, en 3D (z del modelo en la escala de x):
+ *   origen: punto medio de las comisuras internas de los ojos;
+ *   `out`: hacia fuera, por el lado de esa comisura (eje entre las comisuras internas de los ojos);
+ *   `up`: hacia arriba (del dorso nasal a la glabela, sin la parte que va a lo largo de `out`);
+ *   unidad: la distancia intercantal (3D).
+ * Así no cambia con la distancia a la cámara, la inclinación de la cabeza ni, en primera aproximación, el giro:
+ * en 2D, con la cabeza girada, la comisura del lado lejano parecería más cerca de la línea media. La sonrisa
+ * lleva la comisura hacia fuera (+out) y arriba (+up). Lo que se mide es el cambio respecto al reposo
+ * (src/protocol/summary.js), no la posición absoluta.
+ * @returns {Record<'right'|'left', {out:number, up:number}> | null} por lado del MALLADO
+ */
+function mouthCorners(lm, f) {
+  if (lm.length <= Math.max(...MOUTH_CORNERS)) return null;
+  const p3 = (i) => ({ x: lm[i].x * f.width, y: lm[i].y * f.height, z: (lm[i].z ?? 0) * f.width });
+  const s3 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
+  const dot3 = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+  const len3 = (a) => Math.sqrt(dot3(a, a));
+  const ir = p3(EYES.right.inner);
+  const il = p3(EYES.left.inner);
+  const o = { x: (ir.x + il.x) / 2, y: (ir.y + il.y) / 2, z: (ir.z + il.z) / 2 };
+  const across = s3(il, ir); // del ojo derecho del mallado al izquierdo
+  const scale = len3(across);
+  if (!(scale > 0)) return null;
+  const ax = { x: across.x / scale, y: across.y / scale, z: across.z / scale };
+  // «Arriba»: del final del dorso nasal a la glabela, quitándole la componente a lo largo de `ax`.
+  const raw = s3(p3(NASAL_DORSUM[0]), p3(NASAL_DORSUM[NASAL_DORSUM.length - 1]));
+  const k = dot3(raw, ax);
+  const upv = { x: raw.x - k * ax.x, y: raw.y - k * ax.y, z: raw.z - k * ax.z };
+  const ul = len3(upv);
+  if (!(ul > 0)) return null;
+  const ay = { x: upv.x / ul, y: upv.y / ul, z: upv.z / ul };
+  const outer = { right: p3(EYES.right.outer), left: p3(EYES.left.outer) };
+  const out = {};
+  for (const i of MOUTH_CORNERS) {
+    const c = p3(i);
+    const side = len3(s3(c, outer.right)) <= len3(s3(c, outer.left)) ? 'right' : 'left';
+    const v = s3(c, o);
+    const along = dot3(v, ax) / scale; // + hacia el ojo izquierdo del mallado
+    out[side] = { out: side === 'left' ? along : -along, up: dot3(v, ay) / scale, px: { x: c.x, y: c.y } }; // px: para dibujarla
+  }
+  return out.left && out.right ? out : null;
+}
+
+/**
  * ROI de un frame.
  * @param {{x:number,y:number}[]} lm landmarks normalizados (0–1) del frame
  * @param {{width:number,height:number}} frame tamaño del frame en píxeles
@@ -169,6 +213,10 @@ export function buildRois(lm, frame, { frameMirrored = false } = {}) {
     const e = EYES[meshSide];
     out.anchors3d[patientSide(meshSide, frameMirrored)] = { upperLid: mean3(e.upper), lowerLid: mean3(e.lower), brow: mean3(e.brow), canthus: p3(e.outer) };
   }
+
+  // Comisuras de la boca por lado del paciente (o null si el modelo no da los puntos).
+  const corners = mouthCorners(lm, frame);
+  out.mouth = corners ? { [patientSide('left', frameMirrored)]: corners.left, [patientSide('right', frameMirrored)]: corners.right } : null;
 
   out.meta = {
     intercanthal,

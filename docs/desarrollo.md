@@ -25,7 +25,7 @@ node scripts/dev/check-app.cjs --video /tmp/caras/crop.y4m --query '?escala=0.25
 node scripts/dev/check-app.cjs --url http://127.0.0.1:4174/   # sin cabeceras; sin --video = sin cara
 node scripts/dev/check-app.cjs --video /tmp/caras/crop.y4m --flow --wait 15000   # con el flujo óptico activado
 ```
-Vuelca las pastillas y el panel «Verificación de lado», las peticiones externas que salieron y los errores de consola (incluidas las llamadas que bloqueó la barrera). Playwright y Chromium están instalados de forma global: `require('playwright')`, sin `npm install`.
+Vuelca las pastillas y el panel «Detalle técnico del análisis y verificación de lado», las peticiones externas que salieron y los errores de consola (incluidas las llamadas que bloqueó la barrera). Playwright y Chromium están instalados de forma global: `require('playwright')`, sin `npm install`.
 
 Parámetros útiles en la dirección: `?escala=0.25` (acorta el asistente y la prueba de rendimiento) y `?analysis=main` (análisis en el hilo principal).
 
@@ -89,6 +89,12 @@ Con la foto entera (cara pequeña, ojo ≈ 35 px) comprueba el aviso en pantalla
 node scripts/dev/check-facing.cjs --video /tmp/caras/lid.y4m
 ```
 Elige «Frontal» antes de encender (no debe encender la cámara), comprueba que queda marcado en los controles, que «Activar cámara» usa lo elegido y que con la cámara encendida cambiar de cámara la reinicia. Tarda unos 30 s.
+
+## Cámara recordada y análisis en directo con la CPU
+```bash
+node scripts/dev/check-camera-prefs.cjs
+```
+Simula una cámara que dice ser la frontal (como la de un ordenador): al pedir la trasera da la frontal, y al recargar la tarjeta de inicio ya marca «Frontal»; si después da la trasera, se olvida. Luego elige «CPU» en «Análisis de la cara en directo» y comprueba que el modelo se recarga en la CPU y que se recuerda. Tarda unos 40 s.
 
 ## Integración con el hub por postMessage (fase 7c)
 ```bash

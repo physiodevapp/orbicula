@@ -10,7 +10,7 @@ import './styles/tokens.css';
 import './styles/app.css';
 
 import { Camera } from './capture/camera.js';
-import { describeError, fpsLevel, REQUESTED_FPS, PRIORITIES, STRICT_MIN_FPS } from './capture/camera-logic.js';
+import { describeError, fpsLevel, REQUESTED_FPS, PRIORITIES, STRICT_MIN_FPS, facingToRemember, initialFacing } from './capture/camera-logic.js';
 import { WorkerAnalysis } from './landmarks/worker-client.js';
 import { Analysis } from './landmarks/analysis.js';
 import { sampleOf } from './landmarks/process.js';
@@ -63,6 +63,7 @@ const els = {
   roiToggle: $('roiToggle'),
   swapToggle: $('swapToggle'),
   blendToggle: $('blendToggle'),
+  liveDelegate: $('liveDelegate'),
   fpsWarning: $('fpsWarning'),
   analysisWarning: $('analysisWarning'),
   controls: $('controls'),
@@ -444,7 +445,12 @@ const bench = createBenchmark({
 const pref = {
   get(k) { try { return localStorage.getItem(`orbicula.${k}`); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(`orbicula.${k}`, v); } catch { /* sin almacenamiento */ } },
+  remove(k) { try { localStorage.removeItem(`orbicula.${k}`); } catch { /* sin almacenamiento */ } },
 };
+
+// Si este navegador solo dio la frontal al pedir la trasera (un ordenador), se preselecciona la frontal.
+state.facing = initialFacing(pref.get('onlyFront'));
+setPressed('facing', state.facing);
 
 // Los fps solo se dan por bajos tras unos segundos estables (el arranque siempre va lento).
 let lowSince = null;
@@ -744,6 +750,9 @@ function onResult(r) {
 }
 
 /** Crea el análisis en un worker; si no puede arrancar, en el hilo principal. */
+/** Aceleradores a probar en el análisis en directo, según la preferencia (GPU por defecto). */
+const liveDelegates = () => (els.liveDelegate?.value === 'cpu' ? ['CPU'] : ['GPU', 'CPU']);
+
 async function createAnalysis() {
   const blendshapes = els.blendToggle.checked;
   // `?analysis=main` fuerza el hilo principal: sirve para comparar tiempos con y sin worker.
@@ -751,7 +760,8 @@ async function createAnalysis() {
   try {
     if (forceMain) throw new Error('forzado con ?analysis=main');
     const worker = new WorkerAnalysis();
-    await worker.load(blendshapes);
+    // Acelerador elegido para el directo (prueba de velocidad): GPU y, si falla, CPU; o solo la CPU.
+    await worker.load(blendshapes, { delegates: liveDelegates() });
     return worker;
   } catch (err) {
     console.warn('El worker de análisis no arranca, se usa el hilo principal:', err);
@@ -897,8 +907,13 @@ async function start() {
   resetMeasures(); // otra cámara u otra resolución: el reposo y las series ya no valen
   flow?.resetStrip();
   try {
+    const requested = state.facing;
     const info = await camera.start(state);
     state.running = true;
+    const cameras = (await Camera.listDevices().catch(() => null))?.length ?? null;
+    const remember = facingToRemember(requested, info.facing, !!state.deviceId, cameras);
+    if (remember === 'front') pref.set('onlyFront', 'front');
+    else if (remember === null) pref.remove('onlyFront');
     state.facing = info.facing;
     setPressed('facing', info.facing);
     state.displayMirrored = info.facing === 'front';
@@ -952,6 +967,27 @@ els.swapToggle.addEventListener('change', () => {
 });
 
 els.blendToggle.addEventListener('change', () => analysis?.setBlendshapes(els.blendToggle.checked));
+
+// Acelerador del directo: se recuerda. Cambiarlo recarga el modelo y empieza las medidas de cero (no se mezclan
+// números de la GPU y de la CPU). No mientras se graba una prueba, el protocolo o un vídeo.
+els.liveDelegate.value = pref.get('liveDelegate') === 'cpu' ? 'cpu' : 'gpu';
+els.liveDelegate.addEventListener('change', async () => {
+  const value = els.liveDelegate.value;
+  if (document.body.dataset.busy) {
+    els.liveDelegate.value = value === 'cpu' ? 'gpu' : 'cpu';
+    showError('Termina o cancela lo que está en marcha antes de cambiar el análisis.');
+    return;
+  }
+  pref.set('liveDelegate', value);
+  if (!analysis) return; // aún sin modelo: se cargará con la elección nueva
+  const old = analysis;
+  await modelPromise;
+  analysis = null;
+  modelPromise = null;
+  old.dispose();
+  resetMeasures();
+  await loadModel();
+});
 
 els.flowConfig.replaceChildren(
   ...Object.values(FLOW_CONFIGS)
