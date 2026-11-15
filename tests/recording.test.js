@@ -173,5 +173,8 @@ describe('deriva del reloj del vídeo grabado', () => {
     expect(Math.abs(alignmentLag(step(0), step(400)).lagMs - 400)).toBeLessThanOrEqual(20); // en el vídeo pasa 0,4 s más tarde
     expect(Math.abs(alignmentLag(step(0), step(-700)).lagMs + 700)).toBeLessThanOrEqual(20);
     expect(alignmentLag(step(0), step(0)).r).toBeGreaterThan(0.99);
+    // Sin nada que correlacionar (EAR plano con ruido), no se da desfase.
+    const flat = (seed) => ({ series: { t, left: { ear: t.map((x, i) => 0.3 + 0.001 * Math.sin(i * seed)) }, right: { ear: t.map(() => 0.3) } } });
+    expect(alignmentLag(flat(1.3), flat(2.7))?.lagMs ?? null).toBeNull();
   });
 });

@@ -136,10 +136,11 @@ export function mediaClock(timeline, samples, recStart) {
 /**
  * Desfase que queda entre el directo y el vídeo en un paso, correlando su EAR (izquierdo + derecho) en una
  * rejilla de 10 ms, hasta ±maxLagMs. lagMs > 0: lo que pasa en el directo aparece en el vídeo más tarde de lo
- * que lo coloca la ventana del paso (lo ideal, ~0). Para comprobar la corrección de mediaClock en cada análisis.
+ * que lo coloca la ventana del paso (lo ideal, ~0); null si la correlación es menor que minR. Para comprobar
+ * la corrección de mediaClock en cada análisis.
  * @returns {{lagMs:number, r:number} | null}
  */
-export function alignmentLag(live, video, { maxLagMs = 1500, stepMs = 10 } = {}) {
+export function alignmentLag(live, video, { maxLagMs = 1500, stepMs = 10, minR = 0.5 } = {}) {
   const grid = (s) => {
     const t = s?.series?.t ?? s?.rel ?? [];
     if (t.length < 10) return null;
@@ -181,6 +182,8 @@ export function alignmentLag(live, video, { maxLagMs = 1500, stepMs = 10 } = {})
     const r = den > 0 ? cov / den : NaN;
     if (Number.isFinite(r) && (!best || r > best.r)) best = { lagMs: lag * stepMs, r: Math.round(r * 1000) / 1000 };
   }
+  // Con poca correlación (p. ej., una fase sin parpadeos ni cierres) el desfase no dice nada: se da solo r.
+  if (best && best.r < minR) best.lagMs = null;
   return best;
 }
 

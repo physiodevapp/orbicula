@@ -338,6 +338,6 @@ Una primera prueba de 1 GPU en la rama dio 8,1 fotogramas/s; repetida, 12,6, com
 1. Al grabar, con cada trozo de 1 s de MediaRecorder se anota cuándo llegó y cuántos bytes iban (`FrameRecorder.timeline`).
 2. Al abrir el vídeo, el último fotograma entero de esos bytes dice hasta qué tiempo del vídeo se había grabado en ese instante. La diferencia (sesión − vídeo), con una mediana de 5 trozos, es la deriva.
 3. Se corrige solo lo que crece desde el principio: el desfase inicial (+0,1 s) se deja como estaba. Si los trozos no cuadran (menos de 3, o más de un 5 % de deriva), no se toca nada.
-4. **Comprobación en cada análisis:** el JSON del vídeo guarda `video.alignment` con el método, la deriva corregida y, por fase, el desfase que queda entre el EAR del directo y el del vídeo (lo ideal, ~0).
+4. **Comprobación en cada análisis:** el JSON del vídeo guarda `video.alignment` con el método, la deriva corregida y, por fase, el desfase que queda entre el EAR del directo y el del vídeo (lo ideal, ~0; vacío si la correlación es menor de 0,5, p. ej. en una fase sin parpadeos). En la nube (cara sintética) sale `chunks` con 26 trozos.
 
 **Pendiente:** un protocolo grabado en el móvil para ver `video.alignment.check`. Si el desfase que queda es fijo y distinto de 0, falta restar la latencia de entrega de cada trozo.
