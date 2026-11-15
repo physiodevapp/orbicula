@@ -153,3 +153,28 @@ describe('el resumen no cuenta las repeticiones sin cara', () => {
     expect(full.quality.noteCodes).not.toContain('reps-discarded');
   });
 });
+
+describe('fase fiable con una repetición descartada', () => {
+  const CAL = { valid: true, headStill: 0.1, ear: { left: { baseline: 0.3, noise: 0.007 }, right: { baseline: 0.3, noise: 0.007 } }, aperture: { left: { baseline: 0.3 }, right: { baseline: 0.3 } }, rise: { left: 0.03, right: 0.03 }, energy: { left: { brow: 0.1, canthus: 0.1 }, right: { brow: 0.1, canthus: 0.1 } } };
+  const rest = { ...recorded({ reps: null, ms: 20000 }), id: 'rest', calibration: CAL };
+  const q = (step) => summarizeProtocol([rest, step]).phases.soft.quality;
+
+  it('si quedan las repeticiones necesarias, no es poco fiable ni dice «se ha perdido la cara»', () => {
+    // La cara falta 4 s en la repetición 1 (el 83 % de la fase): antes salía «poco fiable».
+    const r = q(recorded({ face: lostIn(2000, 6000) }));
+    expect(r.face).toBeLessThan(0.9);
+    expect(r.reliable).toBe(true);
+    expect(r.noteCodes).toEqual(['reps-discarded']);
+  });
+
+  it('si no quedan las necesarias, sí lo es (face-lost)', () => {
+    const r = q(recorded({ face: (x) => !((x >= 2500 && x <= 4000) || (x >= 9500 && x <= 11000)) }));
+    expect(r.reliable).toBe(false);
+    expect(r.noteCodes).toContain('face-lost');
+    expect(r.noteCodes).not.toContain('reps-discarded');
+  });
+
+  it('una fase sin repeticiones sigue mirando la cara de toda la fase', () => {
+    expect(summarizeProtocol([rest, { ...recorded({ reps: null, face: lostIn(4000, 7000) }), id: 'natural' }]).phases.natural.quality.noteCodes).toContain('face-lost');
+  });
+});

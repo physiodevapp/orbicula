@@ -14,7 +14,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - **El parpadeo espontáneo y las fases de gesto se repiten una vez** si no se vio la cara: en el parpadeo, menos del 90 % del tiempo; en las demás, si no valen 2 de 3 repeticiones (una repetición vale si la cara se vio el 90 % de su ventana). En **modo seguido** se repite sola, tras dos pitidos graves y la voz diciendo por qué; sin modo seguido, suena el aviso y la pantalla de revisión permite seguir o repetir. Si falla otra vez, se sigue y el resumen la marca poco fiable.
 - **El resumen no cuenta las repeticiones sin cara** si quedan las necesarias, y lo anota (`reps-discarded`: «1 de 3 repeticiones descartada»).
 - Solo cuenta la cara no vista: la cara pequeña y la cabeza en movimiento siguen siendo notas. Taparse con la mano no se detecta como «cara perdida» (el modelo sigue detectando una cara).
-- `src/protocol/phase-quality.js`; 11 tests nuevos.
+- En las fases con repeticiones, **«poco fiable» y «se ha perdido la cara» se deciden por repeticiones**, no por la cara de toda la fase: con una repetición descartada y las buenas que hacen falta, la fase sigue siendo fiable y solo lleva la nota «reps-discarded».
+- `src/protocol/phase-quality.js`; 14 tests nuevos.
 - **La repetición espera a que acabe el aviso por voz** (antes, 7 s fijos): con el aviso aún sonando, la explicación de la fase lo cortaba y en Android a veces no llegaba a sonar. Además, entre cancelar una voz que aún habla y decir la siguiente se deja pasar un momento (150 ms).
 
 ### Corregido (protocolo grabado)

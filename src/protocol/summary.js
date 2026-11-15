@@ -237,17 +237,21 @@ function quality(step, v, cal) {
   const notes = [];
   const noteCodes = [];
   const note = (code, text) => { noteCodes.push(code); notes.push(text); };
-  if (face < SUMMARY.minFace) note('face-lost', 'se ha perdido la cara');
+  // Con repeticiones, lo que cuenta es que valgan las necesarias (phase-quality.js): si una se descartó por no verse
+  // la cara pero quedan las buenas, la fase no es poco fiable por eso (la nota «reps-discarded» lo dice). En las
+  // demás fases, la cara se vio al menos el 90 % del tiempo.
+  const u = usableReps(step);
+  const faceOk = step.reps && u.total ? assessPhase(step).ok : face >= SUMMARY.minFace;
+  if (!faceOk) note('face-lost', 'se ha perdido la cara');
   if (moving != null && moving > SUMMARY.maxHeadMoving) note('head-moving', 'la cabeza se ha movido');
   // Tamaño del ojo: solo una nota (no cambia si la fase es fiable); el umbral es provisional (face-size.js).
   const eyePx = medianEyePx(v.eyePx);
   if (isSmallFace(eyePx)) note('small-face', `cara pequeña (el ojo mide ${eyePx} px; conviene más de ${MIN_EYE_PX})`);
   // Repeticiones sin la cara a la vista: no se cuentan (usableReps), y se dice.
-  const u = usableReps(step);
   if (u.dropped) note('reps-discarded', `${u.dropped} de ${u.total} repeticiones descartada${u.dropped > 1 ? 's' : ''} (no se vio la cara)`);
   const slow = fps != null && fps < SUMMARY.unreliableFps;
   if (fps != null && fps < SUMMARY.minAnalysisFps) note('low-fps', `análisis a ${String(fps).replace('.', ',')}/s (< ${SUMMARY.minAnalysisFps})`);
-  const reliable = face >= SUMMARY.minFace && !(moving > SUMMARY.maxHeadMoving) && !slow;
+  const reliable = faceOk && !(moving > SUMMARY.maxHeadMoving) && !slow;
   return { face: r3(face), headMoving: r3(moving), analysisFps: fps, eyePx, reliable, notes, noteCodes };
 }
 
