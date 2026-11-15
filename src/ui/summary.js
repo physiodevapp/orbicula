@@ -51,7 +51,7 @@ export const ROWS = {
     ['canthusRecruit', 'Canto externo (reclutamiento)', 'times'],
   ],
   brows: [
-    ['eyeOpening', 'El ojo se abre', 'pct'],
+    ['eyeOpening', 'El ojo se abre', 'pct', 'Orientativo: cambia poco con las cejas (0–11 %) y varía entre sesiones y entre el directo y el vídeo.'],
     ['browLift', 'Subida de la ceja (DI)', 'di', 'Desplazamiento hacia arriba, en distancias intercantales.'],
     ['browPeak', 'Ceja (pico)', 'times'],
   ],

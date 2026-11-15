@@ -133,7 +133,13 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
     }
     else if (cue === 'go') { beep(880, 200); buzz(150); }
     // Reposo no válido: dos pitidos graves y la voz lo explica; el paso se repite.
-    else if (cue === 'invalid') { beep(330, 200); beep(330, 200, 0.28); buzz([200, 80, 200]); say(`El reposo no ha valido. ${INVALID_SAY[invalidKey(session.cur?.calibration)] ?? 'Quédate quieto.'} Repetimos.`); }
+    else if (cue === 'invalid') {
+      beep(330, 200); beep(330, 200, 0.28); buzz([200, 80, 200]);
+      const text = `El reposo no ha valido. ${INVALID_SAY[invalidKey(session.cur?.calibration)] ?? 'Quédate quieto.'} Repetimos.`;
+      // Como en la repetición de una fase: no empezar la cuenta atrás (cuya explicación corta la voz) hasta acabar.
+      if (session.cur && el.voice.checked) session.cur.retryPauseMs = Math.max(RETRY_PAUSE_MS, spokenPrepMs(text, 0) - 1000);
+      say(text);
+    }
     // Una fase en la que no se vio la cara: los dos pitidos graves y la voz dice por qué; en modo seguido se repite sola.
     else if (cue === 'retry') {
       beep(330, 200); beep(330, 200, 0.28); buzz([200, 80, 200]);

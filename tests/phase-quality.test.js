@@ -107,6 +107,22 @@ describe('repetir una fase en la que no se vio la cara', () => {
     expect(s.state).toBe('prep');
   });
 
+  it('un reposo no válido también puede esperar más (retryPauseMs)', () => {
+    let t = 0;
+    const steps = [{ id: 'rest', title: 'Reposo', durationMs: 1000, prepMs: 0, requireValid: true }];
+    const s = new GuidedSession(steps, { now: () => t, prepMs: 0, onStepEnd: (r) => { r.calibration = { valid: false }; } });
+    s.autoAdvanceMs = 2000;
+    s.start();
+    t = 1; s.tick();
+    t = 1001; s.tick();
+    expect(s.cur.status).toBe('invalid');
+    s.cur.retryPauseMs = 11000;
+    t = 1001 + RETRY_PAUSE_MS + 100; s.tick();
+    expect(s.state).toBe('review');
+    t = 1001 + 11000; s.tick();
+    expect(s.state).toBe('prep');
+  });
+
   it('con la cara a la vista no pasa nada', () => {
     const { s, cues, run } = make({ seguido: true });
     s.start();

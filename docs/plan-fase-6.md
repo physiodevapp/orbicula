@@ -347,3 +347,9 @@ Una primera prueba de 1 GPU en la rama dio 8,1 fotogramas/s; repetida, 12,6, com
 **Prueba con la referencia nueva (2026-11-15, P04, `06e61d0`):** deriva corregida de 1,28 s (72 trozos), casi lineal (~0,54 %). El desfase que queda: **+0,21, +0,17, +0,10, +0,08, −0,02 y −0,04 s** por fase (r 0,86–0,99), frente a ~0,5 s fijo en P03 y hasta −1,01 s sin corregir. Subida de la ceja: directo 0,153 / 0,177 DI, vídeo 0,163 / 0,194.
 - Queda una pendiente pequeña (~0,25 s en 4 min, algo de más corregido): se deja así. Para afinarla harían falta más grabaciones, y ±0,2 s no cambia las ventanas de las repeticiones (empiezan en el pitido y duran 4 s).
 - La comisura sale algo más alta en el vídeo (0,63 / 0,56 frente a 0,51 / 0,51): en directo el modo VIDEO suaviza los puntos y recorta los picos. Como con los parpadeos, compara directo con directo y vídeo con vídeo.
+
+## «El ojo se abre» al subir las cejas: directo frente a vídeo (2026-11-15)
+En P03 salía 0,08 / 0,11 en directo y 0,00 / 0,01 en el vídeo. **No es un fallo sistemático:**
+- En **P04** (con el reloj del vídeo ya bien alineado) sale ~0 en los dos: −0,004 / 0,015 en directo y 0,006 / −0,002 en el vídeo.
+- En P03, el EAR de las cejas en directo llegaba más alto (p90 0,386 frente a 0,357 en el vídeo de la misma actuación). Lo más probable es que el seguimiento del modo VIDEO arrastre un poco los puntos del párpado con la ceja; en P04 no pasó.
+- Es una medida pequeña (el ojo apenas se abre al subir las cejas) comparada con su ruido: **se marca como orientativa** en el resumen y en `schema.md`, sin cambiar el cálculo. Para la elevación de cejas, la medida fiable es la subida de la ceja por flujo (`browLift`), que sí coincide entre directo y vídeo.

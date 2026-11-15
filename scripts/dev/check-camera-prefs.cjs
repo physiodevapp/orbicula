@@ -37,12 +37,16 @@ const check = (name, ok, extra = '') => { console.log(`${ok ? 'OK ' : 'MAL'} ${n
   check('se pide la trasera y el navegador da la frontal', (await page.textContent('#camPill')).trim() === 'frontal');
   await page.reload();
   check('al volver, la frontal ya viene preseleccionada', (await pressed()) === 'front');
-  await page.evaluate(() => localStorage.setItem('test.facing', 'environment'));
+  check('y «Trasera» está desactivada (este equipo no la tiene)', await page.$eval('#startCard [data-facing="rear"]', (b) => b.disabled));
+  // Un equipo que sí da la trasera: con la frontal recordada «Trasera» está desactivada, pero al activar (pide la
+  // frontal recordada) el navegador ya informa de su lado. Se simula pidiendo y recibiendo la trasera.
+  await page.evaluate(() => { localStorage.setItem('test.facing', 'environment'); localStorage.removeItem('orbicula.onlyFront'); });
   await page.reload();
   await page.click('#startCard [data-facing="rear"]');
   await startAndWait();
   await page.reload();
   check('si alguna vez da la trasera, se olvida', (await pressed()) === 'rear');
+  check('y «Trasera» vuelve a estar activa', await page.$eval('#startCard [data-facing="rear"]', (b) => !b.disabled));
 
   // Un ordenador con una sola cámara en el que se elige «Frontal» a mano: también se recuerda.
   await page.evaluate(() => localStorage.removeItem('test.facing'));
