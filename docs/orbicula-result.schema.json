@@ -258,7 +258,7 @@
             "items": {
               "$ref": "#/$defs/coded"
             },
-            "description": "Notas de calidad: código (face-lost, head-moving, low-fps, small-face) y texto."
+            "description": "Notas de calidad: código (face-lost, head-moving, low-fps, small-face, reps-discarded) y texto."
           },
           "eyePx": {
             "type": [

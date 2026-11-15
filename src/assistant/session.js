@@ -5,6 +5,8 @@
 // Estados: idle → prep (cuenta atrás) → running (registrando) → review (el usuario anota)
 //          → siguiente paso … → done.   Se puede interrumpir, saltar o repetir un paso.
 
+import { assessPhase } from '../protocol/phase-quality.js';
+
 export const PREP_MS = 3000;
 /** Modo seguido: pausa entre el final de un paso (dos pitidos) y la cuenta atrás del siguiente. */
 export const AUTO_PAUSE_MS = 2000;
@@ -97,6 +99,8 @@ const newResult = (step, attempt) => ({
   reps: step.reps ?? null,
   wantsFlow: !!step.flow, // el plan necesita el flujo óptico (para avisar si no llega)
   calibration: null, // calibración sobre este paso (si es el reposo; fase 5)
+  phaseQuality: null, // ¿salió bien la fase? (phase-quality.js; solo los pasos que piden repetirse si falla)
+  retry: null, // { code, text, pauseMs? }: salió mal y se va a repetir (solo el primer intento; en modo seguido, solo). pauseMs: espera hasta repetir (la pone la voz: lo que tarda en decirlo)
   detections: [], // eventos de la fase 5 (src/protocol/events.js), en ms desde t0
 });
 
@@ -156,7 +160,8 @@ export class GuidedSession {
     if (this.state === 'running' && step?.reps) {
       const due = repSchedule(step.reps).filter((e) => e.at <= elapsed);
       const last = due.at(-1);
-      rep = { of: step.reps.count, k: last ? last.k + 1 : 0, holding: last?.kind === 'hold', control: last?.cond === 'control' };
+      // sinceMs: tiempo desde el último «ahora» o «suelta» (para no avisar de nada justo después de un gesto).
+      rep = { of: step.reps.count, k: last ? last.k + 1 : 0, holding: last?.kind === 'hold', control: last?.cond === 'control', sinceMs: last ? Math.round(elapsed - last.at) : null };
     }
     return { state: this.state, index: this.index, total: this.steps.length, completed: this.results.length, step, remainingMs, progress, current: this.cur, rep, autoAdvancing: this.autoAdvancing };
   }
@@ -201,9 +206,9 @@ export class GuidedSession {
   tick() {
     const t = this.now();
     if (this.autoAdvancing) {
-      const invalid = this.cur.status === 'invalid';
+      const invalid = this.cur.status === 'invalid' || !!this.cur.retry;
       // `pauseAfterMs` del paso: pausa propia (el análisis del vídeo grabado reproduce los tiempos reales).
-      if (t - this.phaseStart >= (invalid ? RETRY_PAUSE_MS : (this.step.pauseAfterMs ?? this.autoAdvanceMs))) {
+      if (t - this.phaseStart >= (invalid ? (this.cur.retry?.pauseMs ?? RETRY_PAUSE_MS) : (this.step.pauseAfterMs ?? this.autoAdvanceMs))) {
         if (invalid) this.repeat();
         else this.next();
         return;
@@ -303,9 +308,21 @@ export class GuidedSession {
     // Un paso que exige una calibración válida (el reposo del protocolo) no se da por bueno sin ella.
     const invalid = !!this.step.requireValid && this.cur.calibration && !this.cur.calibration.valid;
     if (invalid) this.cur.status = 'invalid';
+    // Una fase de gesto o de parpadeo en la que no se vio la cara: se repite una vez (y se dice por qué). Si
+    // vuelve a fallar se sigue y el resumen la marca poco fiable. Con la revisión (sin modo seguido) solo se avisa:
+    // el botón de repetir ya está.
+    let retry = false;
+    if (!invalid && this.step.retryOnFaceLoss) {
+      const q = assessPhase(this.cur);
+      this.cur.phaseQuality = { ok: q.ok, face: q.face, ...(q.reps ? { valid: q.valid, needed: q.needed, reps: q.reps.length } : {}) };
+      if (!q.ok && (this.attempts[this.cur.id] ?? 1) < 2) {
+        retry = true;
+        this.cur.retry = { code: q.code, text: q.text };
+      }
+    }
     this.state = 'review';
     this.phaseStart = this.now(); // para la pausa del modo seguido
-    this.onCue(invalid ? 'invalid' : 'end');
+    this.onCue(invalid ? 'invalid' : retry ? 'retry' : 'end');
     this.#emit();
   }
 
@@ -361,6 +378,8 @@ export class GuidedSession {
   repeat() {
     if (!['prep', 'running', 'review'].includes(this.state)) return;
     if (this.cur?.status === 'invalid') this.rejections.push({ step: this.cur.id, attempt: this.cur.attempt, calibration: this.cur.calibration, perf: this.cur.perf });
+    // Un intento descartado por no verse la cara también queda anotado (para diagnosticar).
+    else if (this.cur?.retry) this.rejections.push({ step: this.cur.id, attempt: this.cur.attempt, retry: this.cur.retry, phaseQuality: this.cur.phaseQuality, perf: this.cur.perf });
     this.#enter(this.index);
   }
 

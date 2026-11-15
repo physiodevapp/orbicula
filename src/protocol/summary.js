@@ -27,6 +27,7 @@ import { asymmetry } from '../metrics/asymmetry.js';
 import { headSpeedOf } from './events.js';
 import { spectralPeak } from './spectrum.js';
 import { medianEyePx, isSmallFace, MIN_EYE_PX } from './face-size.js';
+import { assessPhase } from './phase-quality.js';
 
 export const SIDES = ['left', 'right'];
 export const SUMMARY = {
@@ -71,6 +72,20 @@ function view(step) {
     ft: f.t ?? f.rel ?? [],
     f,
   };
+}
+
+/**
+ * Repeticiones que cuentan: sin las que no tuvieron la cara a la vista (phase-quality.js), siempre que queden
+ * las que hacen falta; si la fase entera salió mal, se usan todas (no hay nada mejor) y la nota «face-lost» avisa.
+ * @returns {{reps: {rep:number,from:number,to:number}[], dropped: number, total: number}}
+ */
+export function usableReps(step) {
+  const all = repWindows(step);
+  if (!step.reps || !all.length) return { reps: all, dropped: 0, total: all.length };
+  const q = assessPhase(step);
+  if (!q.ok || !q.reps) return { reps: all, dropped: 0, total: all.length };
+  const bad = new Set(q.reps.filter((r) => !r.ok).map((r) => r.rep));
+  return { reps: all.filter((r) => !bad.has(r.rep)), dropped: bad.size, total: all.length };
 }
 
 /** Repeticiones del paso: [{ rep, from, to }] en el reloj de las series. */
@@ -222,14 +237,21 @@ function quality(step, v, cal) {
   const notes = [];
   const noteCodes = [];
   const note = (code, text) => { noteCodes.push(code); notes.push(text); };
-  if (face < SUMMARY.minFace) note('face-lost', 'se ha perdido la cara');
+  // Con repeticiones, lo que cuenta es que valgan las necesarias (phase-quality.js): si una se descartó por no verse
+  // la cara pero quedan las buenas, la fase no es poco fiable por eso (la nota «reps-discarded» lo dice). En las
+  // demás fases, la cara se vio al menos el 90 % del tiempo.
+  const u = usableReps(step);
+  const faceOk = step.reps && u.total ? assessPhase(step).ok : face >= SUMMARY.minFace;
+  if (!faceOk) note('face-lost', 'se ha perdido la cara');
   if (moving != null && moving > SUMMARY.maxHeadMoving) note('head-moving', 'la cabeza se ha movido');
   // Tamaño del ojo: solo una nota (no cambia si la fase es fiable); el umbral es provisional (face-size.js).
   const eyePx = medianEyePx(v.eyePx);
   if (isSmallFace(eyePx)) note('small-face', `cara pequeña (el ojo mide ${eyePx} px; conviene más de ${MIN_EYE_PX})`);
+  // Repeticiones sin la cara a la vista: no se cuentan (usableReps), y se dice.
+  if (u.dropped) note('reps-discarded', `${u.dropped} de ${u.total} repeticiones descartada${u.dropped > 1 ? 's' : ''} (no se vio la cara)`);
   const slow = fps != null && fps < SUMMARY.unreliableFps;
   if (fps != null && fps < SUMMARY.minAnalysisFps) note('low-fps', `análisis a ${String(fps).replace('.', ',')}/s (< ${SUMMARY.minAnalysisFps})`);
-  const reliable = face >= SUMMARY.minFace && !(moving > SUMMARY.maxHeadMoving) && !slow;
+  const reliable = faceOk && !(moving > SUMMARY.maxHeadMoving) && !slow;
   return { face: r3(face), headMoving: r3(moving), analysisFps: fps, eyePx, reliable, notes, noteCodes };
 }
 
@@ -245,7 +267,7 @@ function eventCounts(step, side) {
 /** Métricas de un lado en una fase. */
 function sideMetrics(phase, step, v, side, cal, ctx) {
   const base = cal?.ear?.[side]?.baseline;
-  const reps = repWindows(step);
+  const reps = usableReps(step).reps;
   // En el reposo no se cuentan eventos: es la calibración.
   const out = phase === 'rest' ? {} : { ...eventCounts(step, side) };
   if (phase === 'rest' || phase === 'natural' || phase === 'free') {
@@ -329,7 +351,7 @@ export function summarizeProtocol(steps) {
   for (const side of SIDES) {
     const c = ['soft', 'forced'].filter((id) => byId[id]).map((id) => {
       const v = view(byId[id]);
-      return mean(repWindows(byId[id]).map((r) => closureIn(v, side, cal?.ear?.[side]?.baseline, r.from, r.to)));
+      return mean(usableReps(byId[id]).reps.map((r) => closureIn(v, side, cal?.ear?.[side]?.baseline, r.from, r.to)));
     });
     maxClosure[side] = maxOf(c);
   }

@@ -192,3 +192,22 @@ Recargar la página perdía un protocolo o 2 minutos de análisis de vídeo. Se 
 2. **CSV:** ¿te vale en dos archivos (cara y flujo)? Es lo más limpio, porque no comparten instantes.
 3. **Qué lleva `timeseries`:** las señales de la cara más el cierre por flujo, sin el flujo por ROI. ¿Te parece bien o quieres más?
 4. **Tokens del hub:** ¿puedo leer el repo `physiodevapp/physiq`? Lo pide `CLAUDE.md`, y es la única forma de copiar bien sus tokens.
+
+## Avisos por voz en todas las fases (2026-11-15)
+Con la cámara trasera no se mira la pantalla: en el modo seguido, el clínico no se enteraba de que se había alejado o salido del encuadre hasta el resumen. Reglas (`src/protocol/quality-voice.js`):
+- **Cara perdida:** cualquier fase y paso; a los 1,5 s; se repite cada 10 s mientras siga.
+- **Cara pequeña:** en el reposo, como antes (decide si la calibración vale, repite cada 15 s). En las demás fases, a los 3 s y **una vez por paso e intento**: los datos siguen valiendo con más ruido, y repetirlo distrae.
+- **Sin cortar el gesto:** nada entre el «ahora» y el «suelta» ni en el 1,5 s siguiente (el gesto llega ~0,5–1 s tarde). Como la app reintenta con cada resultado, el aviso sale en la pausa siguiente.
+- La voz encola el aviso tras la del paso, nunca la corta.
+
+**La prueba del 2026-11-15 (P05)** confirmó dónde llega la detección: con la mano tapando la cara en los cierres, el modelo **siguió detectando una cara** (2 muestras sin cara de 658 en el cierre fuerte, ojo de 79 px), así que el aviso de cara perdida no podía saltar. Taparse no se ve como «cara perdida»; sí funcionó con la cara fuera del encuadre (parpadeo: dos huecos de 2,4–2,6 s, avisó) y con alejarse (cejas, ojo de 47 px, avisó). No se intenta detectar «cara tapada»: se confundiría con el cierre sostenido del propio gesto. **Verificado:** tests de las reglas y `check-smallface` (el reposo sigue avisando una vez cada 15 s; la cara grande no avisa). La cara perdida en medio de una fase no se probó en el navegador (la cámara simulada siempre la ve); falta la prueba en el móvil.
+
+## Qué hacer cuando una fase sale mal (2026-11-15)
+Solo cuenta **no haber visto la cara** (`src/protocol/phase-quality.js`): es lo que el clínico puede corregir y lo que invalida la medida. La cara pequeña o la cabeza en movimiento dejan datos con más ruido, se anotan en el resumen y no hacen repetir.
+- **Parpadeo espontáneo:** vale si la cara se vio el 90 % del tiempo.
+- **Fases con repeticiones** (cierres, cejas, sonrisa): una repetición vale si la cara se vio el 90 % de su ventana (del «ahora» al «suelta» + 1 s). La fase vale si valen **2 de 3** (dos tercios si hay otro número; todas si son 1 o 2). Se mira por repetición porque en la fase entera no llama la atención: con 1,5 s sin cara en dos repeticiones de 3, la cara se vio el 88 % de toda la fase.
+- **Si no vale:** una sola repetición automática por fase. En **modo seguido** la fase se repite sola a los 7 s, tras dos pitidos graves y la voz («Cierre suave: no te he visto bien la cara (se perdió la cara en 2 de 3 repeticiones). Repetimos.»). **Sin modo seguido** suenan el aviso y la voz dice «Puedes repetirla»; la pantalla de revisión lo explica y deja seguir o repetir. Si vuelve a fallar se sigue y el resumen la marca poco fiable (`face-lost`).
+- **Si vale pero faltan repeticiones:** el resumen no cuenta las que no tuvieron cara y lo dice (`reps-discarded`: «1 de 3 repeticiones descartada»).
+- El intento descartado queda en `rejections` del JSON de diagnóstico (con `retry` y `phaseQuality`), no en el público.
+- **Descartado:** reiniciar el reloj a mitad de fase (descoloca marcas y pitidos) y añadir una repetición dentro de la fase (alarga la duración de forma impredecible y complica el orden aleatorio de contracciones y controles).
+- El reposo sigue como antes (`requireValid`: se repite hasta que valga).

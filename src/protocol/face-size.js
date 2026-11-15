@@ -33,3 +33,6 @@ export function isSmallFace(eyePx, wasSmall = false) {
 export const smallFaceText = (eyePx) => `Cara pequeña: acerca el móvil o la cara (el ojo mide ${Math.round(eyePx)} px; conviene más de ${MIN_EYE_PX}).`;
 /** Lo que dice la voz (siempre «tú»). */
 export const SMALL_FACE_SAY = 'Cara pequeña. Acércate un poco.';
+/** Si se aleja en una fase de gesto (no el reposo): un aviso más suave, una vez por fase. */
+export const SMALL_FACE_MID_SAY = 'Te has alejado. Acércate un poco.';
+export const FACE_LOST_SAY = 'No te veo. Vuelve al centro.';

@@ -26,7 +26,7 @@ import { allowedOrigins } from './integration/origins.js';
 import { createBridge } from './integration/bridge.js';
 import { parseConfig } from './integration/messages.js';
 import { featureAllowed } from './ui/wake.js';
-import { isSmallFace, smallFaceText, SMALL_FACE_SAY } from './protocol/face-size.js';
+import { isSmallFace, smallFaceText, SMALL_FACE_SAY, FACE_LOST_SAY } from './protocol/face-size.js';
 import { buildPublicResult, isValidCode } from './export/result.js';
 import { createStore } from './persistence/store.js';
 import { idbAdapter } from './persistence/idb.js';
@@ -630,7 +630,9 @@ let faceLostSince = null;
 let smallSince = null;
 let smallFace = false; // con histéresis (face-size.js): el aviso no parpadea al rondar el umbral
 let lastSmallSpoken = -Infinity;
+let lastLostSpoken = -Infinity;
 const SMALL_SPOKEN_EVERY_MS = 15000; // la voz repite el aviso como mucho cada tanto mientras siga pequeña
+const LOST_SPOKEN_EVERY_MS = 10000; // y el de cara perdida, mientras siga sin verse
 const SHOW_AFTER_MS = 1000; // un aviso de calidad solo sale si la condición se mantiene
 
 function setBar(id, valueId, frac, text) {
@@ -645,14 +647,20 @@ function updateQuality(r, now) {
   smallFace = r.face ? isSmallFace(eyePx, smallFace) : false;
   smallSince = smallFace ? (smallSince ?? now) : null;
   let msg = '';
-  if (faceLostSince && now - faceLostSince > SHOW_AFTER_MS) msg = 'No se detecta la cara. Encuádrala de frente y con buena luz.';
-  else if (smallSince && now - smallSince > SHOW_AFTER_MS) {
+  if (faceLostSince && now - faceLostSince > SHOW_AFTER_MS) {
+    msg = 'No se detecta la cara. Encuádrala de frente y con buena luz.';
+    // También por voz, en cualquier fase del protocolo (con la trasera no se mira la pantalla). Espera a que acabe
+    // el gesto en curso (quality-voice.js) y solo cuenta como «ya avisado» si habló de verdad.
+    if (now - lastLostSpoken >= LOST_SPOKEN_EVERY_MS) {
+      for (const a of [assistant, protocol]) if (a.speakWarning?.(FACE_LOST_SAY, { kind: 'lost', sustainedMs: now - faceLostSince })) lastLostSpoken = now;
+    }
+  } else if (smallSince && now - smallSince > SHOW_AFTER_MS) {
     msg = smallFaceText(eyePx);
-    // También por voz (con la cámara trasera no se mira la pantalla), solo antes y durante el reposo.
+    // También por voz: en el reposo, como siempre; en las demás fases, una vez por fase y a los 3 s (quality-voice.js).
     // Solo cuenta como «ya avisado» si habló de verdad: antes de empezar el protocolo no habla, y el aviso debe
     // salir en cuanto empiece (no 15 s después).
     if (now - lastSmallSpoken >= SMALL_SPOKEN_EVERY_MS) {
-      for (const a of [assistant, protocol]) if (a.speakWarning?.(SMALL_FACE_SAY)) lastSmallSpoken = now;
+      for (const a of [assistant, protocol]) if (a.speakWarning?.(SMALL_FACE_SAY, { kind: 'small', sustainedMs: now - smallSince })) lastSmallSpoken = now;
     }
   }
   else if (eventDetector?.last.moving && state.showFlow) msg = 'Cabeza en movimiento: quieto. Mientras tanto no se registran eventos.';

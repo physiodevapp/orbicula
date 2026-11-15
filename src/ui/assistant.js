@@ -1,10 +1,12 @@
 // Asistente de pruebas: guía paso a paso (GuidedSession), avisa sobre el vídeo con la cuenta
 // atrás y guarda el registro como un JSON que se descarga o se comparte. Todo en el
 // dispositivo: no hay ninguna llamada de red.
-import { GuidedSession, AUTO_PAUSE_MS, randomPattern } from '../assistant/session.js';
+import { GuidedSession, AUTO_PAUSE_MS, RETRY_PAUSE_MS, randomPattern } from '../assistant/session.js';
 import { PLANS, DEFAULT_PLAN, spokenPrepMs } from '../assistant/steps.js';
 import { cleanSettings, PROTOCOL_DEFAULTS } from '../protocol/steps.js';
 import { summarizeProtocol } from '../protocol/summary.js';
+import { qualityVoice } from '../protocol/quality-voice.js';
+import { SMALL_FACE_MID_SAY } from '../protocol/face-size.js';
 import { renderSummary } from './summary.js';
 import { bindCodeField, showMessage } from './code-field.js';
 import { requestWake } from './wake.js';
@@ -58,6 +60,7 @@ const mmss = (ms) => `${Math.floor(ms / 60000)}:${pad(Math.ceil((ms % 60000) / 1
  */
 export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () => {}, onStepStart = () => {}, onState = () => {}, exporter = null, prefix = 'as', rootId = 'assistant', busyKey = 'assistant', plan: fixedPlan = null }) {
   const root = $(rootId);
+  const warnedSmall = new Set(); // avisos de «cara pequeña» ya dados en las fases que no son el reposo (uno por paso)
   const P = prefix;
   const el = {
     status: $(`${P}Status`), code: $(`${P}Code`), sound: $(`${P}Sound`), auto: $(`${P}Auto`), voice: $(`${P}Voice`),
@@ -106,12 +109,19 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
     const voice = localVoice();
     if (!voice) return;
     try {
-      if (!queue) speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.voice = voice;
       u.lang = voice.lang;
       u.rate = 1.05;
-      speechSynthesis.speak(u);
+      // Chrome en Android a veces no dice lo que se pide justo después de cancelar una voz que aún hablaba: se deja
+      // pasar un momento entre cancelar y hablar (solo si había algo hablando).
+      if (!queue && (speechSynthesis.speaking || speechSynthesis.pending)) {
+        speechSynthesis.cancel();
+        setTimeout(() => { try { speechSynthesis.speak(u); } catch { /* sin voz */ } }, 150);
+      } else {
+        if (!queue) speechSynthesis.cancel();
+        speechSynthesis.speak(u);
+      }
     } catch { /* sin voz */ }
   }
 
@@ -124,6 +134,16 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
     else if (cue === 'go') { beep(880, 200); buzz(150); }
     // Reposo no válido: dos pitidos graves y la voz lo explica; el paso se repite.
     else if (cue === 'invalid') { beep(330, 200); beep(330, 200, 0.28); buzz([200, 80, 200]); say(`El reposo no ha valido. ${INVALID_SAY[invalidKey(session.cur?.calibration)] ?? 'Quédate quieto.'} Repetimos.`); }
+    // Una fase en la que no se vio la cara: los dos pitidos graves y la voz dice por qué; en modo seguido se repite sola.
+    else if (cue === 'retry') {
+      beep(330, 200); beep(330, 200, 0.28); buzz([200, 80, 200]);
+      const c = session.cur;
+      const text = `${c?.title ?? 'La fase'}: no te he visto bien la cara${c?.retry?.text ? ` (${c.retry.text})` : ''}. ${session.autoAdvanceMs != null ? 'Repetimos.' : 'Puedes repetirla.'}`;
+      // La repetición espera a que termine de decirlo: si empezara la cuenta atrás con la voz aún hablando, la
+      // explicación de la fase (que no se encola) cortaba este aviso y, en Android, a veces no llegaba a sonar.
+      if (c?.retry && el.voice.checked) c.retry.pauseMs = Math.max(RETRY_PAUSE_MS, spokenPrepMs(text, 0) - 1000);
+      say(text);
+    }
     else if (cue === 'end') { beep(660); beep(660, 130, 0.22); buzz([80, 60, 80]); }
     else if (cue === 'done') { beep(660); beep(880, 130, 0.18); beep(1100, 200, 0.36); buzz([100, 60, 100, 60, 200]); say('Prueba terminada.'); }
     // Repeticiones: agudo y largo = «ahora»; grave = «suelta».
@@ -241,8 +261,10 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
       const exp = !x ? '' : x.closures != null
         ? `Esperado: ${x.closures} cierres en cada ojo.`
         : `Esperado: I ${x.left}, D ${x.right} (parpadeos o cierres).`;
-      const auto = s.autoAdvancing ? (invalid ? 'Modo seguido: el reposo se repite solo en unos segundos.' : 'Modo seguido: el siguiente paso empieza solo.') : '';
-      el.expect.textContent = [auto, exp, s.step.hint].filter(Boolean).join(' ');
+      const retry = c.retry;
+      const auto = s.autoAdvancing ? (invalid ? 'Modo seguido: el reposo se repite solo en unos segundos.' : retry ? 'Modo seguido: la fase se repite sola en unos segundos.' : 'Modo seguido: el siguiente paso empieza solo.') : '';
+      const poor = retry ? `No se vio bien la cara: ${retry.text}.${s.autoAdvancing ? '' : ' Conviene repetir la fase.'}` : c.phaseQuality && !c.phaseQuality.ok ? 'La cara volvió a no verse bien: la fase queda marcada como poco fiable.' : '';
+      el.expect.textContent = [poor, auto, exp, s.step.hint].filter(Boolean).join(' ');
       $(`${P}Next`).disabled = invalid; // un reposo no válido no se da por bueno: hay que repetirlo
       el.countedRow.hidden = !s.step.countable;
       el.counted.value = c.user.counted ?? '';
@@ -374,14 +396,19 @@ export function createAssistant({ getContext, getPerf, onStart, onStepEnd = () =
     /** La cámara se reinició, etc.: el paso en curso queda interrumpido. */
     interrupt: (reason) => session.interrupt(reason),
     /**
-     * Aviso de calidad (p. ej. «cara pequeña»): un tono grave y la voz, solo antes y durante el reposo, que es
-     * donde el tamaño de la cara decide si la calibración vale. No corta la voz del paso. Devuelve si avisó.
+     * Aviso de calidad por voz (`kind`: 'small' = cara pequeña, 'lost' = cara perdida): un tono grave y la voz, sin
+     * cortar la del paso. Quién puede hablar y cuándo lo decide qualityVoice (src/protocol/quality-voice.js): en el
+     * reposo, como siempre; en las demás fases, la cara perdida y la pequeña (una vez por paso), nunca durante un
+     * gesto. Devuelve si avisó de verdad (si no, quien llama lo reintenta con el siguiente resultado).
      */
-    speakWarning: (text) => {
-      const s = session.snapshot();
-      if (!['prep', 'running'].includes(s.state) || !s.step?.calibrates) return false;
+    speakWarning: (text, { kind = 'small', sustainedMs = Infinity } = {}) => {
+      const snap = session.snapshot();
+      const d = qualityVoice(kind, snap, sustainedMs, warnedSmall);
+      if (!d.speak) return false;
+      if (d.key) warnedSmall.add(d.key);
       beep(260, 280); buzz(90);
-      say(text, { queue: true });
+      // «Cara pequeña» fuera del reposo: un aviso más suave («te has alejado»).
+      say(kind === 'small' && !snap.step?.calibrates ? SMALL_FACE_MID_SAY : text, { queue: true });
       return true;
     },
     /** El hub oculta orbicula: se detiene la sesión conservando lo ya hecho (como «Detener», con «Retomar sesión»). */
