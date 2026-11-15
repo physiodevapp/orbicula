@@ -4,6 +4,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Corregido (protocolo grabado)
+- **Las fases y las marcas caían cada vez más tarde en el vídeo grabado:** el reloj del MP4 de MediaRecorder se queda atrás respecto al de la sesión (~1 s en 4 min en el móvil del autor). Por eso la subida de la ceja salía más baja en el vídeo que en directo: la ceja empezaba a subir antes de la ventana de la repetición. Ahora se anota cuándo llega cada trozo de la grabación y se corrige la deriva al abrir el vídeo (`mediaClock`). El JSON del vídeo guarda `video.alignment` con la deriva corregida y, por fase, el desfase que queda entre el EAR del directo y el del vídeo, para comprobarlo.
+
 ### Añadido (sonrisa con las comisuras de la boca)
 - **La sonrisa se mide con las comisuras de la boca** (landmarks 61/291, extremos de FACEMESH_LIPS), en un sistema 3D de la propia cara y en distancias intercantales: no cambia con la distancia, la inclinación ni, en primera aproximación, el giro de la cabeza. En la fase de sonrisa, por lado: **desplazamiento** de la comisura desde su reposo (`commissure`), **subida** (`commissureLift`) y **co-activación** con el cierre del ojo (`coactivationCorner`), con su asimetría. El reposo es el de la propia fase (fuera de las repeticiones) o, si no basta, el del paso de reposo.
 - El blendshape `mouthSmile` casi satura con una sonrisa amplia y el modelo tiende a darlo simétrico; se mantiene en el JSON (`smile`, `coactivation`) por compatibilidad y en el resumen como «Sonrisa (modelo)».

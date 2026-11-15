@@ -19,6 +19,9 @@ export class FrameRecorder {
     this.chunks = [];
     this.bytes = 0;
     this.startedAt = null; // performance.now() cuando arrancó la grabación (reloj de la cámara)
+    // Llegada de cada trozo (performance.now()) y bytes acumulados: dice hasta dónde había llegado el vídeo en
+    // cada instante de la sesión, para corregir la deriva de su reloj (src/video/offline.js, mediaClock).
+    this.timeline = [];
     this.overflow = false;
     this.error = null;
   }
@@ -39,6 +42,7 @@ export class FrameRecorder {
         if (!e.data?.size) return;
         this.chunks.push(e.data);
         this.bytes += e.data.size;
+        this.timeline.push({ at: performance.now(), bytes: this.bytes });
         if (this.bytes > MAX_BYTES && rec.state === 'recording') {
           this.overflow = true;
           rec.stop();
@@ -71,6 +75,7 @@ export class FrameRecorder {
     this.chunks = [];
     this.bytes = 0;
     this.startedAt = null;
+    this.timeline = [];
     this.overflow = false;
     this.error = null;
   }

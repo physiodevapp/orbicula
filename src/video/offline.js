@@ -75,10 +75,121 @@ export function createVideoSession(steps, { onStepEnd = () => {}, onStepStart = 
  * @param {number} recStartCam instante (reloj de la cámara) en que arrancó la grabación
  * @returns {{id:string, runStart:number, runEnd:number}[]}
  */
-export function protocolWindows(results, recStartCam) {
+export function protocolWindows(results, recStartCam, map = (ms) => ms) {
   return results
     .filter((r) => r.status === 'completed' && r.t0 != null)
-    .map((r) => ({ id: r.id, runStart: r.t0 - recStartCam, runEnd: r.t0 - recStartCam + r.plannedMs }));
+    .map((r) => ({ id: r.id, runStart: map(r.t0 - recStartCam), runEnd: map(r.t0 - recStartCam + r.plannedMs) }));
+}
+
+/**
+ * Reloj del vídeo grabado frente al de la sesión. Las marcas del protocolo se colocaban en el vídeo suponiendo
+ * que su reloj avanza igual que el de la sesión, pero el MP4 de MediaRecorder en Android se va quedando atrás: en
+ * el protocolo del 2026-11-10, 1,0 s al llegar a la sonrisa (~0,5 %, a tirones), medido correlando el EAR del
+ * directo con el del vídeo. Las marcas caían tarde y, por ejemplo, la subida de la ceja empezaba antes de la
+ * ventana de la repetición (docs/plan-fase-6.md, «Deriva del reloj del vídeo grabado»).
+ *
+ * Con cada trozo que entrega MediaRecorder se anota cuándo llegó y cuántos bytes iban: el último fotograma
+ * entero de esos bytes dice hasta qué tiempo del vídeo se había grabado en ese instante de la sesión. La
+ * diferencia (sesión − vídeo), suavizada con una mediana de 5 trozos, es la deriva. Se corrige respecto a la del
+ * instante `anchorMs` (el inicio del primer paso): al arrancar, el codificador llena su cola y los primeros trozos
+ * llegan antes, y tomar el primero como referencia dejaba un desfase fijo de ~0,5 s (protocolo del 2026-11-15).
+ * En el paso de referencia el reloj queda como estaba (lo que se midió el 2026-11-10: +0,1 s).
+ * @param {{at:number, bytes:number}[]} timeline llegada de cada trozo (performance.now) y bytes acumulados
+ * @param {{byte?:number, size:number, t:number, durationMs:number}[]} samples muestras del MP4
+ * @param {number} recStart performance.now() al arrancar la grabación
+ * @param {{anchorMs?: number}} [o] instante de la sesión (desde el arranque) en que la corrección vale 0
+ * @returns {{map:(ms:number)=>number, method:'chunks'|'identity', reason?:string, points?:number, driftMs?:number, curve?:number[][]}}
+ */
+export function mediaClock(timeline, samples, recStart, { anchorMs = null } = {}) {
+  const identity = (reason) => ({ map: (ms) => ms, method: 'identity', reason });
+  if (!Array.isArray(timeline) || timeline.length < 3 || !Number.isFinite(recStart)) return identity('sin tiempos de los trozos');
+  const byByte = samples.filter((s) => Number.isFinite(s.byte)).map((s) => ({ end: s.byte + s.size, m: s.t + s.durationMs })).sort((a, b) => a.end - b.end);
+  if (byByte.length < 3) return identity('las muestras no dicen su posición en el archivo');
+  // Tiempo del vídeo alcanzado con los bytes de cada trozo (el último fotograma entero, el mayor tiempo visto).
+  const pts = [];
+  let j = -1;
+  let reached = -Infinity;
+  for (const c of timeline) {
+    while (j + 1 < byByte.length && byByte[j + 1].end <= c.bytes) reached = Math.max(reached, byByte[++j].m);
+    if (Number.isFinite(reached)) pts.push({ w: c.at - recStart, d: c.at - recStart - reached });
+  }
+  if (pts.length < 3) return identity('pocos trozos con fotogramas');
+  // Mediana móvil de 5 de la diferencia.
+  const sm = pts.map((p, i) => {
+    const win = pts.slice(Math.max(0, i - 2), i + 3).map((q) => q.d).sort((a, b) => a - b);
+    return { w: p.w, d: win[Math.floor(win.length / 2)] };
+  });
+  const dAt = (w) => {
+    if (w <= sm[0].w) return sm[0].d;
+    if (w >= sm.at(-1).w) return sm.at(-1).d;
+    let i = 1;
+    while (sm[i].w < w) i++;
+    const a = sm[i - 1];
+    const b = sm[i];
+    return a.d + ((b.d - a.d) * (w - a.w)) / (b.w - a.w || 1);
+  };
+  const d0 = Number.isFinite(anchorMs) ? dAt(anchorMs) : sm[0].d;
+  const span = sm.at(-1).w - sm[0].w;
+  const driftMs = sm.at(-1).d - d0;
+  // Más de un 5 % no es una deriva de reloj: algo no cuadra con los trozos, mejor no tocar nada.
+  if (!(span > 0) || Math.abs(driftMs) > 0.05 * span) return identity(`deriva fuera de rango (${Math.round(driftMs)} ms en ${Math.round(span)} ms)`);
+  // Curva para el diagnóstico: [instante de la sesión, corrección] cada ~5 s (ms enteros).
+  const curve = sm.filter((_, i) => i % 5 === 0 || i === sm.length - 1).map((p) => [Math.round(p.w), Math.round(p.d - d0)]);
+  return { map: (ms) => ms - (dAt(ms) - d0), method: 'chunks', points: pts.length, driftMs: Math.round(driftMs), curve };
+}
+
+/**
+ * Desfase que queda entre el directo y el vídeo en un paso, correlando su EAR (izquierdo + derecho) en una
+ * rejilla de 10 ms, hasta ±maxLagMs. lagMs > 0: lo que pasa en el directo aparece en el vídeo más tarde de lo
+ * que lo coloca la ventana del paso (lo ideal, ~0); null si la correlación es menor que minR. Para comprobar
+ * la corrección de mediaClock en cada análisis.
+ * @returns {{lagMs:number, r:number} | null}
+ */
+export function alignmentLag(live, video, { maxLagMs = 1500, stepMs = 10, minR = 0.5 } = {}) {
+  const grid = (s) => {
+    const t = s?.series?.t ?? s?.rel ?? [];
+    if (t.length < 10) return null;
+    const v = t.map((_, i) => {
+      const l = s.series?.left?.ear?.[i];
+      const r = s.series?.right?.ear?.[i];
+      return Number.isFinite(l) && Number.isFinite(r) ? (l + r) / 2 : NaN;
+    });
+    const out = [];
+    let k = 0;
+    for (let x = 0; x <= t.at(-1); x += stepMs) {
+      while (k + 1 < t.length && t[k + 1] <= x) k++;
+      const a = v[k];
+      const b = v[Math.min(k + 1, t.length - 1)];
+      const ta = t[k];
+      const tb = t[Math.min(k + 1, t.length - 1)];
+      out.push(Number.isFinite(a) && Number.isFinite(b) && tb > ta ? a + ((b - a) * (x - ta)) / (tb - ta) : Number.isFinite(a) ? a : NaN);
+    }
+    return out;
+  };
+  const a = grid(live);
+  const b = grid(video);
+  if (!a || !b) return null;
+  const n = Math.min(a.length, b.length);
+  const maxLag = Math.round(maxLagMs / stepMs);
+  let best = null;
+  for (let lag = -maxLag; lag <= maxLag; lag++) {
+    // Vídeo en x frente al directo en x − lag: si el vídeo va «tarde», casa con lag > 0.
+    let sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0, m = 0;
+    for (let x = Math.max(0, lag); x < Math.min(n, n + lag); x++) {
+      const p = a[x - lag];
+      const q = b[x];
+      if (!Number.isFinite(p) || !Number.isFinite(q)) continue;
+      sx += p; sy += q; sxx += p * p; syy += q * q; sxy += p * q; m++;
+    }
+    if (m < 50) continue;
+    const cov = sxy - (sx * sy) / m;
+    const den = Math.sqrt((sxx - (sx * sx) / m) * (syy - (sy * sy) / m));
+    const r = den > 0 ? cov / den : NaN;
+    if (Number.isFinite(r) && (!best || r > best.r)) best = { lagMs: lag * stepMs, r: Math.round(r * 1000) / 1000 };
+  }
+  // Con poca correlación (p. ej., una fase sin parpadeos ni cierres) el desfase no dice nada: se da solo r.
+  if (best && best.r < minR) best.lagMs = null;
+  return best;
 }
 
 /**

@@ -219,6 +219,7 @@ export async function openRecording(blob) {
   const cts0 = Math.min(...raw.map((x) => x.cts));
   const samples = raw.map((x, i) => ({
     offset: i,
+    byte: x.offset, // posición en el archivo: con ella se sabe en qué trozo de MediaRecorder llegó (mediaClock)
     size: x.size,
     key: !!x.is_sync,
     t: ((x.cts - cts0) * 1000) / ts,
